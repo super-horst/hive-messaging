@@ -1,0 +1,22 @@
+
+message Peer {
+
+	required string namespace		= 1;
+	required bytes publicKey		= 2;
+	optional string name			= 3;
+
+}
+
+message Envelope {
+
+	required string name			= 1;
+	//required Peer destination 		= 1;
+	//optional string senderGuid		= 2;
+	//optional bytes content			= 3;
+  
+}
+
+message Sync {
+	required bytes publicKey		= 1;
+}
+
