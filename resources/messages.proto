@@ -1,22 +1,43 @@
-
-message Peer {
-
-	required string namespace		= 1;
-	required bytes publicKey		= 2;
-	optional string name			= 3;
-
-}
-
 message Envelope {
 
-	required string name			= 1;
-	//required Peer destination 		= 1;
-	//optional string senderGuid		= 2;
-	//optional bytes content			= 3;
-  
+  enum Type {
+    UNKNOWN = 0;
+    CIPHERTEXT = 1;
+    KEY_EXCHANGE = 2;
+    PREKEY_BUNDLE = 3;
+    RECEIPT = 5;
+  }
+
+  optional Type type = 1;
+
+  // authentication
+  optional SenderCertificate client_auth = 2;
+  optional ServerCertificate server_auth = 3;
+
+  optional uint64 timestamp = 10;
+  optional bytes  content = 11; // encrypted
 }
 
-message Sync {
-	required bytes publicKey		= 1;
+message ServerCertificate {
+  message Certificate {
+    optional string uuid = 1;
+    optional string namespace = 2;
+    optional bytes identity_key = 3;
+  }
+
+  optional bytes certificate = 1;
+  optional bytes signature = 2;
 }
 
+message SenderCertificate {
+  message Certificate {
+    optional string uuid = 1;
+    optional string namespace = 2;
+    optional fixed64 expires = 3;
+    optional bytes identity_key = 4;
+    optional ServerCertificate signer = 5;
+  }
+
+  optional bytes certificate = 1;
+  optional bytes signature = 2;
+}
