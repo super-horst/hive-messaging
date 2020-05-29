@@ -188,20 +188,17 @@ mod codec_tests {
 
         let data = rmsg.write_length_delimited_to_bytes().unwrap();
         let mut bytes = BytesMut::new();
-
-        // complete message
-        bytes.extend_from_slice(&data[..]);
+        let mut codec = EnvelopeCodec::new();
 
         // incomplete message
         bytes.extend_from_slice(&data[0..2]);
-
-        let mut codec = EnvelopeCodec::new();
-
         let _result = codec.decode(&mut bytes);
 
         // incomplete message remains
         assert_eq!(bytes.len(), 2);
+        // result is Ok but None
         assert!(_result.is_ok());
+        assert!(_result.unwrap().is_none());
 
         // remaining message
         bytes.extend_from_slice(&data[2..]);
@@ -209,6 +206,7 @@ mod codec_tests {
 
         assert!(bytes.is_empty());
         assert!(_result.is_ok());
+        assert!(_result.unwrap().is_some());
     }
 
     #[test]
@@ -253,6 +251,7 @@ mod codec_tests {
                 }
             }
             Err(e) => {
+                eprintln!("{}", e);
                 panic!(e)
             }
         }
