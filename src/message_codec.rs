@@ -2,17 +2,16 @@ use std::io;
 use std::fmt;
 use std::error;
 
-use bytes::BytesMut;
+use bytes::{ Buf, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
 
-use protobuf::Message;
+use protobuf::{Message as protobuf_msg_for_fns, CodedInputStream};
 use crate::messages::*;
 
-const PROTOBUF_MARKER: u8 = 0x0a;
+const VARINT_THRESHOLD: u8 = 0x80;
 
 pub mod encoding {
     use super::*;
-    use bytes::Buf;
 
     #[derive(Debug)]
     pub enum CodecError {
@@ -57,6 +56,12 @@ pub mod encoding {
         }
     }
 
+    impl From<protobuf::ProtobufError> for CodecError {
+        fn from(err: protobuf::ProtobufError) -> Self {
+            CodecError::InvalidMessageError(err)
+        }
+    }
+
     /// Codec implementing tokio_util::codec ... for Envelope protobuf message
     #[derive(Debug)]
     pub struct EnvelopeCodec {}
@@ -71,8 +76,8 @@ pub mod encoding {
         type Error = CodecError;
 
         fn encode(&mut self, item: Envelope, dst: &mut BytesMut) -> Result<(), CodecError> {
-            //to_bytes
-            let bytes = item.write_to_bytes();
+            // keep length delimited
+            let bytes = item.write_length_delimited_to_bytes();
             match bytes {
                 Ok(b) => {
                     dst.extend(b);
@@ -88,46 +93,56 @@ pub mod encoding {
         type Error = CodecError;
 
         fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-            while src.remaining() >= 1 && PROTOBUF_MARKER != src.bytes()[0] {
-                src.advance(1);
+            // length delimited protobuf is prefixed by a length varint,
+            // this counts all bytes of the encoded length
+            let mut i: usize = 0;
+            for &byte in &src[..] {
+                i += 1;
+                if byte < VARINT_THRESHOLD {
+                    break;
+                }
             }
 
-            if src.remaining() < 2 {
+            if i >= src.remaining() {
+                // incomplete message
                 return Ok(None);
             }
 
-            // get length from protobuf message + offset
-            let length = src.bytes()[1] as usize + 2;
+            // get encoded message length
+            let length: usize;
+            match CodedInputStream::from_bytes(&src[..i]).read_raw_varint64() {
+                Ok(msg_len) => length = msg_len as usize + i,
+                Err(e) => return Err(CodecError::from(e)),
+            }
 
             if src.remaining() < length {
+                // incomplete message
                 return Ok(None);
             }
 
             // single message
-            let mut msg_buffer = src.split_to(length);
-            let proto_result = protobuf::parse_from_bytes(&msg_buffer);
+            let msg_buffer = src.split_to(length).freeze();
+            let mut stream = CodedInputStream::from_carllerche_bytes(&msg_buffer);
 
-            match proto_result {
-                Ok(v) => Ok(Some(v)),
-                Err(e) => Err(CodecError::InvalidMessageError(e))
-            }
+            return match stream.read_message() {
+                Ok(parsed) => Ok(Some(parsed)),
+                Err(e) => Err(CodecError::from(e)),
+            };
         }
     }
 }
 
 #[cfg(test)]
-mod tests {
-    static NAME: &'static str = "Name1";
-
+mod codec_tests {
     use super::*;
     use super::encoding::*;
 
     #[test]
     fn test_decode() {
         let mut rmsg = Envelope::new();
-        rmsg.set_name(NAME.to_string());
+        rmsg.set_field_type(Envelope_Type::RECEIPT);
 
-        let data = rmsg.write_to_bytes().unwrap();
+        let data = rmsg.write_length_delimited_to_bytes().unwrap();
 
         let mut bytes = BytesMut::new();
         bytes.extend_from_slice(&data[..]);
@@ -140,11 +155,12 @@ mod tests {
                 match v {
                     None => panic!("Decoder did not return a message"),
                     Some(message) => {
-                        assert_eq!(NAME.to_string(), message.get_name());
+                        assert_eq!(Envelope_Type::RECEIPT, message.get_field_type());
                     }
                 }
             }
             Err(e) => {
+                eprintln!("{}", e);
                 panic!(e)
             }
         }
@@ -153,9 +169,9 @@ mod tests {
     #[test]
     fn test_decode_cleanup() {
         let mut rmsg = Envelope::new();
-        rmsg.set_name(NAME.to_string());
+        rmsg.set_field_type(Envelope_Type::RECEIPT);
 
-        let data = rmsg.write_to_bytes().unwrap();
+        let data = rmsg.write_length_delimited_to_bytes().unwrap();
         let mut bytes = BytesMut::new();
         bytes.extend_from_slice(&data[..]);
         let mut codec = EnvelopeCodec::new();
@@ -168,9 +184,9 @@ mod tests {
     #[test]
     fn test_decode_incomplete() {
         let mut rmsg = Envelope::new();
-        rmsg.set_name(NAME.to_string());
+        rmsg.set_field_type(Envelope_Type::RECEIPT);
 
-        let data = rmsg.write_to_bytes().unwrap();
+        let data = rmsg.write_length_delimited_to_bytes().unwrap();
         let mut bytes = BytesMut::new();
 
         // complete message
@@ -198,38 +214,41 @@ mod tests {
     #[test]
     fn test_encode() {
         let mut rmsg = Envelope::new();
-        rmsg.set_name(NAME.to_string());
+        rmsg.set_field_type(Envelope_Type::RECEIPT);
+        //rmsg.set_client(SenderCertificate::new());
 
         let mut bytes = BytesMut::new();
         let mut codec = EnvelopeCodec::new();
         let _result = codec.encode(rmsg, &mut bytes);
         assert!(_result.is_ok());
 
-        let proto_result = protobuf::parse_from_bytes(&bytes[..]);
+        let b = bytes.split().freeze();
+
+        let proto_result = CodedInputStream::from_carllerche_bytes(&b).read_message();
 
         assert!(proto_result.is_ok());
         let message: Envelope = proto_result.unwrap();
-        assert_eq!(NAME.to_string(), message.get_name());
+        assert_eq!(Envelope_Type::RECEIPT, message.get_field_type());
     }
 
     #[test]
     fn test_roundtrip() {
         let mut rmsg = Envelope::new();
-        rmsg.set_name(NAME.to_string());
+        rmsg.set_field_type(Envelope_Type::RECEIPT);
 
         let mut bytes = BytesMut::new();
         let mut codec = EnvelopeCodec::new();
         let _result = codec.encode(rmsg, &mut bytes);
         assert!(_result.is_ok());
 
-        let recycled =  codec.decode(&mut bytes);
+        let recycled = codec.decode(&mut bytes);
 
         match recycled {
             Ok(v) => {
                 match v {
                     None => panic!("Decoder did not return a message"),
                     Some(message) => {
-                        assert_eq!(NAME.to_string(), message.get_name());
+                        assert_eq!(Envelope_Type::RECEIPT, message.get_field_type());
                     }
                 }
             }
