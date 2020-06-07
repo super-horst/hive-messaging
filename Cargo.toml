@@ -9,15 +9,22 @@ build = "build.rs"
 
 [dependencies]
 bytes = "0.5.4"
+log = "0.4.8"
+simple_logger = "1.6.0"
 
 tokio = { version = "0.2", features = ["full"] }
 tokio-util = { version = "0.3.1", features = ["codec"] }
+tokio-postgres = "0.5.4"
+async-trait = "0.1.33"
+
 futures = "0.3"
+dashmap = "3.11.4"
 
 error-chain = "0.12.2"
 
 protobuf = { version = "2.14", features = ["with-bytes"] }
 base64 = "0.12.0"
+uuid = { version = "0.8.1", features = ["v4"] }
 
 # crypto
 rand = "0.6"
