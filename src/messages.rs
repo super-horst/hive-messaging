@@ -29,11 +29,13 @@ use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 #[derive(PartialEq,Clone,Default)]
 pub struct Envelope {
     // message fields
+    cmd: ::std::option::Option<Envelope_Command>,
     field_type: ::std::option::Option<Envelope_Type>,
+    peer: ::protobuf::SingularPtrField<Peer>,
     client_auth: ::protobuf::SingularPtrField<SenderCertificate>,
     server_auth: ::protobuf::SingularPtrField<ServerCertificate>,
     timestamp: ::std::option::Option<u64>,
-    content: ::protobuf::SingularField<::std::vec::Vec<u8>>,
+    content: ::protobuf::SingularPtrField<Payload>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -50,11 +52,30 @@ impl Envelope {
         ::std::default::Default::default()
     }
 
-    // optional .Envelope.Type type = 1;
+    // optional .Envelope.Command cmd = 1;
+
+
+    pub fn get_cmd(&self) -> Envelope_Command {
+        self.cmd.unwrap_or(Envelope_Command::UNKNOWN_CMD)
+    }
+    pub fn clear_cmd(&mut self) {
+        self.cmd = ::std::option::Option::None;
+    }
+
+    pub fn has_cmd(&self) -> bool {
+        self.cmd.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_cmd(&mut self, v: Envelope_Command) {
+        self.cmd = ::std::option::Option::Some(v);
+    }
+
+    // optional .Envelope.Type type = 2;
 
 
     pub fn get_field_type(&self) -> Envelope_Type {
-        self.field_type.unwrap_or(Envelope_Type::UNKNOWN)
+        self.field_type.unwrap_or(Envelope_Type::UNKNOWN_TYPE)
     }
     pub fn clear_field_type(&mut self) {
         self.field_type = ::std::option::Option::None;
@@ -69,7 +90,40 @@ impl Envelope {
         self.field_type = ::std::option::Option::Some(v);
     }
 
-    // optional .SenderCertificate client_auth = 2;
+    // optional .Peer peer = 3;
+
+
+    pub fn get_peer(&self) -> &Peer {
+        self.peer.as_ref().unwrap_or_else(|| Peer::default_instance())
+    }
+    pub fn clear_peer(&mut self) {
+        self.peer.clear();
+    }
+
+    pub fn has_peer(&self) -> bool {
+        self.peer.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_peer(&mut self, v: Peer) {
+        self.peer = ::protobuf::SingularPtrField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_peer(&mut self) -> &mut Peer {
+        if self.peer.is_none() {
+            self.peer.set_default();
+        }
+        self.peer.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_peer(&mut self) -> Peer {
+        self.peer.take().unwrap_or_else(|| Peer::new())
+    }
+
+    // optional .SenderCertificate client_auth = 5;
 
 
     pub fn get_client_auth(&self) -> &SenderCertificate {
@@ -102,7 +156,7 @@ impl Envelope {
         self.client_auth.take().unwrap_or_else(|| SenderCertificate::new())
     }
 
-    // optional .ServerCertificate server_auth = 3;
+    // optional .ServerCertificate server_auth = 6;
 
 
     pub fn get_server_auth(&self) -> &ServerCertificate {
@@ -154,14 +208,11 @@ impl Envelope {
         self.timestamp = ::std::option::Option::Some(v);
     }
 
-    // optional bytes content = 11;
+    // optional .Payload content = 11;
 
 
-    pub fn get_content(&self) -> &[u8] {
-        match self.content.as_ref() {
-            Some(v) => &v,
-            None => &[],
-        }
+    pub fn get_content(&self) -> &Payload {
+        self.content.as_ref().unwrap_or_else(|| Payload::default_instance())
     }
     pub fn clear_content(&mut self) {
         self.content.clear();
@@ -172,13 +223,13 @@ impl Envelope {
     }
 
     // Param is passed by value, moved
-    pub fn set_content(&mut self, v: ::std::vec::Vec<u8>) {
-        self.content = ::protobuf::SingularField::some(v);
+    pub fn set_content(&mut self, v: Payload) {
+        self.content = ::protobuf::SingularPtrField::some(v);
     }
 
     // Mutable pointer to the field.
     // If field is not initialized, it is initialized with default value first.
-    pub fn mut_content(&mut self) -> &mut ::std::vec::Vec<u8> {
+    pub fn mut_content(&mut self) -> &mut Payload {
         if self.content.is_none() {
             self.content.set_default();
         }
@@ -186,19 +237,29 @@ impl Envelope {
     }
 
     // Take field
-    pub fn take_content(&mut self) -> ::std::vec::Vec<u8> {
-        self.content.take().unwrap_or_else(|| ::std::vec::Vec::new())
+    pub fn take_content(&mut self) -> Payload {
+        self.content.take().unwrap_or_else(|| Payload::new())
     }
 }
 
 impl ::protobuf::Message for Envelope {
     fn is_initialized(&self) -> bool {
+        for v in &self.peer {
+            if !v.is_initialized() {
+                return false;
+            }
+        };
         for v in &self.client_auth {
             if !v.is_initialized() {
                 return false;
             }
         };
         for v in &self.server_auth {
+            if !v.is_initialized() {
+                return false;
+            }
+        };
+        for v in &self.content {
             if !v.is_initialized() {
                 return false;
             }
@@ -211,12 +272,18 @@ impl ::protobuf::Message for Envelope {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.field_type, 1, &mut self.unknown_fields)?
+                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.cmd, 1, &mut self.unknown_fields)?
                 },
                 2 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.client_auth)?;
+                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.field_type, 2, &mut self.unknown_fields)?
                 },
                 3 => {
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.peer)?;
+                },
+                5 => {
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.client_auth)?;
+                },
+                6 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.server_auth)?;
                 },
                 10 => {
@@ -227,7 +294,7 @@ impl ::protobuf::Message for Envelope {
                     self.timestamp = ::std::option::Option::Some(tmp);
                 },
                 11 => {
-                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.content)?;
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.content)?;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -241,8 +308,15 @@ impl ::protobuf::Message for Envelope {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if let Some(v) = self.field_type {
+        if let Some(v) = self.cmd {
             my_size += ::protobuf::rt::enum_size(1, v);
+        }
+        if let Some(v) = self.field_type {
+            my_size += ::protobuf::rt::enum_size(2, v);
+        }
+        if let Some(ref v) = self.peer.as_ref() {
+            let len = v.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         }
         if let Some(ref v) = self.client_auth.as_ref() {
             let len = v.compute_size();
@@ -256,7 +330,8 @@ impl ::protobuf::Message for Envelope {
             my_size += ::protobuf::rt::value_size(10, v, ::protobuf::wire_format::WireTypeVarint);
         }
         if let Some(ref v) = self.content.as_ref() {
-            my_size += ::protobuf::rt::bytes_size(11, &v);
+            let len = v.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -264,16 +339,24 @@ impl ::protobuf::Message for Envelope {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        if let Some(v) = self.field_type {
+        if let Some(v) = self.cmd {
             os.write_enum(1, v.value())?;
         }
+        if let Some(v) = self.field_type {
+            os.write_enum(2, v.value())?;
+        }
+        if let Some(ref v) = self.peer.as_ref() {
+            os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
+        }
         if let Some(ref v) = self.client_auth.as_ref() {
-            os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_tag(5, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
         }
         if let Some(ref v) = self.server_auth.as_ref() {
-            os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_tag(6, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
         }
@@ -281,7 +364,9 @@ impl ::protobuf::Message for Envelope {
             os.write_uint64(10, v)?;
         }
         if let Some(ref v) = self.content.as_ref() {
-            os.write_bytes(11, &v)?;
+            os.write_tag(11, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -322,10 +407,20 @@ impl ::protobuf::Message for Envelope {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<Envelope_Command>>(
+                    "cmd",
+                    |m: &Envelope| { &m.cmd },
+                    |m: &mut Envelope| { &mut m.cmd },
+                ));
                 fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<Envelope_Type>>(
                     "type",
                     |m: &Envelope| { &m.field_type },
                     |m: &mut Envelope| { &mut m.field_type },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Peer>>(
+                    "peer",
+                    |m: &Envelope| { &m.peer },
+                    |m: &mut Envelope| { &mut m.peer },
                 ));
                 fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<SenderCertificate>>(
                     "client_auth",
@@ -342,7 +437,7 @@ impl ::protobuf::Message for Envelope {
                     |m: &Envelope| { &m.timestamp },
                     |m: &mut Envelope| { &mut m.timestamp },
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Payload>>(
                     "content",
                     |m: &Envelope| { &m.content },
                     |m: &mut Envelope| { &mut m.content },
@@ -366,7 +461,9 @@ impl ::protobuf::Message for Envelope {
 
 impl ::protobuf::Clear for Envelope {
     fn clear(&mut self) {
+        self.cmd = ::std::option::Option::None;
         self.field_type = ::std::option::Option::None;
+        self.peer.clear();
         self.client_auth.clear();
         self.server_auth.clear();
         self.timestamp = ::std::option::Option::None;
@@ -388,11 +485,70 @@ impl ::protobuf::reflect::ProtobufValue for Envelope {
 }
 
 #[derive(Clone,PartialEq,Eq,Debug,Hash)]
+pub enum Envelope_Command {
+    UNKNOWN_CMD = 0,
+    PUBLISH = 1,
+    REQUEST = 2,
+    SEND = 3,
+}
+
+impl ::protobuf::ProtobufEnum for Envelope_Command {
+    fn value(&self) -> i32 {
+        *self as i32
+    }
+
+    fn from_i32(value: i32) -> ::std::option::Option<Envelope_Command> {
+        match value {
+            0 => ::std::option::Option::Some(Envelope_Command::UNKNOWN_CMD),
+            1 => ::std::option::Option::Some(Envelope_Command::PUBLISH),
+            2 => ::std::option::Option::Some(Envelope_Command::REQUEST),
+            3 => ::std::option::Option::Some(Envelope_Command::SEND),
+            _ => ::std::option::Option::None
+        }
+    }
+
+    fn values() -> &'static [Self] {
+        static values: &'static [Envelope_Command] = &[
+            Envelope_Command::UNKNOWN_CMD,
+            Envelope_Command::PUBLISH,
+            Envelope_Command::REQUEST,
+            Envelope_Command::SEND,
+        ];
+        values
+    }
+
+    fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy::INIT;
+        unsafe {
+            descriptor.get(|| {
+                ::protobuf::reflect::EnumDescriptor::new_pb_name::<Envelope_Command>("Envelope.Command", file_descriptor_proto())
+            })
+        }
+    }
+}
+
+impl ::std::marker::Copy for Envelope_Command {
+}
+
+impl ::std::default::Default for Envelope_Command {
+    fn default() -> Self {
+        Envelope_Command::UNKNOWN_CMD
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for Envelope_Command {
+    fn as_ref(&self) -> ::protobuf::reflect::ReflectValueRef {
+        ::protobuf::reflect::ReflectValueRef::Enum(self.descriptor())
+    }
+}
+
+#[derive(Clone,PartialEq,Eq,Debug,Hash)]
 pub enum Envelope_Type {
-    UNKNOWN = 0,
+    UNKNOWN_TYPE = 0,
     CIPHERTEXT = 1,
     KEY_EXCHANGE = 2,
     PREKEY_BUNDLE = 3,
+    ATTESTATION = 4,
     RECEIPT = 5,
 }
 
@@ -403,10 +559,11 @@ impl ::protobuf::ProtobufEnum for Envelope_Type {
 
     fn from_i32(value: i32) -> ::std::option::Option<Envelope_Type> {
         match value {
-            0 => ::std::option::Option::Some(Envelope_Type::UNKNOWN),
+            0 => ::std::option::Option::Some(Envelope_Type::UNKNOWN_TYPE),
             1 => ::std::option::Option::Some(Envelope_Type::CIPHERTEXT),
             2 => ::std::option::Option::Some(Envelope_Type::KEY_EXCHANGE),
             3 => ::std::option::Option::Some(Envelope_Type::PREKEY_BUNDLE),
+            4 => ::std::option::Option::Some(Envelope_Type::ATTESTATION),
             5 => ::std::option::Option::Some(Envelope_Type::RECEIPT),
             _ => ::std::option::Option::None
         }
@@ -414,10 +571,11 @@ impl ::protobuf::ProtobufEnum for Envelope_Type {
 
     fn values() -> &'static [Self] {
         static values: &'static [Envelope_Type] = &[
-            Envelope_Type::UNKNOWN,
+            Envelope_Type::UNKNOWN_TYPE,
             Envelope_Type::CIPHERTEXT,
             Envelope_Type::KEY_EXCHANGE,
             Envelope_Type::PREKEY_BUNDLE,
+            Envelope_Type::ATTESTATION,
             Envelope_Type::RECEIPT,
         ];
         values
@@ -438,7 +596,7 @@ impl ::std::marker::Copy for Envelope_Type {
 
 impl ::std::default::Default for Envelope_Type {
     fn default() -> Self {
-        Envelope_Type::UNKNOWN
+        Envelope_Type::UNKNOWN_TYPE
     }
 }
 
@@ -678,7 +836,7 @@ pub struct ServerCertificate_Certificate {
     // message fields
     uuid: ::protobuf::SingularField<::std::string::String>,
     namespace: ::protobuf::SingularField<::std::string::String>,
-    identity_key: ::protobuf::SingularField<::std::vec::Vec<u8>>,
+    identity: ::protobuf::SingularField<::std::vec::Vec<u8>>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -767,40 +925,40 @@ impl ServerCertificate_Certificate {
         self.namespace.take().unwrap_or_else(|| ::std::string::String::new())
     }
 
-    // optional bytes identity_key = 3;
+    // optional bytes identity = 3;
 
 
-    pub fn get_identity_key(&self) -> &[u8] {
-        match self.identity_key.as_ref() {
+    pub fn get_identity(&self) -> &[u8] {
+        match self.identity.as_ref() {
             Some(v) => &v,
             None => &[],
         }
     }
-    pub fn clear_identity_key(&mut self) {
-        self.identity_key.clear();
+    pub fn clear_identity(&mut self) {
+        self.identity.clear();
     }
 
-    pub fn has_identity_key(&self) -> bool {
-        self.identity_key.is_some()
+    pub fn has_identity(&self) -> bool {
+        self.identity.is_some()
     }
 
     // Param is passed by value, moved
-    pub fn set_identity_key(&mut self, v: ::std::vec::Vec<u8>) {
-        self.identity_key = ::protobuf::SingularField::some(v);
+    pub fn set_identity(&mut self, v: ::std::vec::Vec<u8>) {
+        self.identity = ::protobuf::SingularField::some(v);
     }
 
     // Mutable pointer to the field.
     // If field is not initialized, it is initialized with default value first.
-    pub fn mut_identity_key(&mut self) -> &mut ::std::vec::Vec<u8> {
-        if self.identity_key.is_none() {
-            self.identity_key.set_default();
+    pub fn mut_identity(&mut self) -> &mut ::std::vec::Vec<u8> {
+        if self.identity.is_none() {
+            self.identity.set_default();
         }
-        self.identity_key.as_mut().unwrap()
+        self.identity.as_mut().unwrap()
     }
 
     // Take field
-    pub fn take_identity_key(&mut self) -> ::std::vec::Vec<u8> {
-        self.identity_key.take().unwrap_or_else(|| ::std::vec::Vec::new())
+    pub fn take_identity(&mut self) -> ::std::vec::Vec<u8> {
+        self.identity.take().unwrap_or_else(|| ::std::vec::Vec::new())
     }
 }
 
@@ -820,7 +978,7 @@ impl ::protobuf::Message for ServerCertificate_Certificate {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.namespace)?;
                 },
                 3 => {
-                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.identity_key)?;
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.identity)?;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -840,7 +998,7 @@ impl ::protobuf::Message for ServerCertificate_Certificate {
         if let Some(ref v) = self.namespace.as_ref() {
             my_size += ::protobuf::rt::string_size(2, &v);
         }
-        if let Some(ref v) = self.identity_key.as_ref() {
+        if let Some(ref v) = self.identity.as_ref() {
             my_size += ::protobuf::rt::bytes_size(3, &v);
         }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
@@ -855,7 +1013,7 @@ impl ::protobuf::Message for ServerCertificate_Certificate {
         if let Some(ref v) = self.namespace.as_ref() {
             os.write_string(2, &v)?;
         }
-        if let Some(ref v) = self.identity_key.as_ref() {
+        if let Some(ref v) = self.identity.as_ref() {
             os.write_bytes(3, &v)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
@@ -908,9 +1066,9 @@ impl ::protobuf::Message for ServerCertificate_Certificate {
                     |m: &mut ServerCertificate_Certificate| { &mut m.namespace },
                 ));
                 fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "identity_key",
-                    |m: &ServerCertificate_Certificate| { &m.identity_key },
-                    |m: &mut ServerCertificate_Certificate| { &mut m.identity_key },
+                    "identity",
+                    |m: &ServerCertificate_Certificate| { &m.identity },
+                    |m: &mut ServerCertificate_Certificate| { &mut m.identity },
                 ));
                 ::protobuf::reflect::MessageDescriptor::new_pb_name::<ServerCertificate_Certificate>(
                     "ServerCertificate.Certificate",
@@ -933,7 +1091,7 @@ impl ::protobuf::Clear for ServerCertificate_Certificate {
     fn clear(&mut self) {
         self.uuid.clear();
         self.namespace.clear();
-        self.identity_key.clear();
+        self.identity.clear();
         self.unknown_fields.clear();
     }
 }
@@ -1181,7 +1339,7 @@ pub struct SenderCertificate_Certificate {
     uuid: ::protobuf::SingularField<::std::string::String>,
     namespace: ::protobuf::SingularField<::std::string::String>,
     expires: ::std::option::Option<u64>,
-    identity_key: ::protobuf::SingularField<::std::vec::Vec<u8>>,
+    identity: ::protobuf::SingularField<::std::vec::Vec<u8>>,
     signer: ::protobuf::SingularPtrField<ServerCertificate>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
@@ -1290,40 +1448,40 @@ impl SenderCertificate_Certificate {
         self.expires = ::std::option::Option::Some(v);
     }
 
-    // optional bytes identity_key = 4;
+    // optional bytes identity = 4;
 
 
-    pub fn get_identity_key(&self) -> &[u8] {
-        match self.identity_key.as_ref() {
+    pub fn get_identity(&self) -> &[u8] {
+        match self.identity.as_ref() {
             Some(v) => &v,
             None => &[],
         }
     }
-    pub fn clear_identity_key(&mut self) {
-        self.identity_key.clear();
+    pub fn clear_identity(&mut self) {
+        self.identity.clear();
     }
 
-    pub fn has_identity_key(&self) -> bool {
-        self.identity_key.is_some()
+    pub fn has_identity(&self) -> bool {
+        self.identity.is_some()
     }
 
     // Param is passed by value, moved
-    pub fn set_identity_key(&mut self, v: ::std::vec::Vec<u8>) {
-        self.identity_key = ::protobuf::SingularField::some(v);
+    pub fn set_identity(&mut self, v: ::std::vec::Vec<u8>) {
+        self.identity = ::protobuf::SingularField::some(v);
     }
 
     // Mutable pointer to the field.
     // If field is not initialized, it is initialized with default value first.
-    pub fn mut_identity_key(&mut self) -> &mut ::std::vec::Vec<u8> {
-        if self.identity_key.is_none() {
-            self.identity_key.set_default();
+    pub fn mut_identity(&mut self) -> &mut ::std::vec::Vec<u8> {
+        if self.identity.is_none() {
+            self.identity.set_default();
         }
-        self.identity_key.as_mut().unwrap()
+        self.identity.as_mut().unwrap()
     }
 
     // Take field
-    pub fn take_identity_key(&mut self) -> ::std::vec::Vec<u8> {
-        self.identity_key.take().unwrap_or_else(|| ::std::vec::Vec::new())
+    pub fn take_identity(&mut self) -> ::std::vec::Vec<u8> {
+        self.identity.take().unwrap_or_else(|| ::std::vec::Vec::new())
     }
 
     // optional .ServerCertificate signer = 5;
@@ -1388,7 +1546,7 @@ impl ::protobuf::Message for SenderCertificate_Certificate {
                     self.expires = ::std::option::Option::Some(tmp);
                 },
                 4 => {
-                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.identity_key)?;
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.identity)?;
                 },
                 5 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.signer)?;
@@ -1414,7 +1572,7 @@ impl ::protobuf::Message for SenderCertificate_Certificate {
         if let Some(v) = self.expires {
             my_size += 9;
         }
-        if let Some(ref v) = self.identity_key.as_ref() {
+        if let Some(ref v) = self.identity.as_ref() {
             my_size += ::protobuf::rt::bytes_size(4, &v);
         }
         if let Some(ref v) = self.signer.as_ref() {
@@ -1436,7 +1594,7 @@ impl ::protobuf::Message for SenderCertificate_Certificate {
         if let Some(v) = self.expires {
             os.write_fixed64(3, v)?;
         }
-        if let Some(ref v) = self.identity_key.as_ref() {
+        if let Some(ref v) = self.identity.as_ref() {
             os.write_bytes(4, &v)?;
         }
         if let Some(ref v) = self.signer.as_ref() {
@@ -1499,9 +1657,9 @@ impl ::protobuf::Message for SenderCertificate_Certificate {
                     |m: &mut SenderCertificate_Certificate| { &mut m.expires },
                 ));
                 fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "identity_key",
-                    |m: &SenderCertificate_Certificate| { &m.identity_key },
-                    |m: &mut SenderCertificate_Certificate| { &mut m.identity_key },
+                    "identity",
+                    |m: &SenderCertificate_Certificate| { &m.identity },
+                    |m: &mut SenderCertificate_Certificate| { &mut m.identity },
                 ));
                 fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<ServerCertificate>>(
                     "signer",
@@ -1530,7 +1688,7 @@ impl ::protobuf::Clear for SenderCertificate_Certificate {
         self.uuid.clear();
         self.namespace.clear();
         self.expires = ::std::option::Option::None;
-        self.identity_key.clear();
+        self.identity.clear();
         self.signer.clear();
         self.unknown_fields.clear();
     }
@@ -1548,25 +1706,1493 @@ impl ::protobuf::reflect::ProtobufValue for SenderCertificate_Certificate {
     }
 }
 
+#[derive(PartialEq,Clone,Default)]
+pub struct Peer {
+    // message fields
+    namespace: ::protobuf::SingularField<::std::string::String>,
+    identity: ::protobuf::SingularField<::std::vec::Vec<u8>>,
+    name: ::protobuf::SingularField<::std::string::String>,
+    // special fields
+    pub unknown_fields: ::protobuf::UnknownFields,
+    pub cached_size: ::protobuf::CachedSize,
+}
+
+impl<'a> ::std::default::Default for &'a Peer {
+    fn default() -> &'a Peer {
+        <Peer as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl Peer {
+    pub fn new() -> Peer {
+        ::std::default::Default::default()
+    }
+
+    // optional string namespace = 1;
+
+
+    pub fn get_namespace(&self) -> &str {
+        match self.namespace.as_ref() {
+            Some(v) => &v,
+            None => "",
+        }
+    }
+    pub fn clear_namespace(&mut self) {
+        self.namespace.clear();
+    }
+
+    pub fn has_namespace(&self) -> bool {
+        self.namespace.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_namespace(&mut self, v: ::std::string::String) {
+        self.namespace = ::protobuf::SingularField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_namespace(&mut self) -> &mut ::std::string::String {
+        if self.namespace.is_none() {
+            self.namespace.set_default();
+        }
+        self.namespace.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_namespace(&mut self) -> ::std::string::String {
+        self.namespace.take().unwrap_or_else(|| ::std::string::String::new())
+    }
+
+    // optional bytes identity = 2;
+
+
+    pub fn get_identity(&self) -> &[u8] {
+        match self.identity.as_ref() {
+            Some(v) => &v,
+            None => &[],
+        }
+    }
+    pub fn clear_identity(&mut self) {
+        self.identity.clear();
+    }
+
+    pub fn has_identity(&self) -> bool {
+        self.identity.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_identity(&mut self, v: ::std::vec::Vec<u8>) {
+        self.identity = ::protobuf::SingularField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_identity(&mut self) -> &mut ::std::vec::Vec<u8> {
+        if self.identity.is_none() {
+            self.identity.set_default();
+        }
+        self.identity.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_identity(&mut self) -> ::std::vec::Vec<u8> {
+        self.identity.take().unwrap_or_else(|| ::std::vec::Vec::new())
+    }
+
+    // optional string name = 3;
+
+
+    pub fn get_name(&self) -> &str {
+        match self.name.as_ref() {
+            Some(v) => &v,
+            None => "",
+        }
+    }
+    pub fn clear_name(&mut self) {
+        self.name.clear();
+    }
+
+    pub fn has_name(&self) -> bool {
+        self.name.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_name(&mut self, v: ::std::string::String) {
+        self.name = ::protobuf::SingularField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_name(&mut self) -> &mut ::std::string::String {
+        if self.name.is_none() {
+            self.name.set_default();
+        }
+        self.name.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_name(&mut self) -> ::std::string::String {
+        self.name.take().unwrap_or_else(|| ::std::string::String::new())
+    }
+}
+
+impl ::protobuf::Message for Peer {
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                1 => {
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.namespace)?;
+                },
+                2 => {
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.identity)?;
+                },
+                3 => {
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.name)?;
+                },
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        if let Some(ref v) = self.namespace.as_ref() {
+            my_size += ::protobuf::rt::string_size(1, &v);
+        }
+        if let Some(ref v) = self.identity.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(2, &v);
+        }
+        if let Some(ref v) = self.name.as_ref() {
+            my_size += ::protobuf::rt::string_size(3, &v);
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        if let Some(ref v) = self.namespace.as_ref() {
+            os.write_string(1, &v)?;
+        }
+        if let Some(ref v) = self.identity.as_ref() {
+            os.write_bytes(2, &v)?;
+        }
+        if let Some(ref v) = self.name.as_ref() {
+            os.write_string(3, &v)?;
+        }
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &dyn (::std::any::Any) {
+        self as &dyn (::std::any::Any)
+    }
+    fn as_any_mut(&mut self) -> &mut dyn (::std::any::Any) {
+        self as &mut dyn (::std::any::Any)
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<dyn (::std::any::Any)> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        Self::descriptor_static()
+    }
+
+    fn new() -> Peer {
+        Peer::new()
+    }
+
+    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy::INIT;
+        unsafe {
+            descriptor.get(|| {
+                let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "namespace",
+                    |m: &Peer| { &m.namespace },
+                    |m: &mut Peer| { &mut m.namespace },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
+                    "identity",
+                    |m: &Peer| { &m.identity },
+                    |m: &mut Peer| { &mut m.identity },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "name",
+                    |m: &Peer| { &m.name },
+                    |m: &mut Peer| { &mut m.name },
+                ));
+                ::protobuf::reflect::MessageDescriptor::new_pb_name::<Peer>(
+                    "Peer",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+
+    fn default_instance() -> &'static Peer {
+        static mut instance: ::protobuf::lazy::Lazy<Peer> = ::protobuf::lazy::Lazy::INIT;
+        unsafe {
+            instance.get(Peer::new)
+        }
+    }
+}
+
+impl ::protobuf::Clear for Peer {
+    fn clear(&mut self) {
+        self.namespace.clear();
+        self.identity.clear();
+        self.name.clear();
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for Peer {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for Peer {
+    fn as_ref(&self) -> ::protobuf::reflect::ReflectValueRef {
+        ::protobuf::reflect::ReflectValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
+pub struct Payload {
+    // message fields
+    ciphertext: ::protobuf::SingularField<::std::vec::Vec<u8>>,
+    key_ex: ::protobuf::SingularPtrField<KeyExchange>,
+    pre_key: ::protobuf::SingularPtrField<PreKeyBundle>,
+    receipt: ::protobuf::SingularPtrField<Receipt>,
+    // special fields
+    pub unknown_fields: ::protobuf::UnknownFields,
+    pub cached_size: ::protobuf::CachedSize,
+}
+
+impl<'a> ::std::default::Default for &'a Payload {
+    fn default() -> &'a Payload {
+        <Payload as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl Payload {
+    pub fn new() -> Payload {
+        ::std::default::Default::default()
+    }
+
+    // optional bytes ciphertext = 1;
+
+
+    pub fn get_ciphertext(&self) -> &[u8] {
+        match self.ciphertext.as_ref() {
+            Some(v) => &v,
+            None => &[],
+        }
+    }
+    pub fn clear_ciphertext(&mut self) {
+        self.ciphertext.clear();
+    }
+
+    pub fn has_ciphertext(&self) -> bool {
+        self.ciphertext.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_ciphertext(&mut self, v: ::std::vec::Vec<u8>) {
+        self.ciphertext = ::protobuf::SingularField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_ciphertext(&mut self) -> &mut ::std::vec::Vec<u8> {
+        if self.ciphertext.is_none() {
+            self.ciphertext.set_default();
+        }
+        self.ciphertext.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_ciphertext(&mut self) -> ::std::vec::Vec<u8> {
+        self.ciphertext.take().unwrap_or_else(|| ::std::vec::Vec::new())
+    }
+
+    // optional .KeyExchange key_ex = 2;
+
+
+    pub fn get_key_ex(&self) -> &KeyExchange {
+        self.key_ex.as_ref().unwrap_or_else(|| KeyExchange::default_instance())
+    }
+    pub fn clear_key_ex(&mut self) {
+        self.key_ex.clear();
+    }
+
+    pub fn has_key_ex(&self) -> bool {
+        self.key_ex.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_key_ex(&mut self, v: KeyExchange) {
+        self.key_ex = ::protobuf::SingularPtrField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_key_ex(&mut self) -> &mut KeyExchange {
+        if self.key_ex.is_none() {
+            self.key_ex.set_default();
+        }
+        self.key_ex.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_key_ex(&mut self) -> KeyExchange {
+        self.key_ex.take().unwrap_or_else(|| KeyExchange::new())
+    }
+
+    // optional .PreKeyBundle pre_key = 3;
+
+
+    pub fn get_pre_key(&self) -> &PreKeyBundle {
+        self.pre_key.as_ref().unwrap_or_else(|| PreKeyBundle::default_instance())
+    }
+    pub fn clear_pre_key(&mut self) {
+        self.pre_key.clear();
+    }
+
+    pub fn has_pre_key(&self) -> bool {
+        self.pre_key.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_pre_key(&mut self, v: PreKeyBundle) {
+        self.pre_key = ::protobuf::SingularPtrField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_pre_key(&mut self) -> &mut PreKeyBundle {
+        if self.pre_key.is_none() {
+            self.pre_key.set_default();
+        }
+        self.pre_key.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_pre_key(&mut self) -> PreKeyBundle {
+        self.pre_key.take().unwrap_or_else(|| PreKeyBundle::new())
+    }
+
+    // optional .Receipt receipt = 4;
+
+
+    pub fn get_receipt(&self) -> &Receipt {
+        self.receipt.as_ref().unwrap_or_else(|| Receipt::default_instance())
+    }
+    pub fn clear_receipt(&mut self) {
+        self.receipt.clear();
+    }
+
+    pub fn has_receipt(&self) -> bool {
+        self.receipt.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_receipt(&mut self, v: Receipt) {
+        self.receipt = ::protobuf::SingularPtrField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_receipt(&mut self) -> &mut Receipt {
+        if self.receipt.is_none() {
+            self.receipt.set_default();
+        }
+        self.receipt.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_receipt(&mut self) -> Receipt {
+        self.receipt.take().unwrap_or_else(|| Receipt::new())
+    }
+}
+
+impl ::protobuf::Message for Payload {
+    fn is_initialized(&self) -> bool {
+        for v in &self.key_ex {
+            if !v.is_initialized() {
+                return false;
+            }
+        };
+        for v in &self.pre_key {
+            if !v.is_initialized() {
+                return false;
+            }
+        };
+        for v in &self.receipt {
+            if !v.is_initialized() {
+                return false;
+            }
+        };
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                1 => {
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.ciphertext)?;
+                },
+                2 => {
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.key_ex)?;
+                },
+                3 => {
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.pre_key)?;
+                },
+                4 => {
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.receipt)?;
+                },
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        if let Some(ref v) = self.ciphertext.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(1, &v);
+        }
+        if let Some(ref v) = self.key_ex.as_ref() {
+            let len = v.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
+        }
+        if let Some(ref v) = self.pre_key.as_ref() {
+            let len = v.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
+        }
+        if let Some(ref v) = self.receipt.as_ref() {
+            let len = v.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        if let Some(ref v) = self.ciphertext.as_ref() {
+            os.write_bytes(1, &v)?;
+        }
+        if let Some(ref v) = self.key_ex.as_ref() {
+            os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
+        }
+        if let Some(ref v) = self.pre_key.as_ref() {
+            os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
+        }
+        if let Some(ref v) = self.receipt.as_ref() {
+            os.write_tag(4, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
+        }
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &dyn (::std::any::Any) {
+        self as &dyn (::std::any::Any)
+    }
+    fn as_any_mut(&mut self) -> &mut dyn (::std::any::Any) {
+        self as &mut dyn (::std::any::Any)
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<dyn (::std::any::Any)> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        Self::descriptor_static()
+    }
+
+    fn new() -> Payload {
+        Payload::new()
+    }
+
+    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy::INIT;
+        unsafe {
+            descriptor.get(|| {
+                let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
+                    "ciphertext",
+                    |m: &Payload| { &m.ciphertext },
+                    |m: &mut Payload| { &mut m.ciphertext },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<KeyExchange>>(
+                    "key_ex",
+                    |m: &Payload| { &m.key_ex },
+                    |m: &mut Payload| { &mut m.key_ex },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<PreKeyBundle>>(
+                    "pre_key",
+                    |m: &Payload| { &m.pre_key },
+                    |m: &mut Payload| { &mut m.pre_key },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Receipt>>(
+                    "receipt",
+                    |m: &Payload| { &m.receipt },
+                    |m: &mut Payload| { &mut m.receipt },
+                ));
+                ::protobuf::reflect::MessageDescriptor::new_pb_name::<Payload>(
+                    "Payload",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+
+    fn default_instance() -> &'static Payload {
+        static mut instance: ::protobuf::lazy::Lazy<Payload> = ::protobuf::lazy::Lazy::INIT;
+        unsafe {
+            instance.get(Payload::new)
+        }
+    }
+}
+
+impl ::protobuf::Clear for Payload {
+    fn clear(&mut self) {
+        self.ciphertext.clear();
+        self.key_ex.clear();
+        self.pre_key.clear();
+        self.receipt.clear();
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for Payload {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for Payload {
+    fn as_ref(&self) -> ::protobuf::reflect::ReflectValueRef {
+        ::protobuf::reflect::ReflectValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
+pub struct KeyExchange {
+    // message fields
+    source: ::protobuf::SingularPtrField<Peer>,
+    target: ::protobuf::SingularPtrField<Peer>,
+    one_time_prekey: ::protobuf::SingularField<::std::vec::Vec<u8>>,
+    // special fields
+    pub unknown_fields: ::protobuf::UnknownFields,
+    pub cached_size: ::protobuf::CachedSize,
+}
+
+impl<'a> ::std::default::Default for &'a KeyExchange {
+    fn default() -> &'a KeyExchange {
+        <KeyExchange as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl KeyExchange {
+    pub fn new() -> KeyExchange {
+        ::std::default::Default::default()
+    }
+
+    // optional .Peer source = 1;
+
+
+    pub fn get_source(&self) -> &Peer {
+        self.source.as_ref().unwrap_or_else(|| Peer::default_instance())
+    }
+    pub fn clear_source(&mut self) {
+        self.source.clear();
+    }
+
+    pub fn has_source(&self) -> bool {
+        self.source.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_source(&mut self, v: Peer) {
+        self.source = ::protobuf::SingularPtrField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_source(&mut self) -> &mut Peer {
+        if self.source.is_none() {
+            self.source.set_default();
+        }
+        self.source.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_source(&mut self) -> Peer {
+        self.source.take().unwrap_or_else(|| Peer::new())
+    }
+
+    // optional .Peer target = 2;
+
+
+    pub fn get_target(&self) -> &Peer {
+        self.target.as_ref().unwrap_or_else(|| Peer::default_instance())
+    }
+    pub fn clear_target(&mut self) {
+        self.target.clear();
+    }
+
+    pub fn has_target(&self) -> bool {
+        self.target.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_target(&mut self, v: Peer) {
+        self.target = ::protobuf::SingularPtrField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_target(&mut self) -> &mut Peer {
+        if self.target.is_none() {
+            self.target.set_default();
+        }
+        self.target.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_target(&mut self) -> Peer {
+        self.target.take().unwrap_or_else(|| Peer::new())
+    }
+
+    // optional bytes one_time_prekey = 5;
+
+
+    pub fn get_one_time_prekey(&self) -> &[u8] {
+        match self.one_time_prekey.as_ref() {
+            Some(v) => &v,
+            None => &[],
+        }
+    }
+    pub fn clear_one_time_prekey(&mut self) {
+        self.one_time_prekey.clear();
+    }
+
+    pub fn has_one_time_prekey(&self) -> bool {
+        self.one_time_prekey.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_one_time_prekey(&mut self, v: ::std::vec::Vec<u8>) {
+        self.one_time_prekey = ::protobuf::SingularField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_one_time_prekey(&mut self) -> &mut ::std::vec::Vec<u8> {
+        if self.one_time_prekey.is_none() {
+            self.one_time_prekey.set_default();
+        }
+        self.one_time_prekey.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_one_time_prekey(&mut self) -> ::std::vec::Vec<u8> {
+        self.one_time_prekey.take().unwrap_or_else(|| ::std::vec::Vec::new())
+    }
+}
+
+impl ::protobuf::Message for KeyExchange {
+    fn is_initialized(&self) -> bool {
+        for v in &self.source {
+            if !v.is_initialized() {
+                return false;
+            }
+        };
+        for v in &self.target {
+            if !v.is_initialized() {
+                return false;
+            }
+        };
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                1 => {
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.source)?;
+                },
+                2 => {
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.target)?;
+                },
+                5 => {
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.one_time_prekey)?;
+                },
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        if let Some(ref v) = self.source.as_ref() {
+            let len = v.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
+        }
+        if let Some(ref v) = self.target.as_ref() {
+            let len = v.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
+        }
+        if let Some(ref v) = self.one_time_prekey.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(5, &v);
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        if let Some(ref v) = self.source.as_ref() {
+            os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
+        }
+        if let Some(ref v) = self.target.as_ref() {
+            os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
+        }
+        if let Some(ref v) = self.one_time_prekey.as_ref() {
+            os.write_bytes(5, &v)?;
+        }
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &dyn (::std::any::Any) {
+        self as &dyn (::std::any::Any)
+    }
+    fn as_any_mut(&mut self) -> &mut dyn (::std::any::Any) {
+        self as &mut dyn (::std::any::Any)
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<dyn (::std::any::Any)> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        Self::descriptor_static()
+    }
+
+    fn new() -> KeyExchange {
+        KeyExchange::new()
+    }
+
+    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy::INIT;
+        unsafe {
+            descriptor.get(|| {
+                let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Peer>>(
+                    "source",
+                    |m: &KeyExchange| { &m.source },
+                    |m: &mut KeyExchange| { &mut m.source },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Peer>>(
+                    "target",
+                    |m: &KeyExchange| { &m.target },
+                    |m: &mut KeyExchange| { &mut m.target },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
+                    "one_time_prekey",
+                    |m: &KeyExchange| { &m.one_time_prekey },
+                    |m: &mut KeyExchange| { &mut m.one_time_prekey },
+                ));
+                ::protobuf::reflect::MessageDescriptor::new_pb_name::<KeyExchange>(
+                    "KeyExchange",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+
+    fn default_instance() -> &'static KeyExchange {
+        static mut instance: ::protobuf::lazy::Lazy<KeyExchange> = ::protobuf::lazy::Lazy::INIT;
+        unsafe {
+            instance.get(KeyExchange::new)
+        }
+    }
+}
+
+impl ::protobuf::Clear for KeyExchange {
+    fn clear(&mut self) {
+        self.source.clear();
+        self.target.clear();
+        self.one_time_prekey.clear();
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for KeyExchange {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for KeyExchange {
+    fn as_ref(&self) -> ::protobuf::reflect::ReflectValueRef {
+        ::protobuf::reflect::ReflectValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
+pub struct PreKeyBundle {
+    // message fields
+    identity: ::protobuf::SingularField<::std::vec::Vec<u8>>,
+    prekey: ::protobuf::SingularField<::std::vec::Vec<u8>>,
+    prekey_signature: ::protobuf::SingularField<::std::vec::Vec<u8>>,
+    one_time_prekey: ::protobuf::RepeatedField<::std::vec::Vec<u8>>,
+    // special fields
+    pub unknown_fields: ::protobuf::UnknownFields,
+    pub cached_size: ::protobuf::CachedSize,
+}
+
+impl<'a> ::std::default::Default for &'a PreKeyBundle {
+    fn default() -> &'a PreKeyBundle {
+        <PreKeyBundle as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl PreKeyBundle {
+    pub fn new() -> PreKeyBundle {
+        ::std::default::Default::default()
+    }
+
+    // optional bytes identity = 1;
+
+
+    pub fn get_identity(&self) -> &[u8] {
+        match self.identity.as_ref() {
+            Some(v) => &v,
+            None => &[],
+        }
+    }
+    pub fn clear_identity(&mut self) {
+        self.identity.clear();
+    }
+
+    pub fn has_identity(&self) -> bool {
+        self.identity.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_identity(&mut self, v: ::std::vec::Vec<u8>) {
+        self.identity = ::protobuf::SingularField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_identity(&mut self) -> &mut ::std::vec::Vec<u8> {
+        if self.identity.is_none() {
+            self.identity.set_default();
+        }
+        self.identity.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_identity(&mut self) -> ::std::vec::Vec<u8> {
+        self.identity.take().unwrap_or_else(|| ::std::vec::Vec::new())
+    }
+
+    // optional bytes prekey = 2;
+
+
+    pub fn get_prekey(&self) -> &[u8] {
+        match self.prekey.as_ref() {
+            Some(v) => &v,
+            None => &[],
+        }
+    }
+    pub fn clear_prekey(&mut self) {
+        self.prekey.clear();
+    }
+
+    pub fn has_prekey(&self) -> bool {
+        self.prekey.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_prekey(&mut self, v: ::std::vec::Vec<u8>) {
+        self.prekey = ::protobuf::SingularField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_prekey(&mut self) -> &mut ::std::vec::Vec<u8> {
+        if self.prekey.is_none() {
+            self.prekey.set_default();
+        }
+        self.prekey.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_prekey(&mut self) -> ::std::vec::Vec<u8> {
+        self.prekey.take().unwrap_or_else(|| ::std::vec::Vec::new())
+    }
+
+    // optional bytes prekey_signature = 3;
+
+
+    pub fn get_prekey_signature(&self) -> &[u8] {
+        match self.prekey_signature.as_ref() {
+            Some(v) => &v,
+            None => &[],
+        }
+    }
+    pub fn clear_prekey_signature(&mut self) {
+        self.prekey_signature.clear();
+    }
+
+    pub fn has_prekey_signature(&self) -> bool {
+        self.prekey_signature.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_prekey_signature(&mut self, v: ::std::vec::Vec<u8>) {
+        self.prekey_signature = ::protobuf::SingularField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_prekey_signature(&mut self) -> &mut ::std::vec::Vec<u8> {
+        if self.prekey_signature.is_none() {
+            self.prekey_signature.set_default();
+        }
+        self.prekey_signature.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_prekey_signature(&mut self) -> ::std::vec::Vec<u8> {
+        self.prekey_signature.take().unwrap_or_else(|| ::std::vec::Vec::new())
+    }
+
+    // repeated bytes one_time_prekey = 10;
+
+
+    pub fn get_one_time_prekey(&self) -> &[::std::vec::Vec<u8>] {
+        &self.one_time_prekey
+    }
+    pub fn clear_one_time_prekey(&mut self) {
+        self.one_time_prekey.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_one_time_prekey(&mut self, v: ::protobuf::RepeatedField<::std::vec::Vec<u8>>) {
+        self.one_time_prekey = v;
+    }
+
+    // Mutable pointer to the field.
+    pub fn mut_one_time_prekey(&mut self) -> &mut ::protobuf::RepeatedField<::std::vec::Vec<u8>> {
+        &mut self.one_time_prekey
+    }
+
+    // Take field
+    pub fn take_one_time_prekey(&mut self) -> ::protobuf::RepeatedField<::std::vec::Vec<u8>> {
+        ::std::mem::replace(&mut self.one_time_prekey, ::protobuf::RepeatedField::new())
+    }
+}
+
+impl ::protobuf::Message for PreKeyBundle {
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                1 => {
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.identity)?;
+                },
+                2 => {
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.prekey)?;
+                },
+                3 => {
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.prekey_signature)?;
+                },
+                10 => {
+                    ::protobuf::rt::read_repeated_bytes_into(wire_type, is, &mut self.one_time_prekey)?;
+                },
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        if let Some(ref v) = self.identity.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(1, &v);
+        }
+        if let Some(ref v) = self.prekey.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(2, &v);
+        }
+        if let Some(ref v) = self.prekey_signature.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(3, &v);
+        }
+        for value in &self.one_time_prekey {
+            my_size += ::protobuf::rt::bytes_size(10, &value);
+        };
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        if let Some(ref v) = self.identity.as_ref() {
+            os.write_bytes(1, &v)?;
+        }
+        if let Some(ref v) = self.prekey.as_ref() {
+            os.write_bytes(2, &v)?;
+        }
+        if let Some(ref v) = self.prekey_signature.as_ref() {
+            os.write_bytes(3, &v)?;
+        }
+        for v in &self.one_time_prekey {
+            os.write_bytes(10, &v)?;
+        };
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &dyn (::std::any::Any) {
+        self as &dyn (::std::any::Any)
+    }
+    fn as_any_mut(&mut self) -> &mut dyn (::std::any::Any) {
+        self as &mut dyn (::std::any::Any)
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<dyn (::std::any::Any)> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        Self::descriptor_static()
+    }
+
+    fn new() -> PreKeyBundle {
+        PreKeyBundle::new()
+    }
+
+    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy::INIT;
+        unsafe {
+            descriptor.get(|| {
+                let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
+                    "identity",
+                    |m: &PreKeyBundle| { &m.identity },
+                    |m: &mut PreKeyBundle| { &mut m.identity },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
+                    "prekey",
+                    |m: &PreKeyBundle| { &m.prekey },
+                    |m: &mut PreKeyBundle| { &mut m.prekey },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
+                    "prekey_signature",
+                    |m: &PreKeyBundle| { &m.prekey_signature },
+                    |m: &mut PreKeyBundle| { &mut m.prekey_signature },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
+                    "one_time_prekey",
+                    |m: &PreKeyBundle| { &m.one_time_prekey },
+                    |m: &mut PreKeyBundle| { &mut m.one_time_prekey },
+                ));
+                ::protobuf::reflect::MessageDescriptor::new_pb_name::<PreKeyBundle>(
+                    "PreKeyBundle",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+
+    fn default_instance() -> &'static PreKeyBundle {
+        static mut instance: ::protobuf::lazy::Lazy<PreKeyBundle> = ::protobuf::lazy::Lazy::INIT;
+        unsafe {
+            instance.get(PreKeyBundle::new)
+        }
+    }
+}
+
+impl ::protobuf::Clear for PreKeyBundle {
+    fn clear(&mut self) {
+        self.identity.clear();
+        self.prekey.clear();
+        self.prekey_signature.clear();
+        self.one_time_prekey.clear();
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for PreKeyBundle {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for PreKeyBundle {
+    fn as_ref(&self) -> ::protobuf::reflect::ReflectValueRef {
+        ::protobuf::reflect::ReflectValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
+pub struct Receipt {
+    // message fields
+    uuid: ::protobuf::SingularField<::std::string::String>,
+    signature: ::protobuf::SingularField<::std::vec::Vec<u8>>,
+    // special fields
+    pub unknown_fields: ::protobuf::UnknownFields,
+    pub cached_size: ::protobuf::CachedSize,
+}
+
+impl<'a> ::std::default::Default for &'a Receipt {
+    fn default() -> &'a Receipt {
+        <Receipt as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl Receipt {
+    pub fn new() -> Receipt {
+        ::std::default::Default::default()
+    }
+
+    // optional string uuid = 1;
+
+
+    pub fn get_uuid(&self) -> &str {
+        match self.uuid.as_ref() {
+            Some(v) => &v,
+            None => "",
+        }
+    }
+    pub fn clear_uuid(&mut self) {
+        self.uuid.clear();
+    }
+
+    pub fn has_uuid(&self) -> bool {
+        self.uuid.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_uuid(&mut self, v: ::std::string::String) {
+        self.uuid = ::protobuf::SingularField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_uuid(&mut self) -> &mut ::std::string::String {
+        if self.uuid.is_none() {
+            self.uuid.set_default();
+        }
+        self.uuid.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_uuid(&mut self) -> ::std::string::String {
+        self.uuid.take().unwrap_or_else(|| ::std::string::String::new())
+    }
+
+    // optional bytes signature = 2;
+
+
+    pub fn get_signature(&self) -> &[u8] {
+        match self.signature.as_ref() {
+            Some(v) => &v,
+            None => &[],
+        }
+    }
+    pub fn clear_signature(&mut self) {
+        self.signature.clear();
+    }
+
+    pub fn has_signature(&self) -> bool {
+        self.signature.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_signature(&mut self, v: ::std::vec::Vec<u8>) {
+        self.signature = ::protobuf::SingularField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_signature(&mut self) -> &mut ::std::vec::Vec<u8> {
+        if self.signature.is_none() {
+            self.signature.set_default();
+        }
+        self.signature.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_signature(&mut self) -> ::std::vec::Vec<u8> {
+        self.signature.take().unwrap_or_else(|| ::std::vec::Vec::new())
+    }
+}
+
+impl ::protobuf::Message for Receipt {
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                1 => {
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.uuid)?;
+                },
+                2 => {
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.signature)?;
+                },
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        if let Some(ref v) = self.uuid.as_ref() {
+            my_size += ::protobuf::rt::string_size(1, &v);
+        }
+        if let Some(ref v) = self.signature.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(2, &v);
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        if let Some(ref v) = self.uuid.as_ref() {
+            os.write_string(1, &v)?;
+        }
+        if let Some(ref v) = self.signature.as_ref() {
+            os.write_bytes(2, &v)?;
+        }
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &dyn (::std::any::Any) {
+        self as &dyn (::std::any::Any)
+    }
+    fn as_any_mut(&mut self) -> &mut dyn (::std::any::Any) {
+        self as &mut dyn (::std::any::Any)
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<dyn (::std::any::Any)> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        Self::descriptor_static()
+    }
+
+    fn new() -> Receipt {
+        Receipt::new()
+    }
+
+    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy::INIT;
+        unsafe {
+            descriptor.get(|| {
+                let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "uuid",
+                    |m: &Receipt| { &m.uuid },
+                    |m: &mut Receipt| { &mut m.uuid },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
+                    "signature",
+                    |m: &Receipt| { &m.signature },
+                    |m: &mut Receipt| { &mut m.signature },
+                ));
+                ::protobuf::reflect::MessageDescriptor::new_pb_name::<Receipt>(
+                    "Receipt",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+
+    fn default_instance() -> &'static Receipt {
+        static mut instance: ::protobuf::lazy::Lazy<Receipt> = ::protobuf::lazy::Lazy::INIT;
+        unsafe {
+            instance.get(Receipt::new)
+        }
+    }
+}
+
+impl ::protobuf::Clear for Receipt {
+    fn clear(&mut self) {
+        self.uuid.clear();
+        self.signature.clear();
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for Receipt {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for Receipt {
+    fn as_ref(&self) -> ::protobuf::reflect::ReflectValueRef {
+        ::protobuf::reflect::ReflectValueRef::Message(self)
+    }
+}
+
 static file_descriptor_proto_data: &'static [u8] = b"\
-    \n\x0emessages.proto\x12\0\"\x83\x02\n\x08Envelope\x12\x1e\n\x04type\x18\
-    \x01\x20\x01(\x0e2\x0e.Envelope.TypeB\0\x12)\n\x0bclient_auth\x18\x02\
-    \x20\x01(\x0b2\x12.SenderCertificateB\0\x12)\n\x0bserver_auth\x18\x03\
-    \x20\x01(\x0b2\x12.ServerCertificateB\0\x12\x13\n\ttimestamp\x18\n\x20\
-    \x01(\x04B\0\x12\x11\n\x07content\x18\x0b\x20\x01(\x0cB\0\"W\n\x04Type\
-    \x12\x0b\n\x07UNKNOWN\x10\0\x12\x0e\n\nCIPHERTEXT\x10\x01\x12\x10\n\x0cK\
-    EY_EXCHANGE\x10\x02\x12\x11\n\rPREKEY_BUNDLE\x10\x03\x12\x0b\n\x07RECEIP\
-    T\x10\x05\x1a\0:\0\"\x8f\x01\n\x11ServerCertificate\x12\x15\n\x0bcertifi\
-    cate\x18\x01\x20\x01(\x0cB\0\x12\x13\n\tsignature\x18\x02\x20\x01(\x0cB\
-    \0\x1aL\n\x0bCertificate\x12\x0e\n\x04uuid\x18\x01\x20\x01(\tB\0\x12\x13\
-    \n\tnamespace\x18\x02\x20\x01(\tB\0\x12\x16\n\x0cidentity_key\x18\x03\
-    \x20\x01(\x0cB\0:\0:\0\"\xc9\x01\n\x11SenderCertificate\x12\x15\n\x0bcer\
-    tificate\x18\x01\x20\x01(\x0cB\0\x12\x13\n\tsignature\x18\x02\x20\x01(\
-    \x0cB\0\x1a\x85\x01\n\x0bCertificate\x12\x0e\n\x04uuid\x18\x01\x20\x01(\
-    \tB\0\x12\x13\n\tnamespace\x18\x02\x20\x01(\tB\0\x12\x11\n\x07expires\
-    \x18\x03\x20\x01(\x06B\0\x12\x16\n\x0cidentity_key\x18\x04\x20\x01(\x0cB\
-    \0\x12$\n\x06signer\x18\x05\x20\x01(\x0b2\x12.ServerCertificateB\0:\0:\0\
-    B\0b\x06proto2\
+    \n\x0emessages.proto\x12\0\"\x9e\x03\n\x08Envelope\x12\x20\n\x03cmd\x18\
+    \x01\x20\x01(\x0e2\x11.Envelope.CommandB\0\x12\x1e\n\x04type\x18\x02\x20\
+    \x01(\x0e2\x0e.Envelope.TypeB\0\x12\x15\n\x04peer\x18\x03\x20\x01(\x0b2\
+    \x05.PeerB\0\x12)\n\x0bclient_auth\x18\x05\x20\x01(\x0b2\x12.SenderCerti\
+    ficateB\0\x12)\n\x0bserver_auth\x18\x06\x20\x01(\x0b2\x12.ServerCertific\
+    ateB\0\x12\x13\n\ttimestamp\x18\n\x20\x01(\x04B\0\x12\x1b\n\x07content\
+    \x18\x0b\x20\x01(\x0b2\x08.PayloadB\0\"@\n\x07Command\x12\x0f\n\x0bUNKNO\
+    WN_CMD\x10\0\x12\x0b\n\x07PUBLISH\x10\x01\x12\x0b\n\x07REQUEST\x10\x02\
+    \x12\x08\n\x04SEND\x10\x03\x1a\0\"m\n\x04Type\x12\x10\n\x0cUNKNOWN_TYPE\
+    \x10\0\x12\x0e\n\nCIPHERTEXT\x10\x01\x12\x10\n\x0cKEY_EXCHANGE\x10\x02\
+    \x12\x11\n\rPREKEY_BUNDLE\x10\x03\x12\x0f\n\x0bATTESTATION\x10\x04\x12\
+    \x0b\n\x07RECEIPT\x10\x05\x1a\0:\0\"\x8b\x01\n\x11ServerCertificate\x12\
+    \x15\n\x0bcertificate\x18\x01\x20\x01(\x0cB\0\x12\x13\n\tsignature\x18\
+    \x02\x20\x01(\x0cB\0\x1aH\n\x0bCertificate\x12\x0e\n\x04uuid\x18\x01\x20\
+    \x01(\tB\0\x12\x13\n\tnamespace\x18\x02\x20\x01(\tB\0\x12\x12\n\x08ident\
+    ity\x18\x03\x20\x01(\x0cB\0:\0:\0\"\xc5\x01\n\x11SenderCertificate\x12\
+    \x15\n\x0bcertificate\x18\x01\x20\x01(\x0cB\0\x12\x13\n\tsignature\x18\
+    \x02\x20\x01(\x0cB\0\x1a\x81\x01\n\x0bCertificate\x12\x0e\n\x04uuid\x18\
+    \x01\x20\x01(\tB\0\x12\x13\n\tnamespace\x18\x02\x20\x01(\tB\0\x12\x11\n\
+    \x07expires\x18\x03\x20\x01(\x06B\0\x12\x12\n\x08identity\x18\x04\x20\
+    \x01(\x0cB\0\x12$\n\x06signer\x18\x05\x20\x01(\x0b2\x12.ServerCertificat\
+    eB\0:\0:\0\"A\n\x04Peer\x12\x13\n\tnamespace\x18\x01\x20\x01(\tB\0\x12\
+    \x12\n\x08identity\x18\x02\x20\x01(\x0cB\0\x12\x0e\n\x04name\x18\x03\x20\
+    \x01(\tB\0:\0\"\x80\x01\n\x07Payload\x12\x14\n\nciphertext\x18\x01\x20\
+    \x01(\x0cB\0\x12\x1e\n\x06key_ex\x18\x02\x20\x01(\x0b2\x0c.KeyExchangeB\
+    \0\x12\x20\n\x07pre_key\x18\x03\x20\x01(\x0b2\r.PreKeyBundleB\0\x12\x1b\
+    \n\x07receipt\x18\x04\x20\x01(\x0b2\x08.ReceiptB\0:\0\"\\\n\x0bKeyExchan\
+    ge\x12\x17\n\x06source\x18\x01\x20\x01(\x0b2\x05.PeerB\0\x12\x17\n\x06ta\
+    rget\x18\x02\x20\x01(\x0b2\x05.PeerB\0\x12\x19\n\x0fone_time_prekey\x18\
+    \x05\x20\x01(\x0cB\0:\0\"m\n\x0cPreKeyBundle\x12\x12\n\x08identity\x18\
+    \x01\x20\x01(\x0cB\0\x12\x10\n\x06prekey\x18\x02\x20\x01(\x0cB\0\x12\x1a\
+    \n\x10prekey_signature\x18\x03\x20\x01(\x0cB\0\x12\x19\n\x0fone_time_pre\
+    key\x18\n\x20\x03(\x0cB\0:\0\"0\n\x07Receipt\x12\x0e\n\x04uuid\x18\x01\
+    \x20\x01(\tB\0\x12\x13\n\tsignature\x18\x02\x20\x01(\x0cB\0:\0B\0b\x06pr\
+    oto2\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy::INIT;

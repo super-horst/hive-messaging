@@ -2,7 +2,7 @@ use std::io;
 use std::fmt;
 use std::error;
 
-use bytes::{ Buf, BytesMut};
+use bytes::{Buf, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
 
 use protobuf::{Message as protobuf_msg_for_fns, CodedInputStream};
@@ -64,7 +64,7 @@ pub mod encoding {
 
     /// Codec implementing tokio_util::codec ... for Envelope protobuf message
     #[derive(Debug)]
-    pub struct EnvelopeCodec {}
+    pub struct EnvelopeCodec;
 
     impl EnvelopeCodec {
         pub fn new() -> EnvelopeCodec {
@@ -75,7 +75,7 @@ pub mod encoding {
     impl Encoder<Envelope> for EnvelopeCodec {
         type Error = CodecError;
 
-        fn encode(&mut self, item: Envelope, dst: &mut BytesMut) -> Result<(), CodecError> {
+        fn encode(&mut self, item: Envelope, dst: &mut BytesMut) -> Result<(), Self::Error> {
             // keep length delimited
             let bytes = item.write_length_delimited_to_bytes();
             match bytes {
