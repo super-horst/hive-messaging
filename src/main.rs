@@ -51,13 +51,12 @@ async fn main() {
 
 struct ServerContext {
     listener: TcpListener,
-    sessions: DashMap<Vec<u8>, PreKeys>,
+    sessions: Arc<DashMap<Vec<u8>, PreKeys>>,
 }
 
 impl ServerContext {
-
     fn new(listener: TcpListener) -> ServerContext {
-        ServerContext { listener, sessions: DashMap::new() }
+        ServerContext { listener, sessions: Arc::new(DashMap::new()) }
     }
 
     async fn work(mut self) {
@@ -67,7 +66,7 @@ impl ServerContext {
                 Err(e) => error!("accept failed = {:?}", e),
                 Ok(sock) => {
                     let uuid = Uuid::new_v4();
-                    let mut s = Session::new(uuid.to_string(), sock, &self.sessions);
+                    let mut s = Session::new(uuid.to_string(), sock, Arc::clone(&self.sessions));
 
                     let task_handle = tokio::spawn(async move { s.work().await });
                 }
@@ -129,20 +128,20 @@ impl error::Error for SessionError {
  * Session is a single TCP connection and exists for it's lifetime.
  *
  */
-pub struct Session<'a> {
+pub struct Session {
     session: String,
     transport: Framed<TcpStream, EnvelopeCodec>,
-    sessions: &'a DashMap<Vec<u8>, PreKeys>,
+    sessions: Arc<DashMap<Vec<u8>, PreKeys>>,
 }
 
-impl ToString for Session<'_> {
+impl ToString for Session {
     fn to_string(&self) -> String {
         self.session.clone()
     }
 }
 
 #[async_trait]
-impl MessageHandler for Session<'_> {
+impl MessageHandler for Session {
     fn handle_chipertext(&mut self, data: Envelope) {}
 
     fn handle_exchange(&mut self, data: Envelope) {}
@@ -163,8 +162,8 @@ impl MessageHandler for Session<'_> {
     }
 }
 
-impl Session<'_> {
-    pub fn new(peer: String, socket: TcpStream, sessions: &DashMap<Vec<u8>, PreKeys>) -> Session {
+impl Session {
+    pub fn new(peer: String, socket: TcpStream, sessions: Arc<DashMap<Vec<u8>, PreKeys>>) -> Session {
         let codec = EnvelopeCodec::new();
         let transport = Framed::new(socket, codec);
 
@@ -180,11 +179,15 @@ impl Session<'_> {
 
         let pre_key_bundle = PreKeys { identity: id.clone(), pre_key, one_time_keys: one_time_key.into_vec() };
 
-        self.sessions.insert(id, pre_key_bundle);
+        self.sessions.insert(id.clone(), pre_key_bundle);
+
+        debug!("Inserted pre key for {}", base64::encode(id));
     }
 
     async fn publish_pre_key_bundle(&mut self, mut data: Envelope) -> Result<(), Box<error::Error>> {
         let peer_id = data.take_peer().take_identity();
+
+        debug!("Requested pre key for {}", base64::encode(peer_id.clone()));
 
         let mut pre_keys;
         match self.sessions.get_mut(&peer_id) {
@@ -319,16 +322,28 @@ mod tests {
         let bob_stream = TcpStream::connect("127.0.0.1:6142").await.unwrap();
         let mut bob_transport = Framed::new(bob_stream, EnvelopeCodec::new());
 
-        let mut rmsg = Envelope::new();
-        rmsg.set_cmd(Envelope_Command::PUBLISH);
-        rmsg.set_field_type(Envelope_Type::PREKEY_BUNDLE);
-        rmsg.set_content(payload);
+        let mut a_pub_pre_key = Envelope::new();
+        a_pub_pre_key.set_cmd(Envelope_Command::PUBLISH);
+        a_pub_pre_key.set_field_type(Envelope_Type::PREKEY_BUNDLE);
+        a_pub_pre_key.set_content(payload);
 
-        alice_transport.send(rmsg).await.unwrap();
+        alice_transport.send(a_pub_pre_key).await.unwrap();
 
-        println!("send success");
+        println!("publish success");
 
-        while let Some(message) = alice_transport.next().await {
+        let mut a_peer = Peer::new();
+        a_peer.set_identity(test_keys.alice.unwrap().id_key.as_bytes().to_vec());
+
+        let mut b_req_pre_key = Envelope::new();
+        b_req_pre_key.set_cmd(Envelope_Command::REQUEST);
+        b_req_pre_key.set_field_type(Envelope_Type::PREKEY_BUNDLE);
+        b_req_pre_key.set_peer(a_peer);
+
+        bob_transport.send(b_req_pre_key).await.unwrap();
+
+        println!("request sent");
+
+        while let Some(message) = bob_transport.next().await {
             match message {
                 Ok(message) => {
                     println!("echo success = {:?}", message.get_field_type());
