@@ -32,6 +32,7 @@ rand_core = "0.5"
 x25519-dalek = "0.6"
 ed25519-dalek = "0.9"
 hkdf = "0.8"
+digest = "0.8.1"
 sha2 = "0.8.2"
 
 [build-dependencies]

@@ -2,9 +2,8 @@ message Envelope {
 
   enum Command {
     UNKNOWN_CMD = 0;
-    PUBLISH = 1;
+    SEND = 1;
     REQUEST = 2;
-    SEND = 3;
   }
 
   enum Type {

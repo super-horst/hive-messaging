@@ -6,7 +6,8 @@ use bytes::{Buf, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
 
 use protobuf::{Message as protobuf_msg_for_fns, CodedInputStream};
-use crate::messages::*;
+
+use super::messages::*;
 
 const VARINT_THRESHOLD: u8 = 0x80;
 
@@ -24,7 +25,6 @@ pub mod encoding {
     impl fmt::Display for CodecError {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match self {
-                // TODO do useful stuff
                 &CodecError::InvalidMessageError(ref e) => write!(f, "Invalid message error: {}", e),
                 &CodecError::IoError(ref e) => write!(f, "I/O error: {}", e),
             }
@@ -35,7 +35,6 @@ pub mod encoding {
         #[allow(deprecated)] // call to `description`
         fn description(&self) -> &str {
             match self {
-                // TODO do useful stuff
                 &CodecError::InvalidMessageError(ref e) => e.description(),
                 &CodecError::IoError(ref e) => e.description(),
             }
@@ -43,7 +42,6 @@ pub mod encoding {
 
         fn cause(&self) -> Option<&dyn error::Error> {
             match self {
-                // TODO do useful stuff
                 &CodecError::InvalidMessageError(ref e) => Some(e),
                 &CodecError::IoError(ref e) => Some(e),
             }
@@ -63,14 +61,8 @@ pub mod encoding {
     }
 
     /// Codec implementing tokio_util::codec ... for Envelope protobuf message
-    #[derive(Debug)]
+    #[derive(Debug, Default)]
     pub struct EnvelopeCodec;
-
-    impl EnvelopeCodec {
-        pub fn new() -> EnvelopeCodec {
-            EnvelopeCodec {}
-        }
-    }
 
     impl Encoder<Envelope> for EnvelopeCodec {
         type Error = CodecError;
@@ -146,7 +138,7 @@ mod codec_tests {
 
         let mut bytes = BytesMut::new();
         bytes.extend_from_slice(&data[..]);
-        let mut codec = EnvelopeCodec::new();
+        let mut codec = EnvelopeCodec::default();
 
         let result = codec.decode(&mut bytes);
 
@@ -174,7 +166,7 @@ mod codec_tests {
         let data = rmsg.write_length_delimited_to_bytes().unwrap();
         let mut bytes = BytesMut::new();
         bytes.extend_from_slice(&data[..]);
-        let mut codec = EnvelopeCodec::new();
+        let mut codec = EnvelopeCodec::default();
 
         let _result = codec.decode(&mut bytes);
 
@@ -188,7 +180,7 @@ mod codec_tests {
 
         let data = rmsg.write_length_delimited_to_bytes().unwrap();
         let mut bytes = BytesMut::new();
-        let mut codec = EnvelopeCodec::new();
+        let mut codec = EnvelopeCodec::default();
 
         // incomplete message
         bytes.extend_from_slice(&data[0..2]);
@@ -216,7 +208,7 @@ mod codec_tests {
         //rmsg.set_client(SenderCertificate::new());
 
         let mut bytes = BytesMut::new();
-        let mut codec = EnvelopeCodec::new();
+        let mut codec = EnvelopeCodec::default();
         let _result = codec.encode(rmsg, &mut bytes);
         assert!(_result.is_ok());
 
@@ -235,7 +227,7 @@ mod codec_tests {
         rmsg.set_field_type(Envelope_Type::RECEIPT);
 
         let mut bytes = BytesMut::new();
-        let mut codec = EnvelopeCodec::new();
+        let mut codec = EnvelopeCodec::default();
         let _result = codec.encode(rmsg, &mut bytes);
         assert!(_result.is_ok());
 

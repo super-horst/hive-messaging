@@ -1,7 +1,67 @@
 use x25519_dalek::*;
+use ed25519_dalek::*;
 use hkdf::*;
 use sha2::Sha256;
 use rand_core::OsRng;
+use std::marker::PhantomData;
+
+// A cryptographic identity
+pub trait Identity {
+
+    // Hexstring of this cryptographic identity
+    fn id(&self) -> String;
+}
+
+pub trait PrivateIdentity {
+    type PrivateKey;
+
+    /// Sign some data using the underlying private key.
+    /// Since the digest used is SHA512, output will be 64 bytes
+    fn sign(&self, data: &Vec<u8>) -> [u8; 64];
+}
+
+pub trait PublicIdentity {
+    type PublicKey;
+
+    ///Verify a raw byte signature
+    fn verify(&self, data: &Vec<u8>, signature: &[u8; 64]) -> Result<(), String>;
+}
+
+/*
+pub trait X3DH {
+    fn exchange_initial(&self, other: &PublicIdentity,
+                        pre_key: &PublicIdentity,
+                        onetime_pre_key: Option<PublicIdentity>) -> (PublicIdentity, [u8; 32]);
+}*/
+
+
+struct DalekPrivateId {
+    inner: x25519_dalek::StaticSecret,
+}
+
+impl PrivateIdentity for DalekPrivateId {
+    type PrivateKey = x25519_dalek::StaticSecret;
+
+    fn sign(&self, data: &Vec<u8>) -> [u8; 64] {
+        unimplemented!()
+    }
+
+}
+
+
+struct DalekPublicId {
+    inner: x25519_dalek::PublicKey,
+}
+
+impl PublicIdentity for DalekPublicId {
+    type PublicKey = x25519_dalek::PublicKey;
+
+    fn verify(&self, data: &Vec<u8>, signature: &[u8; 64]) -> Result<(), String> {
+        unimplemented!()
+    }
+
+}
+
 
 //TODO initial implementation is not ready for production!
 
@@ -10,11 +70,11 @@ const DH_BUFFER_SIZE: usize = 128;
 
 pub struct DhKeyPair<'a> {
     mine: &'a StaticSecret,
-    other: &'a PublicKey,
+    other: &'a x25519_dalek::PublicKey,
 }
 
 impl<'a> DhKeyPair<'a> {
-    pub fn mine_dh(&self, public_key: &PublicKey) -> SharedSecret {
+    pub fn mine_dh(&self, public_key: &x25519_dalek::PublicKey) -> SharedSecret {
         self.mine.diffie_hellman(public_key)
     }
 
@@ -24,8 +84,8 @@ impl<'a> DhKeyPair<'a> {
 }
 
 pub fn x3dh_agree_initial(identities: &DhKeyPair,
-                          pre_key: &PublicKey,
-                          onetime_pre_key: Option<PublicKey>) -> (PublicKey, [u8; 32]) {
+                          pre_key: &x25519_dalek::PublicKey,
+                          onetime_pre_key: Option<x25519_dalek::PublicKey>) -> (x25519_dalek::PublicKey, [u8; 32]) {
     // static secret but ephemeral
     let eph = StaticSecret::new(&mut OsRng);
 
@@ -51,11 +111,11 @@ pub fn x3dh_agree_initial(identities: &DhKeyPair,
     let mut okm = [0u8; 32];
     h.expand(&[0u8; 0], &mut okm).unwrap();
 
-    return (PublicKey::from(&eph), okm);
+    return (x25519_dalek::PublicKey::from(&eph), okm);
 }
 
 pub fn x3dh_agree_respond(identities: &DhKeyPair,
-                          ephemeral_key: &PublicKey,
+                          ephemeral_key: &x25519_dalek::PublicKey,
                           pre_key: &StaticSecret,
                           onetime_pre_key: Option<StaticSecret>) -> [u8; 32] {
     let dh1 = identities.other_dh(&pre_key);
@@ -91,13 +151,13 @@ mod crypto_tests {
     #[test]
     fn test_dh_without_onetimekey() {
         let a_priv = StaticSecret::new(&mut OsRng);
-        let a_pub = PublicKey::from(&a_priv);
+        let a_pub = x25519_dalek::PublicKey::from(&a_priv);
 
         let b_priv = StaticSecret::new(&mut OsRng);
-        let b_pub = PublicKey::from(&b_priv);
+        let b_pub = x25519_dalek::PublicKey::from(&b_priv);
 
         let pre_key_priv = StaticSecret::new(&mut OsRng);
-        let pre_key_pub = PublicKey::from(&pre_key_priv);
+        let pre_key_pub = x25519_dalek::PublicKey::from(&pre_key_priv);
 
         let from_a = DhKeyPair { mine: &a_priv, other: &b_pub };
         let from_b = DhKeyPair { mine: &b_priv, other: &a_pub };
@@ -111,16 +171,16 @@ mod crypto_tests {
     #[test]
     fn test_dh_with_onetimekey() {
         let a_priv = StaticSecret::new(&mut OsRng);
-        let a_pub = PublicKey::from(&a_priv);
+        let a_pub = x25519_dalek::PublicKey::from(&a_priv);
 
         let b_priv = StaticSecret::new(&mut OsRng);
-        let b_pub = PublicKey::from(&b_priv);
+        let b_pub = x25519_dalek::PublicKey::from(&b_priv);
 
         let pre_key_priv = StaticSecret::new(&mut OsRng);
-        let pre_key_pub = PublicKey::from(&pre_key_priv);
+        let pre_key_pub = x25519_dalek::PublicKey::from(&pre_key_priv);
 
         let otk_priv = StaticSecret::new(&mut OsRng);
-        let otk_pub = PublicKey::from(&otk_priv);
+        let otk_pub = x25519_dalek::PublicKey::from(&otk_priv);
 
         let from_a = DhKeyPair { mine: &a_priv, other: &b_pub };
         let from_b = DhKeyPair { mine: &b_priv, other: &a_pub };

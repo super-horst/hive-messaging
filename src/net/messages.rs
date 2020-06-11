@@ -487,9 +487,8 @@ impl ::protobuf::reflect::ProtobufValue for Envelope {
 #[derive(Clone,PartialEq,Eq,Debug,Hash)]
 pub enum Envelope_Command {
     UNKNOWN_CMD = 0,
-    PUBLISH = 1,
+    SEND = 1,
     REQUEST = 2,
-    SEND = 3,
 }
 
 impl ::protobuf::ProtobufEnum for Envelope_Command {
@@ -500,9 +499,8 @@ impl ::protobuf::ProtobufEnum for Envelope_Command {
     fn from_i32(value: i32) -> ::std::option::Option<Envelope_Command> {
         match value {
             0 => ::std::option::Option::Some(Envelope_Command::UNKNOWN_CMD),
-            1 => ::std::option::Option::Some(Envelope_Command::PUBLISH),
+            1 => ::std::option::Option::Some(Envelope_Command::SEND),
             2 => ::std::option::Option::Some(Envelope_Command::REQUEST),
-            3 => ::std::option::Option::Some(Envelope_Command::SEND),
             _ => ::std::option::Option::None
         }
     }
@@ -510,9 +508,8 @@ impl ::protobuf::ProtobufEnum for Envelope_Command {
     fn values() -> &'static [Self] {
         static values: &'static [Envelope_Command] = &[
             Envelope_Command::UNKNOWN_CMD,
-            Envelope_Command::PUBLISH,
-            Envelope_Command::REQUEST,
             Envelope_Command::SEND,
+            Envelope_Command::REQUEST,
         ];
         values
     }
@@ -3158,41 +3155,40 @@ impl ::protobuf::reflect::ProtobufValue for Receipt {
 }
 
 static file_descriptor_proto_data: &'static [u8] = b"\
-    \n\x0emessages.proto\x12\0\"\x9e\x03\n\x08Envelope\x12\x20\n\x03cmd\x18\
+    \n\x0emessages.proto\x12\0\"\x91\x03\n\x08Envelope\x12\x20\n\x03cmd\x18\
     \x01\x20\x01(\x0e2\x11.Envelope.CommandB\0\x12\x1e\n\x04type\x18\x02\x20\
     \x01(\x0e2\x0e.Envelope.TypeB\0\x12\x15\n\x04peer\x18\x03\x20\x01(\x0b2\
     \x05.PeerB\0\x12)\n\x0bclient_auth\x18\x05\x20\x01(\x0b2\x12.SenderCerti\
     ficateB\0\x12)\n\x0bserver_auth\x18\x06\x20\x01(\x0b2\x12.ServerCertific\
     ateB\0\x12\x13\n\ttimestamp\x18\n\x20\x01(\x04B\0\x12\x1b\n\x07content\
-    \x18\x0b\x20\x01(\x0b2\x08.PayloadB\0\"@\n\x07Command\x12\x0f\n\x0bUNKNO\
-    WN_CMD\x10\0\x12\x0b\n\x07PUBLISH\x10\x01\x12\x0b\n\x07REQUEST\x10\x02\
-    \x12\x08\n\x04SEND\x10\x03\x1a\0\"m\n\x04Type\x12\x10\n\x0cUNKNOWN_TYPE\
-    \x10\0\x12\x0e\n\nCIPHERTEXT\x10\x01\x12\x10\n\x0cKEY_EXCHANGE\x10\x02\
-    \x12\x11\n\rPREKEY_BUNDLE\x10\x03\x12\x0f\n\x0bATTESTATION\x10\x04\x12\
-    \x0b\n\x07RECEIPT\x10\x05\x1a\0:\0\"\x8b\x01\n\x11ServerCertificate\x12\
-    \x15\n\x0bcertificate\x18\x01\x20\x01(\x0cB\0\x12\x13\n\tsignature\x18\
-    \x02\x20\x01(\x0cB\0\x1aH\n\x0bCertificate\x12\x0e\n\x04uuid\x18\x01\x20\
-    \x01(\tB\0\x12\x13\n\tnamespace\x18\x02\x20\x01(\tB\0\x12\x12\n\x08ident\
-    ity\x18\x03\x20\x01(\x0cB\0:\0:\0\"\xc5\x01\n\x11SenderCertificate\x12\
-    \x15\n\x0bcertificate\x18\x01\x20\x01(\x0cB\0\x12\x13\n\tsignature\x18\
-    \x02\x20\x01(\x0cB\0\x1a\x81\x01\n\x0bCertificate\x12\x0e\n\x04uuid\x18\
-    \x01\x20\x01(\tB\0\x12\x13\n\tnamespace\x18\x02\x20\x01(\tB\0\x12\x11\n\
-    \x07expires\x18\x03\x20\x01(\x06B\0\x12\x12\n\x08identity\x18\x04\x20\
-    \x01(\x0cB\0\x12$\n\x06signer\x18\x05\x20\x01(\x0b2\x12.ServerCertificat\
-    eB\0:\0:\0\"A\n\x04Peer\x12\x13\n\tnamespace\x18\x01\x20\x01(\tB\0\x12\
-    \x12\n\x08identity\x18\x02\x20\x01(\x0cB\0\x12\x0e\n\x04name\x18\x03\x20\
-    \x01(\tB\0:\0\"\x80\x01\n\x07Payload\x12\x14\n\nciphertext\x18\x01\x20\
-    \x01(\x0cB\0\x12\x1e\n\x06key_ex\x18\x02\x20\x01(\x0b2\x0c.KeyExchangeB\
-    \0\x12\x20\n\x07pre_key\x18\x03\x20\x01(\x0b2\r.PreKeyBundleB\0\x12\x1b\
-    \n\x07receipt\x18\x04\x20\x01(\x0b2\x08.ReceiptB\0:\0\"\\\n\x0bKeyExchan\
-    ge\x12\x17\n\x06source\x18\x01\x20\x01(\x0b2\x05.PeerB\0\x12\x17\n\x06ta\
-    rget\x18\x02\x20\x01(\x0b2\x05.PeerB\0\x12\x19\n\x0fone_time_prekey\x18\
-    \x05\x20\x01(\x0cB\0:\0\"m\n\x0cPreKeyBundle\x12\x12\n\x08identity\x18\
-    \x01\x20\x01(\x0cB\0\x12\x10\n\x06prekey\x18\x02\x20\x01(\x0cB\0\x12\x1a\
-    \n\x10prekey_signature\x18\x03\x20\x01(\x0cB\0\x12\x19\n\x0fone_time_pre\
-    key\x18\n\x20\x03(\x0cB\0:\0\"0\n\x07Receipt\x12\x0e\n\x04uuid\x18\x01\
-    \x20\x01(\tB\0\x12\x13\n\tsignature\x18\x02\x20\x01(\x0cB\0:\0B\0b\x06pr\
-    oto2\
+    \x18\x0b\x20\x01(\x0b2\x08.PayloadB\0\"3\n\x07Command\x12\x0f\n\x0bUNKNO\
+    WN_CMD\x10\0\x12\x08\n\x04SEND\x10\x01\x12\x0b\n\x07REQUEST\x10\x02\x1a\
+    \0\"m\n\x04Type\x12\x10\n\x0cUNKNOWN_TYPE\x10\0\x12\x0e\n\nCIPHERTEXT\
+    \x10\x01\x12\x10\n\x0cKEY_EXCHANGE\x10\x02\x12\x11\n\rPREKEY_BUNDLE\x10\
+    \x03\x12\x0f\n\x0bATTESTATION\x10\x04\x12\x0b\n\x07RECEIPT\x10\x05\x1a\0\
+    :\0\"\x8b\x01\n\x11ServerCertificate\x12\x15\n\x0bcertificate\x18\x01\
+    \x20\x01(\x0cB\0\x12\x13\n\tsignature\x18\x02\x20\x01(\x0cB\0\x1aH\n\x0b\
+    Certificate\x12\x0e\n\x04uuid\x18\x01\x20\x01(\tB\0\x12\x13\n\tnamespace\
+    \x18\x02\x20\x01(\tB\0\x12\x12\n\x08identity\x18\x03\x20\x01(\x0cB\0:\0:\
+    \0\"\xc5\x01\n\x11SenderCertificate\x12\x15\n\x0bcertificate\x18\x01\x20\
+    \x01(\x0cB\0\x12\x13\n\tsignature\x18\x02\x20\x01(\x0cB\0\x1a\x81\x01\n\
+    \x0bCertificate\x12\x0e\n\x04uuid\x18\x01\x20\x01(\tB\0\x12\x13\n\tnames\
+    pace\x18\x02\x20\x01(\tB\0\x12\x11\n\x07expires\x18\x03\x20\x01(\x06B\0\
+    \x12\x12\n\x08identity\x18\x04\x20\x01(\x0cB\0\x12$\n\x06signer\x18\x05\
+    \x20\x01(\x0b2\x12.ServerCertificateB\0:\0:\0\"A\n\x04Peer\x12\x13\n\tna\
+    mespace\x18\x01\x20\x01(\tB\0\x12\x12\n\x08identity\x18\x02\x20\x01(\x0c\
+    B\0\x12\x0e\n\x04name\x18\x03\x20\x01(\tB\0:\0\"\x80\x01\n\x07Payload\
+    \x12\x14\n\nciphertext\x18\x01\x20\x01(\x0cB\0\x12\x1e\n\x06key_ex\x18\
+    \x02\x20\x01(\x0b2\x0c.KeyExchangeB\0\x12\x20\n\x07pre_key\x18\x03\x20\
+    \x01(\x0b2\r.PreKeyBundleB\0\x12\x1b\n\x07receipt\x18\x04\x20\x01(\x0b2\
+    \x08.ReceiptB\0:\0\"\\\n\x0bKeyExchange\x12\x17\n\x06source\x18\x01\x20\
+    \x01(\x0b2\x05.PeerB\0\x12\x17\n\x06target\x18\x02\x20\x01(\x0b2\x05.Pee\
+    rB\0\x12\x19\n\x0fone_time_prekey\x18\x05\x20\x01(\x0cB\0:\0\"m\n\x0cPre\
+    KeyBundle\x12\x12\n\x08identity\x18\x01\x20\x01(\x0cB\0\x12\x10\n\x06pre\
+    key\x18\x02\x20\x01(\x0cB\0\x12\x1a\n\x10prekey_signature\x18\x03\x20\
+    \x01(\x0cB\0\x12\x19\n\x0fone_time_prekey\x18\n\x20\x03(\x0cB\0:\0\"0\n\
+    \x07Receipt\x12\x0e\n\x04uuid\x18\x01\x20\x01(\tB\0\x12\x13\n\tsignature\
+    \x18\x02\x20\x01(\x0cB\0:\0B\0b\x06proto2\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy::INIT;
