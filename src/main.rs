@@ -11,7 +11,7 @@ use tokio_util::codec::Framed;
 use futures::{SinkExt, stream::StreamExt};
 
 use x25519_dalek::*;
-use rand_core::OsRng;
+use rand::rngs::OsRng;
 use async_trait::async_trait;
 
 use protobuf::*;
@@ -19,6 +19,7 @@ use protobuf::*;
 use dashmap::*;
 
 mod crypto;
+mod accounts;
 
 mod net;
 
@@ -43,6 +44,8 @@ async fn main() {
     // Start the server and block this async fn until `server` spins down.
     server.await;
 }
+
+
 
 /*
 #[async_trait]

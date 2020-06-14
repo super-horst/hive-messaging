@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "io.hive.svc.accounts";
+option java_outer_classname = "AccountsSvc";
+
+package accounts_svc;
+
+// Account service definition.
+service Accounts {
+  // refresh attestation
+  rpc RefreshAttestation (SignedChallenge) returns (SenderCertificate);
+
+  // check attestation
+  rpc CheckAttestation (SenderCertificate) returns (CheckResult);
+
+  // publish new prekeys
+  rpc PublishPreKeys (PreKeyBundle) returns (PublishKeyResult);
+}
+
+message PreKeyBundle {
+  Peer peer = 1;
+
+  bytes pre_key = 2;
+  bytes pre_key_signature = 3;
+
+  repeated bytes one_time_pre_keys = 10;
+}
+
+message Peer {
+  string namespace = 1;
+  bytes identity = 2;
+  string name = 3;
+}
+
+message CheckResult {
+  //TODO
+}
+
+message PublishKeyResult {
+  //TODO
+}
+
+message SignedChallenge {
+  message Challenge {
+    bytes identity = 1;
+    fixed64 timestamp = 2;
+  }
+  bytes challenge = 1;
+
+  bytes signature = 5;
+}
+
+message SenderCertificate {
+  message Certificate {
+    string uuid = 1;
+    string namespace = 2;
+    fixed64 expires = 3;
+    bytes identity = 4;
+    ServerCertificate signer = 5;
+  }
+
+  bytes certificate = 1;
+  bytes signature = 2;
+}
+
+message ServerCertificate {
+  message Certificate {
+    string uuid = 1;
+    bytes identity = 2;
+    string namespace = 3;
+  }
+
+  bytes certificate = 1;
+  bytes signature = 2;
+}
