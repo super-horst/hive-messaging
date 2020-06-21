@@ -1,44 +1,22 @@
-use std::fmt;
+mod interfaces;
 
 mod dalek_keys;
 mod certificates;
 
-pub use dalek_keys::{DalekEd25519PrivateId, DalekEd25519PublicId, SimpleDalekIdentities};
+pub use dalek_keys::{DalekEd25519PrivateId,
+                     DalekEd25519PublicId,
+                     SimpleDalekIdentities};
 
-pub use certificates::{CertificateBundle, ClientCertificate, ServerCertificate, CertificateFactory};
+pub use certificates::{CertificateBundle,
+                       ClientCertificate,
+                       ServerCertificate,
+                       CertificateFactory};
 
-/// Identity provider
-#[async_trait::async_trait]
-pub trait Identities: Send + Sync {
-    /// resolve identity from the given bytes
-    /// async covers I/O use cases
-    async fn resolve_id(&self, id: &[u8]) -> Result<Box<dyn PublicIdentity>, Box<dyn std::error::Error>>;
+pub use interfaces::{Identities,
+                     PrivateIdentity,
+                     PublicIdentity,
+                     CryptoError};
 
-    /// the current main identity
-    fn my_id(&self) -> &dyn PrivateIdentity;
-}
-
-/// A cryptographic identity
-pub trait Identity: fmt::Debug + Send + Sync {
-    /// Hexstring of this cryptographic identity
-    fn id(&self) -> String;
-
-    /// this identity's namespace
-    fn namespace(&self) -> String;
-}
-
-pub trait PublicIdentity: Identity {
-    ///Verify a raw byte signature
-    fn verify(&self, data: &[u8], signature: &[u8]) -> Result<(), String>;
-
-    fn as_bytes(&self) -> Vec<u8>;
-}
-
-pub trait PrivateIdentity: PublicIdentity {
-    /// Sign some data using the underlying private key.
-    /// Since the digest used is SHA512, output will be 64 bytes
-    fn sign(&self, data: &[u8]) -> Vec<u8>;
-}
 
 // TODO IMPLEMENTATION RUINS -> RECYCLE IF POSSIBLE
 

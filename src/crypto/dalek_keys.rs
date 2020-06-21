@@ -1,4 +1,4 @@
-use std::{io, error, fmt, sync, borrow};
+use std::{io, fmt, sync, borrow};
 use sync::Arc;
 use io::Write;
 use borrow::Borrow;
@@ -7,9 +7,10 @@ use ed25519_dalek;
 use sha2::Sha512;
 use rand::rngs::OsRng;
 
-use super::{Identity, PrivateIdentity, PublicIdentity, Identities};
+use crate::crypto::interfaces::*;
 
 //TODO initial implementation is not ready for production!
+
 
 /// Simple Identities object
 #[derive(Debug)]
@@ -26,9 +27,12 @@ impl SimpleDalekIdentities {
 
 #[async_trait::async_trait]
 impl Identities for SimpleDalekIdentities {
-    async fn resolve_id(&self, id: &[u8]) -> Result<Box<dyn PublicIdentity>, Box<dyn error::Error>> {
-        //TODO error handling
-        let public = ed25519_dalek::PublicKey::from_bytes(id).unwrap();
+    async fn resolve_id(&self, id: &[u8]) -> Result<Box<dyn PublicIdentity>, CryptoError> {
+        let public = ed25519_dalek::PublicKey::from_bytes(id)
+            .map_err(|e| CryptoError::Signature {
+                message: "Failed to decode public key".to_string(),
+                cause: e,
+            })?;
 
         Ok(Box::new(DalekEd25519PublicId { inner: public }))
     }
@@ -44,11 +48,18 @@ pub struct DalekEd25519PublicId {
 }
 
 impl PublicIdentity for DalekEd25519PublicId {
-    fn verify(&self, data: &[u8], signature: &[u8]) -> Result<(), String> {
-        //TODO error handling
-        let signature = ed25519_dalek::Signature::from_bytes(signature).unwrap();
+    fn verify(&self, data: &[u8], signature: &[u8]) -> Result<(), CryptoError> {
+        let signature = ed25519_dalek::Signature::from_bytes(signature)
+            .map_err(|e| CryptoError::Signature {
+                message: "Failed to convert signature".to_string(),
+                cause: e,
+            })?;
 
-        self.inner.verify::<Sha512>(&data[..], &signature).unwrap();
+        self.inner.verify::<Sha512>(&data[..], &signature)
+            .map_err(|e| CryptoError::Signature {
+                message: "Failed to verify signature".to_string(),
+                cause: e,
+            })?;
 
         Ok(())
     }
@@ -80,16 +91,16 @@ pub struct DalekEd25519PrivateId {
 }
 
 impl PrivateIdentity for DalekEd25519PrivateId {
-    fn sign(&self, data: &[u8]) -> Vec<u8> {
-        //TODO error handling?
-        let signature = self.secret.expand::<Sha512>().sign::<Sha512>(data, &self.public.inner);
+    fn sign(&self, data: &[u8]) -> Result<Vec<u8>, CryptoError> {
+        let signature = self.secret.expand::<Sha512>()
+                            .sign::<Sha512>(data, &self.public.inner);
 
-        Vec::from(&signature.to_bytes()[..])
+        Ok(Vec::from(&signature.to_bytes()[..]))
     }
 }
 
 impl PublicIdentity for DalekEd25519PrivateId {
-    fn verify(&self, data: &[u8], signature: &[u8]) -> Result<(), String> {
+    fn verify(&self, data: &[u8], signature: &[u8]) -> Result<(), CryptoError> {
         self.public.verify(data, signature)
     }
 
@@ -143,7 +154,7 @@ mod dalek_crypto_tests {
 
         let wrapped_privates = DalekEd25519PrivateId::generate();
 
-        let signed = wrapped_privates.sign(data);
+        let signed = wrapped_privates.sign(data).unwrap();
 
         wrapped_privates.verify(data, &signed).unwrap();
     }
