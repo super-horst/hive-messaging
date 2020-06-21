@@ -97,6 +97,10 @@ impl PrivateIdentity for DalekEd25519PrivateId {
 
         Ok(Vec::from(&signature.to_bytes()[..]))
     }
+
+    fn public_id(&self) -> &dyn PublicIdentity {
+        &self.public
+    }
 }
 
 impl PublicIdentity for DalekEd25519PrivateId {

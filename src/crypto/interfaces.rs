@@ -53,8 +53,10 @@ pub trait PublicIdentity: Identity {
     fn as_bytes(&self) -> Vec<u8>;
 }
 
-pub trait PrivateIdentity: PublicIdentity {
+pub trait PrivateIdentity: Identity {
     /// Sign some data using the underlying private key.
     /// Since the digest used is SHA512, output will be 64 bytes
     fn sign(&self, data: &[u8]) -> Result<Vec<u8>, CryptoError>;
+
+    fn public_id(&self) -> &dyn PublicIdentity;
 }
