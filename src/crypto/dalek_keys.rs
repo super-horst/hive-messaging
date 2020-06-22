@@ -1,14 +1,12 @@
-use std::{io, fmt, sync, borrow};
-use sync::Arc;
-use io::Write;
-use borrow::Borrow;
+use crate::prelude::*;
+use std::sync::Arc;
+use std::borrow::Borrow;
 
 use x25519_dalek;
 use ed25519_dalek;
 use sha2::Sha512;
 
 use crate::crypto::interfaces::*;
-use bytes::Buf;
 
 //TODO initial implementation is not ready for production!
 //TODO [UPDATE] ... coming closer to be ready for production!
@@ -151,7 +149,6 @@ impl Identity for DalekEd25519PrivateId {
 impl DalekEd25519PrivateId {
     pub fn generate() -> Result<DalekEd25519PrivateId, CryptoError> {
         // just use x25519 for key generation
-        use x25519_dalek;
         use rand_core::OsRng;
         let raw_privates = x25519_dalek::StaticSecret::new(&mut OsRng).to_bytes();
 
@@ -194,7 +191,6 @@ impl fmt::Debug for DalekEd25519PrivateId {
 #[cfg(test)]
 mod dalek_crypto_tests {
     use super::*;
-    use rand_core::RngCore;
 
     #[test]
     fn test_dalek_sign_verify() {
