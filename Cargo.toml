@@ -27,9 +27,9 @@ prost = "0.6.1"
 futures = "0.3"
 dashmap = "3.11.4"
 
-error-chain = "0.12.2"
+failure = "0.1.8"
 
-protobuf = { version = "2.14", features = ["with-bytes"] }
+protobuf = { version = "2.14", features = ["with-bytes"] }#cleanup
 base64 = "0.12.0"
 uuid = { version = "0.8.1", features = ["v4"] }
 
@@ -45,4 +45,4 @@ sha2 = "0.8.2"
 
 [build-dependencies]
 tonic-build = "0.2.0"
-protobuf-codegen-pure = "2.14"
+protobuf-codegen-pure = "2.14" #cleanup
