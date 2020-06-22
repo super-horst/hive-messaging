@@ -8,6 +8,7 @@ pub use dalek_keys::{DalekEd25519PrivateId,
                      SimpleDalekIdentities};
 
 pub use certificates::{CertificateBundle,
+                       Certificate,
                        ClientCertificate,
                        ServerCertificate,
                        CertificateFactory};

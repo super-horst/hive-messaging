@@ -1,11 +1,101 @@
 use std::{io, vec, error, fmt, time};
 
+use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::convert::TryFrom;
 use std::ops::Add;
 
+use uuid::Uuid;
+
 use crate::prelude::*;
 use crate::crypto::interfaces::*;
+
+
+pub struct Certificate<'a> {
+    cert: Vec<u8>,
+    signature: Vec<u8>,
+    expiration: u64,
+    serial: String,
+    public: Box<dyn PublicIdentity>,
+    signer_certificate: Option<&'a Certificate<'a>>,
+}
+
+impl<'a> Certificate<'a> {
+    pub fn encoded_certificate(&self) -> &[u8] {
+        self.cert.as_slice()
+    }
+
+    pub fn signature(&self) -> &[u8] {
+        self.signature.as_slice()
+    }
+
+    pub fn public_key(&self) -> &dyn PublicIdentity {
+        self.public.borrow()
+    }
+
+    pub fn signer_certificate(&self) -> &Option<&'_ Certificate<'_>> {
+        &self.signer_certificate
+    }
+}
+
+#[derive(Default)]
+pub struct CertificateBuilder<'a> {
+    cert: Option<Vec<u8>>,
+    signature: Option<Vec<u8>>,
+    public: Option<Box<dyn PublicIdentity>>,
+    signer: Option<Box<dyn PublicIdentity>>,
+    signer_cert: Option<&'a Certificate<'a>>,
+}
+
+impl<'a> CertificateBuilder<'a> {
+    fn certified(&mut self, cert: Vec<u8>, public: Box<dyn PublicIdentity>)
+                 -> &mut CertificateBuilder<'a> {
+        self.cert = Some(cert);
+        self.public = Some(public);
+
+        self
+    }
+
+    fn signature(&mut self, signature: Vec<u8>) -> &mut CertificateBuilder<'a> {
+        self.signature = Some(signature);
+
+        self
+    }
+
+    fn signer_certificate<'b: 'a>(&mut self, signer_cert: &'b Certificate<'b>)
+                                  -> &mut CertificateBuilder<'a> {
+        self.signer_cert = Some(signer_cert);
+
+        self
+    }
+
+    fn build(self) -> Result<Certificate<'a>, CryptoError> {
+        let certified = self.cert.ok_or(
+            CryptoError::Message {
+                message: "Builder was given no certificate".to_string()
+            })?;
+        let certified_key = self.public.ok_or(
+            CryptoError::Message {
+                message: "Builder was given no key".to_string()
+            })?;
+        let signature = self.signature.ok_or(
+            CryptoError::Message {
+                message: "Builder was given no signature".to_string()
+            })?;
+
+        Ok(Certificate {
+            cert: certified,
+            public: certified_key,
+            signature,
+            //TODO expiration
+            expiration: 0,
+            signer_certificate: self.signer_cert,
+            //TODO serial
+            serial: Uuid::new_v4().to_string(),
+        })
+    }
+}
+
 
 /// Wrapper for certificate information & a signer to provide a serialisation
 pub struct CertificateBundle<'a, T> {

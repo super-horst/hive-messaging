@@ -18,6 +18,11 @@ pub enum CryptoError {
         message: String,
         #[fail(cause)] cause: prost::EncodeError,
     },
+    #[fail(display = "Failed to process key: {}", message)]
+    Key {
+        message: String,
+        #[fail(cause)] cause: ed25519_dalek::errors::SignatureError,
+    },
     #[fail(display = "Failed to process signature: {}", message)]
     Signature {
         message: String,
@@ -58,5 +63,6 @@ pub trait PrivateIdentity: Identity {
     /// Since the digest used is SHA512, output will be 64 bytes
     fn sign(&self, data: &[u8]) -> Result<Vec<u8>, CryptoError>;
 
+    /// corresponding public key
     fn public_id(&self) -> &dyn PublicIdentity;
 }
