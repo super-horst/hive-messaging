@@ -151,17 +151,6 @@ impl PrivateIdentity for DalekEd25519PrivateId {
     }
 }
 
-impl Identity for DalekEd25519PrivateId {
-    fn id(&self) -> String {
-        self.public.id()
-    }
-
-    //TODO
-    fn namespace(&self) -> String {
-        "my::namespace".to_string()
-    }
-}
-
 impl DalekEd25519PrivateId {
     pub fn generate() -> Result<DalekEd25519PrivateId, CryptoError> {
         // just use x25519 for key generation
@@ -199,7 +188,7 @@ impl DalekEd25519PrivateId {
 
 impl fmt::Debug for DalekEd25519PrivateId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Ed25519 dalek private key: {}", self.id())
+        write!(f, "Ed25519 dalek private key: {}", self.public.id())
     }
 }
 

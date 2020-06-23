@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package messages;
+
+option java_multiple_files = true;
+option java_package = "hive.svc.messages";
+option java_outer_classname = "MessagesSvc";
+
+import "hive_common.proto";
+
+// Messages service definition.
+service Messages {
+  // refresh attestation
+  rpc GetMessages (MessageFilter) returns (stream MessageEnvelope);
+
+}
+
+message MessageFilter {
+  enum State {
+    UNKNOWN = 0;
+    NEW = 1;
+  }
+
+  State state = 1;
+}
+
+message MessageEnvelope {
+
+}
+

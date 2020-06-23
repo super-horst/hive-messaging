@@ -18,8 +18,7 @@ pub struct Accounts<T> {
 impl<T> AccountService for Accounts<T>
     where
         T: AccountService + fmt::Debug, {
-    async fn update_attestation(&mut self, id: &dyn PrivateIdentity) -> Result<(), AccountError> {
+    async fn update_attestation(&mut self, id: &dyn PrivateIdentity) -> Result<(), AccountsError> {
         self.wrapped.update_attestation(id).await
     }
 }
-

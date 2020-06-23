@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package common;
+
+message PreKeyBundle {
+  bytes identity = 1;
+  string namespace = 2;
+
+  bytes pre_key = 5;
+  bytes pre_key_signature = 6;
+
+  repeated bytes one_time_pre_keys = 10;
+}
+
+message SignedChallenge {
+  message Challenge {
+    bytes identity = 1;
+    string namespace = 2;
+
+    fixed64 timestamp = 3;
+  }
+
+  bytes challenge = 1;
+  bytes signature = 2;
+}
+
+message Certificate {
+  message TbsCertificate {
+    bytes identity = 1;
+    string namespace = 2;
+
+    fixed64 expires = 3;
+    string uuid = 4;
+
+    // if there is no signer given,
+    // the certificate must be self signed
+    Certificate signer = 5;
+  }
+
+  bytes certificate = 1;
+  bytes signature = 2;
+}

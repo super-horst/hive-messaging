@@ -13,11 +13,20 @@ use crate::crypto::CryptoError;
 
 use super::interfaces::*;
 
+mod common {
+    tonic::include_proto!("common");
+}
+
+mod accounts {
+    tonic::include_proto!("accounts");
+}
+
+use common::*;
+use accounts::*;
+use accounts::accounts_server;
+
 const CHALLENGE_GRACE_SECONDS: u64 = 11;
 const DEFAULT_CLIENT_CERT_VALIDITY: Duration = Duration::from_secs(2 * 24 * 60 * 60);//2 days
-
-
-tonic::include_proto!("accounts_svc");
 
 pub struct GrpcCertificateEncoding;
 
@@ -87,7 +96,7 @@ impl fmt::Debug for GrpcAccountService {
 
 #[async_trait::async_trait]
 impl AccountService for GrpcAccountService {
-    async fn update_attestation(&mut self, id: &dyn crypto::PrivateIdentity) -> Result<(), AccountError> {
+    async fn update_attestation(&mut self, id: &dyn crypto::PrivateIdentity) -> Result<(), AccountsError> {
         // preparing client request
         let now = SystemTime::now().duration_since(UNIX_EPOCH)
                                    .map(|d| d.as_secs()).unwrap();
@@ -99,28 +108,26 @@ impl AccountService for GrpcAccountService {
         };
 
         let mut buf: Vec<u8> = Vec::with_capacity(challenge.encoded_len());
-        // TODO handle error
-        challenge.encode(&mut buf).unwrap();
+        challenge.encode(&mut buf).map_err(|e| AccountsError::Encoding {
+            message: "unable to serialise challenge".to_string(),
+            cause: e,
+        })?;
 
-        // TODO handle error
-        let signature = id.sign(&buf).unwrap();
+        let signature = id.sign(&buf)
+                          .map_err(|e| AccountsError::Cryptography {
+                              message: "failed to sign challenge".to_string(),
+                              cause: e,
+                          })?;
 
         let signed = SignedChallenge { challenge: buf, signature };
 
-        let mut request = tonic::Request::new(signed);
+        let request = tonic::Request::new(signed);
 
-        // include tracer if there is one
-        /*ctx.put_tracer(|x| {
-            info!("Requesting {}", x);
-
-            // there should never be an error here!
-            let value = MetadataValue::<Ascii>::from_str(x.as_str())?;
-            request.metadata_mut().append(METADATA_TRACE_KEY, value);
-            Ok(())
-        })?;*/
-
-        // TODO handle error
-        let _result = self.client.update_attestation(request).await.unwrap();
+        let _result = self.client.update_attestation(request).await
+                          .map_err(|e| AccountsError::Transport {
+                              message: "failed to update attestation".to_string(),
+                              cause: e,
+                          })?;
 
         Ok(())
     }
@@ -164,7 +171,7 @@ impl accounts_server::Accounts for InMemoryAccounts {
         let id = self.ids.resolve_id(&challenge.identity).await
                      .map_err(|e| {
                          debug!("Received unknown identity '{}': {}", hex::encode(challenge.identity), e);
-                         tonic::Status::not_found("unable to find identity")
+                         tonic::Status::not_found("unable to verify identity")
                      })?;
 
         // check signature
@@ -213,15 +220,17 @@ impl accounts_server::Accounts for InMemoryAccounts {
 mod account_svc_tests {
     use super::*;
     use tokio;
-    use crate::crypto::*;
-    use crate::accounts::interfaces::AccountError;
+    use crate::crypto;
+    use crypto::PrivateIdentity;
+    use crate::accounts::interfaces::AccountsError;
     use crate::accounts::GrpcCertificateEncoding;
+    use accounts_server::Accounts;
     use std::borrow::Borrow;
 
     #[tokio::test]
     async fn test_refresh_attestation() -> Result<(), failure::Error> {
         let server_id = crypto::DalekEd25519PrivateId::generate()
-            .map_err(|e| AccountError::Cryptography {
+            .map_err(|e| AccountsError::Cryptography {
                 message: "Unable to generate new key".to_string(),
                 cause: e,
             })?;
@@ -230,7 +239,7 @@ mod account_svc_tests {
 
         let server_public = crypto::DalekEd25519PublicId::from_raw_bytes(public_bytes).unwrap();
 
-        let cert = CertificateFactory::default()
+        let cert = crypto::CertificateFactory::default()
             .certified(Box::new(server_public))
             .expiration(Duration::from_secs(1000))
             .self_sign::<GrpcCertificateEncoding>(&server_id).unwrap();
@@ -243,7 +252,7 @@ mod account_svc_tests {
                                    .map(|d| d.as_secs()).unwrap();
 
         let client_id = crypto::DalekEd25519PrivateId::generate()?;
-        let challenge = grpc::signed_challenge::Challenge {
+        let challenge = signed_challenge::Challenge {
             identity: client_id.public_id().as_bytes(),
             namespace: client_id.public_id().namespace(),
             timestamp: now,
@@ -255,14 +264,14 @@ mod account_svc_tests {
         // TODO handle error
         let signature = client_id.sign(&buf).unwrap();
 
-        let signed = grpc::SignedChallenge { challenge: buf, signature };
+        let signed = SignedChallenge { challenge: buf, signature };
 
         let response = accs.update_attestation(tonic::Request::new(signed)).await.unwrap();
 
         let cert_response = response.into_inner();
 
         let buf = BytesMut::from(cert_response.certificate.as_ref() as &[u8]);
-        let inner_sender_cert = grpc::Certificate::decode(buf).unwrap();
+        let inner_sender_cert = Certificate::decode(buf).unwrap();
 
         Ok(())
 
@@ -283,17 +292,17 @@ mod account_svc_tests {
         Ok(())*/
     }
 
-    pub fn build_server() -> impl AccountsServerTrait {
+    pub fn build_server() -> impl accounts_server::Accounts {
         let server_id = crypto::DalekEd25519PrivateId::generate()
             .map(Box::new)
-            .map_err(|e| AccountError::Cryptography {
+            .map_err(|e| AccountsError::Cryptography {
                 message: "Unable to generate new key".to_string(),
                 cause: e,
             }).unwrap();
 
         let server_public = server_id.public_id().copy();
 
-        let cert = CertificateFactory::default()
+        let cert = crypto::CertificateFactory::default()
             .certified(server_public)
             .expiration(Duration::from_secs(1000))
             .self_sign::<GrpcCertificateEncoding>(server_id.as_ref()).unwrap();
@@ -303,23 +312,25 @@ mod account_svc_tests {
         return inner_accs;
     }
 
-    pub fn build_client_challenge() -> grpc::SignedChallenge {
+    pub fn build_client_challenge() -> SignedChallenge {
         // preparing client request
         let now = SystemTime::now().duration_since(UNIX_EPOCH)
                                    .map(|d| d.as_secs()).unwrap();
 
         // TODO error handling
         let client_id = crypto::DalekEd25519PrivateId::generate().unwrap();
-        let challenge = grpc::signed_challenge::Challenge { identity: client_id.public_id().as_bytes(),
+        let challenge = signed_challenge::Challenge {
+            identity: client_id.public_id().as_bytes(),
             namespace: client_id.public_id().namespace(),
-            timestamp: now };
+            timestamp: now,
+        };
 
         let mut buf: Vec<u8> = Vec::with_capacity(challenge.encoded_len());
         challenge.encode(&mut buf).unwrap();
 
         let signature = client_id.sign(&buf).unwrap();
 
-        return grpc::SignedChallenge { challenge: buf, signature };
+        return SignedChallenge { challenge: buf, signature };
     }
     /*
         #[tokio::test]

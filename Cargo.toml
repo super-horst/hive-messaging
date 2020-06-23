@@ -29,7 +29,6 @@ dashmap = "3.11.4"
 
 failure = "0.1.8"
 
-protobuf = { version = "2.14", features = ["with-bytes"] }#cleanup
 base64 = "0.12.0"
 uuid = { version = "0.8.1", features = ["v4"] }
 
@@ -37,7 +36,7 @@ uuid = { version = "0.8.1", features = ["v4"] }
 rand = "0.6"
 rand_core = "0.5"
 curve25519-dalek = "2.1.0" # ed25519 only needs "1"
-x25519-dalek = "0.6" #cleanup
+x25519-dalek = "0.6"
 ed25519-dalek = "0.9.1"
 hkdf = "0.8"
 digest = "0.8.1"
@@ -45,4 +44,3 @@ sha2 = "0.8.2"
 
 [build-dependencies]
 tonic-build = "0.2.0"
-protobuf-codegen-pure = "2.14" #cleanup

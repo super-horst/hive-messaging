@@ -1,13 +1,12 @@
 extern crate tonic_build;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /*Codegen::new()
-        .out_dir("src/net")
-        .inputs(&["resources/proto/messages.proto"])
-        .includes(&["resources/proto"])
-        .run()?;*/
+    tonic_build::configure()
+        .compile(
+            &["proto/accounts_svc.proto", "proto/messages_svc.proto"],
+            &["proto"],
+        )?;
 
-    tonic_build::compile_protos("proto/accounts_svc.proto")?;
 
     Ok(())
 }

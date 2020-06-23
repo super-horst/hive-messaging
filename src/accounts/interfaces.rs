@@ -5,7 +5,7 @@ use crate::crypto::PrivateIdentity;
 use failure::{Error, Fail};
 
 #[derive(Debug, Fail)]
-pub enum AccountError {
+pub enum AccountsError {
     #[fail(display = "Error message: {}", message)]
     Message {
         message: String,
@@ -14,6 +14,16 @@ pub enum AccountError {
     GenericError {
         message: String,
         #[fail(cause)] cause: Error,
+    },
+    #[fail(display = "Encoding failed: {}", message)]
+    Encoding {
+        message: String,
+        #[fail(cause)] cause: prost::EncodeError,
+    },
+    #[fail(display = "Transport failed: {}", message)]
+    Transport {
+        message: String,
+        #[fail(cause)] cause: tonic::Status,
     },
     #[fail(display = "Error during I/O: {}", message)]
     IoError {
@@ -30,5 +40,5 @@ pub enum AccountError {
 #[async_trait::async_trait]
 pub trait AccountService: Send + Sync {
     /// Refresh the current attestation from the server
-    async fn update_attestation(&mut self, id: &dyn PrivateIdentity) -> Result<(), AccountError>;
+    async fn update_attestation(&mut self, id: &dyn PrivateIdentity) -> Result<(), AccountsError>;
 }
