@@ -32,6 +32,11 @@ pub enum CryptoError {
     },
 }
 
+/// A certificate representation.
+///
+/// Carries an encoded certificate, signature and some decoded
+/// additional information.
+///
 #[derive(Debug)]
 pub struct Certificate<'a> {
     pub(crate) cert: Vec<u8>,
@@ -40,23 +45,30 @@ pub struct Certificate<'a> {
 }
 
 impl<'a> Certificate<'a> {
+    /// get the encoded certificate
     pub fn encoded_certificate(&self) -> &[u8] {
         self.cert.as_slice()
     }
 
+    /// get the certificate's signature
     pub fn signature(&self) -> &[u8] {
         self.signature.as_slice()
     }
 
+    /// get the public key represented by this certificate
     pub fn public_key(&self) -> &dyn PublicIdentity {
         self.infos.identity.borrow()
     }
 
+    /// get the optional signer certificate
     pub fn signer_certificate(&self) -> &Option<&'_ Certificate<'_>> {
         &self.infos.signer_certificate
     }
 }
 
+/// An inner certificate.
+///
+/// Contains parsed information about a certificate.
 #[derive(Debug)]
 pub struct CertificateInfoBundle<'a> {
     pub(crate) identity: Box<dyn PublicIdentity>,

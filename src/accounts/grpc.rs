@@ -217,82 +217,18 @@ impl accounts_server::Accounts for InMemoryAccounts {
 }
 
 #[cfg(test)]
-mod account_svc_tests {
+mod account_grpc_tests {
     use super::*;
     use tokio;
     use crate::crypto;
     use crypto::PrivateIdentity;
+    use crypto::Identities;
     use crate::accounts::interfaces::AccountsError;
     use crate::accounts::GrpcCertificateEncoding;
     use accounts_server::Accounts;
     use std::borrow::Borrow;
 
-    #[tokio::test]
-    async fn test_refresh_attestation() -> Result<(), failure::Error> {
-        let server_id = crypto::DalekEd25519PrivateId::generate()
-            .map_err(|e| AccountsError::Cryptography {
-                message: "Unable to generate new key".to_string(),
-                cause: e,
-            })?;
-
-        let public_bytes = &server_id.public_id().as_bytes()[..];
-
-        let server_public = crypto::DalekEd25519PublicId::from_raw_bytes(public_bytes).unwrap();
-
-        let cert = crypto::CertificateFactory::default()
-            .certified(Box::new(server_public))
-            .expiration(Duration::from_secs(1000))
-            .self_sign::<GrpcCertificateEncoding>(&server_id).unwrap();
-
-        let ids = Arc::new(crypto::SimpleDalekIdentities::new(Box::new(server_id), cert));
-        let accs = InMemoryAccounts { ids: Arc::clone(&ids) as Arc<dyn crypto::Identities> };
-
-        // preparing client request
-        let now = SystemTime::now().duration_since(UNIX_EPOCH)
-                                   .map(|d| d.as_secs()).unwrap();
-
-        let client_id = crypto::DalekEd25519PrivateId::generate()?;
-        let challenge = signed_challenge::Challenge {
-            identity: client_id.public_id().as_bytes(),
-            namespace: client_id.public_id().namespace(),
-            timestamp: now,
-        };
-
-        let mut buf: Vec<u8> = Vec::with_capacity(challenge.encoded_len());
-        challenge.encode(&mut buf).unwrap();
-
-        // TODO handle error
-        let signature = client_id.sign(&buf).unwrap();
-
-        let signed = SignedChallenge { challenge: buf, signature };
-
-        let response = accs.update_attestation(tonic::Request::new(signed)).await.unwrap();
-
-        let cert_response = response.into_inner();
-
-        let buf = BytesMut::from(cert_response.certificate.as_ref() as &[u8]);
-        let inner_sender_cert = Certificate::decode(buf).unwrap();
-
-        Ok(())
-
-        //TODO fix me
-        /*
-        let signer = match inner_sender_cert.signer {
-            Some(s) => s,
-            None => panic!("No signer"),
-        };
-
-        let buf = BytesMut::from(signer.certificate.as_ref() as &[u8]);
-        let inner_server_cert = grpc::Certificate::decode(buf).unwrap();
-
-        let server_public = ids.resolve_id(&inner_server_cert.identity).await.unwrap();
-
-        server_public.verify(&cert_response.certificate, &cert_response.signature).unwrap();
-
-        Ok(())*/
-    }
-
-    pub fn build_server() -> impl accounts_server::Accounts {
+    pub fn build_server() -> (impl accounts_server::Accounts, Arc<dyn Identities>) {
         let server_id = crypto::DalekEd25519PrivateId::generate()
             .map(Box::new)
             .map_err(|e| AccountsError::Cryptography {
@@ -309,7 +245,42 @@ mod account_svc_tests {
 
         let ids = Arc::new(crypto::SimpleDalekIdentities::new(server_id, cert));
         let inner_accs = InMemoryAccounts { ids: Arc::clone(&ids) as Arc<dyn crypto::Identities> };
-        return inner_accs;
+        return (inner_accs, ids);
+    }
+
+    #[tokio::test]
+    async fn test_refresh_attestation() -> Result<(), failure::Error> {
+        let (accs, ids) = build_server();
+
+        // preparing client request
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)
+                                   .map(|d| d.as_secs()).unwrap();
+
+        let client_id = crypto::DalekEd25519PrivateId::generate()?;
+        let challenge = signed_challenge::Challenge {
+            identity: client_id.public_id().as_bytes(),
+            namespace: client_id.public_id().namespace(),
+            timestamp: now,
+        };
+
+        let mut buf: Vec<u8> = Vec::with_capacity(challenge.encoded_len());
+        challenge.encode(&mut buf).unwrap();
+
+        let signature = client_id.sign(&buf).unwrap();
+
+        let signed = SignedChallenge { challenge: buf, signature };
+
+        let response = accs.update_attestation(tonic::Request::new(signed)).await.unwrap();
+
+        let cert_response = response.into_inner();
+
+        let buf = BytesMut::from(cert_response.certificate.as_ref() as &[u8]);
+        let inner_sender_cert = certificate::TbsCertificate::decode(buf).unwrap();
+
+        //TODO analyse signer
+        ids.my_id().public_id().verify(&cert_response.certificate, &cert_response.signature).unwrap();
+
+        Ok(())
     }
 
     pub fn build_client_challenge() -> SignedChallenge {
@@ -317,7 +288,6 @@ mod account_svc_tests {
         let now = SystemTime::now().duration_since(UNIX_EPOCH)
                                    .map(|d| d.as_secs()).unwrap();
 
-        // TODO error handling
         let client_id = crypto::DalekEd25519PrivateId::generate().unwrap();
         let challenge = signed_challenge::Challenge {
             identity: client_id.public_id().as_bytes(),
@@ -332,29 +302,5 @@ mod account_svc_tests {
 
         return SignedChallenge { challenge: buf, signature };
     }
-    /*
-        #[tokio::test]
-        async fn test_server_client() {
-            //simple_logger::init_with_level(log::Level::Debug).unwrap();
 
-            let addr = "[::1]:50051".parse().unwrap();
-
-            debug!("GreeterServer listening on {}", addr);
-
-            let server = Server::builder()
-                .add_service(AccountsServer::new(build_server()))
-                .serve(addr);
-
-            tokio::spawn(async move { server.await.unwrap() });
-
-            tokio::time::delay_for(Duration::from_millis(1000)).await;
-
-            let client = AccountsClient::connect("http://[::1]:50051").await.unwrap();
-
-            let mut account_svc = GrpcAccountService { client };
-
-            let client_id = crypto::DalekEd25519PrivateId::generate().unwrap();
-            //let ctx= &ExecutionContext::Tracer(Uuid::new_v4().to_string());
-            account_svc.update_attestation(&client_id).await.unwrap();
-        }*/
 }

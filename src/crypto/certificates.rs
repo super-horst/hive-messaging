@@ -1,10 +1,11 @@
+use crate::prelude::*;
+
 use std::borrow::Borrow;
 use std::convert::TryFrom;
 use std::ops::Add;
 
 use uuid::Uuid;
 
-use crate::prelude::*;
 use crate::crypto::interfaces::*;
 
 /// Certificate encoding trait
@@ -16,6 +17,9 @@ pub trait CertificateEncoding {
     fn encode(data: &Certificate) -> Result<Vec<u8>, CryptoError>;
 }
 
+/// Build-a-certificate.
+///
+/// Add all ingredients and decide how to sign it!
 #[derive(Default)]
 pub struct CertificateFactory {
     certified: Option<Box<dyn PublicIdentity>>,
@@ -23,7 +27,7 @@ pub struct CertificateFactory {
 }
 
 impl CertificateFactory {
-    /// certify the given identity
+    /// Certify the given identity
     pub fn certified(mut self, certified: Box<dyn PublicIdentity>)
                      -> CertificateFactory {
         self.certified = Some(certified);
@@ -31,24 +35,28 @@ impl CertificateFactory {
         self
     }
 
+    /// Define when the new certificate expires
     pub fn expiration(mut self, validity: Duration)
                       -> CertificateFactory {
         self.validity = validity;
 
         self
     }
-
+    /// Self-sign the certificate information with the given private key.
+    /// The resulting certificate will not carry a signer certificate.
     pub fn self_sign<'a, E>(self,
-                        signer: &dyn PrivateIdentity)
-                        -> Result<Certificate<'a>, CryptoError>
+                            signer: &dyn PrivateIdentity)
+                            -> Result<Certificate<'a>, CryptoError>
         where E: CertificateEncoding {
         self.sign::<E>(signer, None)
     }
 
+    /// Sign the certificate information with the given private key and an
+    /// optional certificate
     pub fn sign<'a, E>(self,
-                   signer: &dyn PrivateIdentity,
-                   signer_cert: Option<&'a Certificate<'a>>)
-                   -> Result<Certificate<'a>, CryptoError>
+                       signer: &dyn PrivateIdentity,
+                       signer_cert: Option<&'a Certificate<'a>>)
+                       -> Result<Certificate<'a>, CryptoError>
         where E: CertificateEncoding {
         let certified = self.certified.ok_or(
             CryptoError::Message {
@@ -75,11 +83,7 @@ impl CertificateFactory {
 
         let signature = signer.sign(&tbs[..])?;
 
-        Ok(Certificate {
-            cert: tbs,
-            signature,
-            infos,
-        })
+        Ok(Certificate { cert: tbs, signature, infos })
     }
 }
 
