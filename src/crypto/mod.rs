@@ -7,16 +7,10 @@ pub use dalek_keys::{DalekEd25519PrivateId,
                      DalekEd25519PublicId,
                      SimpleDalekIdentities};
 
-pub use certificates::{CertificateBundle,
-                       Certificate,
-                       ClientCertificate,
-                       ServerCertificate,
+pub use certificates::{CertificateEncoding,
                        CertificateFactory};
 
-pub use interfaces::{Identities,
-                     PrivateIdentity,
-                     PublicIdentity,
-                     CryptoError};
+pub use interfaces::*;
 
 
 // TODO IMPLEMENTATION RUINS -> RECYCLE IF POSSIBLE

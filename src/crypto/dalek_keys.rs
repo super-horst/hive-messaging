@@ -15,26 +15,32 @@ const COMBINED_PUBLIC_KEY_SIZE: usize = 64;
 
 /// Simple Identities object
 #[derive(Debug)]
-pub struct SimpleDalekIdentities {
-    my_id: Arc<dyn PrivateIdentity>,
+pub struct SimpleDalekIdentities<'a> {
+    my_id: Box<dyn PrivateIdentity>,
+    my_certificate: Certificate<'a>,
 }
 
 /// Dalek identities provider
-impl SimpleDalekIdentities {
-    pub fn new(private: Arc<dyn PrivateIdentity>) -> SimpleDalekIdentities {
-        return SimpleDalekIdentities { my_id: private };
+impl SimpleDalekIdentities<'_> {
+    pub fn new<'a>(private: Box<dyn PrivateIdentity>, certificate: Certificate<'a>) -> SimpleDalekIdentities<'a> {
+        return SimpleDalekIdentities { my_id: private, my_certificate: certificate };
     }
 }
 
 #[async_trait::async_trait]
-impl Identities for SimpleDalekIdentities {
+impl<'a> Identities for SimpleDalekIdentities<'a> {
     async fn resolve_id(&self, id: &[u8]) -> Result<Box<dyn PublicIdentity>, CryptoError> {
         DalekEd25519PublicId::from_raw_bytes(id)
-            .map(|p| Box::new(p) as Box<dyn PublicIdentity>)
+            .map(|p| Box::new(p))
+            .map(|p| p as Box<dyn PublicIdentity>)
     }
 
     fn my_id(&self) -> &dyn PrivateIdentity {
         self.my_id.borrow()
+    }
+
+    fn my_certificate(&self) -> &Certificate<'_> {
+        self.my_certificate.borrow()
     }
 }
 
@@ -70,6 +76,16 @@ impl PublicIdentity for DalekEd25519PublicId {
 
         buffer
     }
+
+    fn copy(&self) -> Box<dyn PublicIdentity> {
+        let bytes = self.as_bytes();
+
+        // expect no errors ... just recycling
+        let key = DalekEd25519PublicId::from_raw_bytes(&bytes[..])
+            .expect("Failed to copy DalekEd25519PublicId");
+
+        Box::new(key)
+    }
 }
 
 impl Identity for DalekEd25519PublicId {
@@ -82,7 +98,7 @@ impl Identity for DalekEd25519PublicId {
 }
 
 impl DalekEd25519PublicId {
-    fn from_raw_bytes(bytes: &[u8]) -> Result<DalekEd25519PublicId, CryptoError> {
+    pub fn from_raw_bytes(bytes: &[u8]) -> Result<DalekEd25519PublicId, CryptoError> {
         if bytes.len() < COMBINED_PUBLIC_KEY_SIZE {
             return Err(CryptoError::Message { message: "Invalid public key format".to_string() });
         }

@@ -1,6 +1,8 @@
 use std::fmt;
 
 use failure::{Error, Fail};
+use std::borrow::Borrow;
+use std::time::SystemTime;
 
 #[derive(Debug, Fail)]
 pub enum CryptoError {
@@ -30,6 +32,57 @@ pub enum CryptoError {
     },
 }
 
+#[derive(Debug)]
+pub struct Certificate<'a> {
+    pub(crate) cert: Vec<u8>,
+    pub(crate) signature: Vec<u8>,
+    pub(crate) infos: CertificateInfoBundle<'a>,
+}
+
+impl<'a> Certificate<'a> {
+    pub fn encoded_certificate(&self) -> &[u8] {
+        self.cert.as_slice()
+    }
+
+    pub fn signature(&self) -> &[u8] {
+        self.signature.as_slice()
+    }
+
+    pub fn public_key(&self) -> &dyn PublicIdentity {
+        self.infos.identity.borrow()
+    }
+
+    pub fn signer_certificate(&self) -> &Option<&'_ Certificate<'_>> {
+        &self.infos.signer_certificate
+    }
+}
+
+#[derive(Debug)]
+pub struct CertificateInfoBundle<'a> {
+    pub(crate) identity: Box<dyn PublicIdentity>,
+    pub(crate) expiration: SystemTime,
+    pub(crate) serial: String,
+    pub(crate) signer_certificate: Option<&'a Certificate<'a>>,
+}
+
+impl<'a> CertificateInfoBundle<'a> {
+    pub fn public_key(&self) -> &dyn PublicIdentity {
+        self.identity.borrow()
+    }
+
+    pub fn expires(&self) -> &SystemTime {
+        &self.expiration
+    }
+
+    pub fn serial(&self) -> &str {
+        &self.serial
+    }
+
+    pub fn signer_certificate(&self) -> &Option<&'_ Certificate<'_>> {
+        &self.signer_certificate
+    }
+}
+
 /// Identity provider
 #[async_trait::async_trait]
 pub trait Identities: Send + Sync {
@@ -39,6 +92,9 @@ pub trait Identities: Send + Sync {
 
     /// the current main identity
     fn my_id(&self) -> &dyn PrivateIdentity;
+
+    /// the current main identity
+    fn my_certificate(&self) -> &Certificate;
 }
 
 /// A cryptographic identity
@@ -56,9 +112,12 @@ pub trait PublicIdentity: Identity {
 
     /// encode public identities as bytes
     fn as_bytes(&self) -> Vec<u8>;
+
+    /// make a copy of myself
+    fn copy(&self) -> Box<dyn PublicIdentity>;
 }
 
-pub trait PrivateIdentity: Identity {
+pub trait PrivateIdentity: fmt::Debug + Send + Sync {
     /// Sign some data using the underlying private key.
     /// Since the digest used is SHA512, output will be 64 bytes
     fn sign(&self, data: &[u8]) -> Result<Vec<u8>, CryptoError>;

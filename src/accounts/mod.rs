@@ -3,11 +3,12 @@ use crate::prelude::*;
 use crate::crypto::PrivateIdentity;
 
 mod interfaces;
-mod rpc;
 mod grpc;
 
+#[cfg(test)]
+pub use grpc::GrpcCertificateEncoding;
+
 use interfaces::*;
-use rpc::*;
 
 pub struct Accounts<T> {
     wrapped: Box<T>,
