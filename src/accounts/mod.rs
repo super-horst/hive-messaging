@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use crate::crypto::PrivateIdentity;
+use crate::crypto::PrivateKey;
 
 mod interfaces;
 mod grpc;
@@ -18,7 +18,7 @@ pub struct Accounts<T> {
 impl<T> AccountService for Accounts<T>
     where
         T: AccountService + fmt::Debug, {
-    async fn update_attestation(&mut self, id: &dyn PrivateIdentity) -> Result<(), AccountsError> {
+    async fn update_attestation(&mut self, id: &PrivateKey) -> Result<(), AccountsError> {
         self.wrapped.update_attestation(id).await
     }
 }

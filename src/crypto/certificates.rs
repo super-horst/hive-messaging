@@ -6,7 +6,7 @@ use std::ops::Add;
 
 use uuid::Uuid;
 
-use crate::crypto::interfaces::*;
+use super::*;
 
 
 /// A certificate representation.
@@ -33,8 +33,8 @@ impl<'a> Certificate<'a> {
     }
 
     /// get the public key represented by this certificate
-    pub fn public_key(&self) -> &dyn PublicIdentity {
-        self.infos.identity.borrow()
+    pub fn public_key(&self) -> &PublicKey {
+        &self.infos.identity
     }
 
     /// get the optional signer certificate
@@ -48,15 +48,15 @@ impl<'a> Certificate<'a> {
 /// Contains parsed information about a certificate.
 #[derive(Debug)]
 pub struct CertificateInfoBundle<'a> {
-    pub(crate) identity: Box<dyn PublicIdentity>,
+    pub(crate) identity: PublicKey,
     pub(crate) expiration: SystemTime,
     pub(crate) serial: String,
     pub(crate) signer_certificate: Option<&'a Certificate<'a>>,
 }
 
 impl<'a> CertificateInfoBundle<'a> {
-    pub fn public_key(&self) -> &dyn PublicIdentity {
-        self.identity.borrow()
+    pub fn public_key(&self) -> &PublicKey {
+        &self.identity
     }
 
     pub fn expires(&self) -> &SystemTime {
@@ -86,13 +86,13 @@ pub trait CertificateEncoding {
 /// Add all ingredients and decide how to sign it!
 #[derive(Default)]
 pub struct CertificateFactory {
-    certified: Option<Box<dyn PublicIdentity>>,
+    certified: Option<PublicKey>,
     validity: Duration,
 }
 
 impl CertificateFactory {
     /// Certify the given identity
-    pub fn certified(mut self, certified: Box<dyn PublicIdentity>)
+    pub fn certified(mut self, certified: PublicKey)
                      -> CertificateFactory {
         self.certified = Some(certified);
 
@@ -109,7 +109,7 @@ impl CertificateFactory {
     /// Self-sign the certificate information with the given private key.
     /// The resulting certificate will not carry a signer certificate.
     pub fn self_sign<'a, E>(self,
-                            signer: &dyn PrivateIdentity)
+                            signer: &PrivateKey)
                             -> Result<Certificate<'a>, CryptoError>
         where E: CertificateEncoding {
         self.sign::<E>(signer, None)
@@ -118,7 +118,7 @@ impl CertificateFactory {
     /// Sign the certificate information with the given private key and an
     /// optional certificate
     pub fn sign<'a, E>(self,
-                       signer: &dyn PrivateIdentity,
+                       signer: &PrivateKey,
                        signer_cert: Option<&'a Certificate<'a>>)
                        -> Result<Certificate<'a>, CryptoError>
         where E: CertificateEncoding {
@@ -154,40 +154,40 @@ impl CertificateFactory {
 #[cfg(test)]
 mod certificate_tests {
     use super::*;
-    use crate::crypto::DalekEd25519PrivateId;
+    use crate::crypto::PrivateKey;
     use crate::accounts::GrpcCertificateEncoding;
 
     #[test]
     fn test_create_self_signed() {
-        let private = DalekEd25519PrivateId::generate().unwrap();
+        let private = PrivateKey::generate().unwrap();
 
         let cert = CertificateFactory::default()
-            .certified(private.public_id().copy())
+            .certified(private.id().copy())
             .expiration(Duration::from_secs(1000))
             .self_sign::<GrpcCertificateEncoding>(&private).unwrap();
 
-        private.public_id().verify(cert.encoded_certificate(), cert.signature()).unwrap();
+        private.id().verify(cert.encoded_certificate(), cert.signature()).unwrap();
     }
 
     #[test]
     fn test_create_signed() {
-        let signer_private = DalekEd25519PrivateId::generate().unwrap();
+        let signer_private = PrivateKey::generate().unwrap();
 
         let signer_cert = CertificateFactory::default()
-            .certified(signer_private.public_id().copy())
+            .certified(signer_private.id().copy())
             .expiration(Duration::from_secs(1000))
             .self_sign::<GrpcCertificateEncoding>(&signer_private).unwrap();
 
-        signer_private.public_id().verify(signer_cert.encoded_certificate(), signer_cert.signature()).unwrap();
+        signer_private.id().verify(signer_cert.encoded_certificate(), signer_cert.signature()).unwrap();
 
         // Sign a foreign certificate
-        let signed_private = DalekEd25519PrivateId::generate().unwrap();
+        let signed_private = PrivateKey::generate().unwrap();
 
         let signed = CertificateFactory::default()
-            .certified(signed_private.public_id().copy())
+            .certified(signed_private.id().copy())
             .expiration(Duration::from_secs(1000))
             .sign::<GrpcCertificateEncoding>(&signer_private, Some(&signer_cert)).unwrap();
 
-        signer_private.public_id().verify(signed.encoded_certificate(), signed.signature()).unwrap();
+        signer_private.id().verify(signed.encoded_certificate(), signed.signature()).unwrap();
     }
 }

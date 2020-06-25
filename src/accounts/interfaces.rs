@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use crate::crypto::PrivateIdentity;
+use crate::crypto::PrivateKey;
 
 use failure::{Error, Fail};
 
@@ -35,5 +35,5 @@ pub enum AccountsError {
 #[async_trait::async_trait]
 pub trait AccountService: Send + Sync {
     /// Refresh the current attestation from the server
-    async fn update_attestation(&mut self, id: &dyn PrivateIdentity) -> Result<(), AccountsError>;
+    async fn update_attestation(&mut self, id: &PrivateKey) -> Result<(), AccountsError>;
 }

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use crate::crypto::PublicIdentity;
+use crate::crypto::PublicKey;
 
 use failure::{Error, Fail};
 
@@ -41,7 +41,7 @@ pub struct MessageState;
 
 #[async_trait]
 pub trait MessageService: Send + Sync {
-    async fn send_message(&self, dst: &dyn PublicIdentity, msg: Message) -> Result<ReceiptFuture, MessagesError>;
+    async fn send_message(&self, dst: &PublicKey, msg: Message) -> Result<ReceiptFuture, MessagesError>;
 
     async fn recv_message(&self, state: &MessageState) -> Result<Message, MessagesError>;
 }

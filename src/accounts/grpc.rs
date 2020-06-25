@@ -39,7 +39,7 @@ impl crypto::CertificateEncoding for GrpcCertificateEncoding {
         let id = infos.public_key();
 
         let mut tbs_cert = certificate::TbsCertificate {
-            identity: id.as_bytes(),
+            identity: id.id_bytes(),
             namespace: id.namespace(),
             expires,
             uuid: infos.serial().to_string(),
@@ -96,13 +96,13 @@ impl fmt::Debug for GrpcAccountService {
 
 #[async_trait::async_trait]
 impl AccountService for GrpcAccountService {
-    async fn update_attestation(&mut self, id: &dyn crypto::PrivateIdentity) -> Result<(), AccountsError> {
+    async fn update_attestation(&mut self, id: &crypto::PrivateKey) -> Result<(), AccountsError> {
         // preparing client request
         let now = SystemTime::now().duration_since(UNIX_EPOCH)
                                    .map(|d| d.as_secs()).unwrap();
-        let pulbic = id.public_id();
+        let pulbic = id.id();
         let challenge = signed_challenge::Challenge {
-            identity: pulbic.as_bytes(),
+            identity: pulbic.id_bytes(),
             namespace: pulbic.namespace(),
             timestamp: now,
         };
@@ -221,7 +221,7 @@ mod account_grpc_tests {
     use super::*;
     use tokio;
     use crate::crypto;
-    use crypto::PrivateIdentity;
+    use crypto::PrivateKey;
     use crypto::Identities;
     use crate::accounts::interfaces::AccountsError;
     use crate::accounts::GrpcCertificateEncoding;
@@ -229,19 +229,18 @@ mod account_grpc_tests {
     use std::borrow::Borrow;
 
     pub fn build_server() -> (impl accounts_server::Accounts, Arc<dyn Identities>) {
-        let server_id = crypto::DalekEd25519PrivateId::generate()
-            .map(Box::new)
+        let server_id = crypto::PrivateKey::generate()
             .map_err(|e| AccountsError::Cryptography {
                 message: "Unable to generate new key".to_string(),
                 cause: e,
             }).unwrap();
 
-        let server_public = server_id.public_id().copy();
+        let server_public = server_id.id().copy();
 
         let cert = crypto::CertificateFactory::default()
             .certified(server_public)
             .expiration(Duration::from_secs(1000))
-            .self_sign::<GrpcCertificateEncoding>(server_id.as_ref()).unwrap();
+            .self_sign::<GrpcCertificateEncoding>(&server_id).unwrap();
 
         let ids = Arc::new(crypto::SimpleDalekIdentities::new(server_id, cert));
         let inner_accs = InMemoryAccounts { ids: Arc::clone(&ids) as Arc<dyn crypto::Identities> };
@@ -256,10 +255,10 @@ mod account_grpc_tests {
         let now = SystemTime::now().duration_since(UNIX_EPOCH)
                                    .map(|d| d.as_secs()).unwrap();
 
-        let client_id = crypto::DalekEd25519PrivateId::generate()?;
+        let client_id = crypto::PrivateKey::generate()?;
         let challenge = signed_challenge::Challenge {
-            identity: client_id.public_id().as_bytes(),
-            namespace: client_id.public_id().namespace(),
+            identity: client_id.id().id_bytes(),
+            namespace: client_id.id().namespace(),
             timestamp: now,
         };
 
@@ -278,7 +277,7 @@ mod account_grpc_tests {
         let inner_sender_cert = certificate::TbsCertificate::decode(buf).unwrap();
 
         //TODO analyse signer
-        ids.my_id().public_id().verify(&cert_response.certificate, &cert_response.signature).unwrap();
+        ids.my_id().id().verify(&cert_response.certificate, &cert_response.signature).unwrap();
 
         Ok(())
     }
@@ -288,10 +287,10 @@ mod account_grpc_tests {
         let now = SystemTime::now().duration_since(UNIX_EPOCH)
                                    .map(|d| d.as_secs()).unwrap();
 
-        let client_id = crypto::DalekEd25519PrivateId::generate().unwrap();
+        let client_id = crypto::PrivateKey::generate().unwrap();
         let challenge = signed_challenge::Challenge {
-            identity: client_id.public_id().as_bytes(),
-            namespace: client_id.public_id().namespace(),
+            identity: client_id.id().id_bytes(),
+            namespace: client_id.id().namespace(),
             timestamp: now,
         };
 

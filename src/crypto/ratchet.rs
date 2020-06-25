@@ -1,7 +1,7 @@
 use hkdf::Hkdf;
 use sha2::Sha512;
 
-use crate::crypto::interfaces::*;
+use crate::crypto::error::*;
 
 use failure::{Error, Fail};
 

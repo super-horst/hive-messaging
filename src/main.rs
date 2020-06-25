@@ -1,34 +1,64 @@
-use std::io;
-use std::fmt;
-use std::error;
-
-use log::*;
-use simple_logger;
-use uuid::Uuid;
-
-use tokio::net::{TcpListener, TcpStream};
-use tokio_util::codec::Framed;
-use futures::{SinkExt, stream::StreamExt};
-
-use x25519_dalek::*;
-use rand::rngs::OsRng;
-use async_trait::async_trait;
-
-use protobuf::*;
-
-use dashmap::*;
+mod messages;
+mod prelude;
 
 mod crypto;
 mod accounts;
 
-mod net;
+use env_logger;
 
-use net::*;
+use std::{error::Error, io};
+use tracing::{debug, error, info, span, warn, Level};
+fn main() {
 
-use std::sync::Arc;
-use std::sync::mpsc::Receiver;
+    /*env_logger::builder()
+        .format(|buf, record| {
+            writeln!(buf, "{}: {}", record.level(), record.args())
+        })
+        .init();#*/
 
-#[tokio::main]
+
+    shave(5).unwrap();
+}
+
+
+#[tracing::instrument]
+pub fn shave(yak: usize) -> Result<(), Box<dyn Error + 'static>> {
+
+    debug!(excitement = "yay!", "hello! I'm gonna shave a yak.");
+    if yak == 3 {
+        warn!("could not locate yak!");
+        return Err(io::Error::new(io::ErrorKind::Other, "shaving yak failed!").into());
+    } else {
+        debug!("yak shaved successfully");
+    }
+    Ok(())
+}
+
+pub fn shave_all(yaks: usize) -> usize {
+    let span = span!(Level::TRACE, "shaving_yaks", yaks);
+    let _enter = span.enter();
+
+    info!("shaving yaks");
+
+    let mut yaks_shaved = 0;
+    for yak in 1..=yaks {
+        let res = shave(yak);
+        debug!(yak, shaved = res.is_ok());
+
+        if let Err(ref error) = res {
+            error!(yak, error = error.as_ref(), "failed to shave yak!");
+        } else {
+            yaks_shaved += 1;
+        }
+        debug!(yaks_shaved);
+    }
+
+    yaks_shaved
+}
+
+
+
+/*#[tokio::main]
 async fn main() {
     simple_logger::init().unwrap();
 
@@ -43,8 +73,7 @@ async fn main() {
 
     // Start the server and block this async fn until `server` spins down.
     server.await;
-}
-
+}*/
 
 
 /*
