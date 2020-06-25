@@ -7,6 +7,7 @@ use ed25519_dalek;
 use sha2::Sha512;
 
 use crate::crypto::interfaces::*;
+use crate::crypto::certificates::*;
 
 //TODO initial implementation is not ready for production!
 //TODO [UPDATE] ... coming closer to be ready for production!

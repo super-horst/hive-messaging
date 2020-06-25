@@ -8,7 +8,7 @@ mod grpc;
 #[cfg(test)]
 pub use grpc::GrpcCertificateEncoding;
 
-use interfaces::*;
+pub use interfaces::*;
 
 pub struct Accounts<T> {
     wrapped: Box<T>,

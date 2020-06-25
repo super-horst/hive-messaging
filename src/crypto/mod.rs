@@ -7,10 +7,16 @@ pub use dalek_keys::{DalekEd25519PrivateId,
                      DalekEd25519PublicId,
                      SimpleDalekIdentities};
 
-pub use certificates::{CertificateEncoding,
+pub use certificates::{Certificate,
+                       CertificateInfoBundle,
+                       CertificateEncoding,
                        CertificateFactory};
 
 pub use interfaces::*;
+
+mod ratchet;
+
+pub use ratchet::*;
 
 
 // TODO IMPLEMENTATION RUINS -> RECYCLE IF POSSIBLE

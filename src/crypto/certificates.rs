@@ -8,6 +8,70 @@ use uuid::Uuid;
 
 use crate::crypto::interfaces::*;
 
+
+/// A certificate representation.
+///
+/// Carries an encoded certificate, signature and some decoded
+/// additional information.
+///
+#[derive(Debug)]
+pub struct Certificate<'a> {
+    pub(crate) cert: Vec<u8>,
+    pub(crate) signature: Vec<u8>,
+    pub(crate) infos: CertificateInfoBundle<'a>,
+}
+
+impl<'a> Certificate<'a> {
+    /// get the encoded certificate
+    pub fn encoded_certificate(&self) -> &[u8] {
+        self.cert.as_slice()
+    }
+
+    /// get the certificate's signature
+    pub fn signature(&self) -> &[u8] {
+        self.signature.as_slice()
+    }
+
+    /// get the public key represented by this certificate
+    pub fn public_key(&self) -> &dyn PublicIdentity {
+        self.infos.identity.borrow()
+    }
+
+    /// get the optional signer certificate
+    pub fn signer_certificate(&self) -> &Option<&'_ Certificate<'_>> {
+        &self.infos.signer_certificate
+    }
+}
+
+/// An inner certificate.
+///
+/// Contains parsed information about a certificate.
+#[derive(Debug)]
+pub struct CertificateInfoBundle<'a> {
+    pub(crate) identity: Box<dyn PublicIdentity>,
+    pub(crate) expiration: SystemTime,
+    pub(crate) serial: String,
+    pub(crate) signer_certificate: Option<&'a Certificate<'a>>,
+}
+
+impl<'a> CertificateInfoBundle<'a> {
+    pub fn public_key(&self) -> &dyn PublicIdentity {
+        self.identity.borrow()
+    }
+
+    pub fn expires(&self) -> &SystemTime {
+        &self.expiration
+    }
+
+    pub fn serial(&self) -> &str {
+        &self.serial
+    }
+
+    pub fn signer_certificate(&self) -> &Option<&'_ Certificate<'_>> {
+        &self.signer_certificate
+    }
+}
+
 /// Certificate encoding trait
 pub trait CertificateEncoding {
     /// encode the raw certicate data that is to be signed

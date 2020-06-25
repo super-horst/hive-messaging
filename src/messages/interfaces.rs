@@ -1,11 +1,11 @@
 use crate::prelude::*;
 
-use crate::crypto::PrivateIdentity;
+use crate::crypto::PublicIdentity;
 
 use failure::{Error, Fail};
 
 #[derive(Debug, Fail)]
-pub enum AccountsError {
+pub enum MessagesError {
     #[fail(display = "Error message: {}", message)]
     Message {
         message: String,
@@ -32,8 +32,16 @@ pub enum AccountsError {
     },
 }
 
-#[async_trait::async_trait]
-pub trait AccountService: Send + Sync {
-    /// Refresh the current attestation from the server
-    async fn update_attestation(&mut self, id: &dyn PrivateIdentity) -> Result<(), AccountsError>;
+//TODO
+pub struct ReceiptFuture;
+
+pub struct Message;
+
+pub struct MessageState;
+
+#[async_trait]
+pub trait MessageService: Send + Sync {
+    async fn send_message(&self, dst: &dyn PublicIdentity, msg: Message) -> Result<ReceiptFuture, MessagesError>;
+
+    async fn recv_message(&self, state: &MessageState) -> Result<Message, MessagesError>;
 }
