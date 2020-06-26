@@ -1,3 +1,4 @@
+mod cryptostorage;
 mod error;
 pub use error::*;
 
@@ -17,6 +18,7 @@ mod ratchet;
 mod x3dh;
 
 pub use ratchet::*;
+use std::sync::Arc;
 
 /// Identity provider
 #[async_trait::async_trait]
@@ -29,7 +31,7 @@ pub trait Identities: Send + Sync {
     fn my_id(&self) -> &PrivateKey;
 
     /// the current main identity
-    fn my_certificate(&self) -> &Certificate;
+    fn my_certificate(&self) -> &Arc<Certificate>;
 }
 
 

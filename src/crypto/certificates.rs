@@ -2,26 +2,27 @@ use crate::prelude::*;
 
 use std::borrow::Borrow;
 use std::convert::TryFrom;
-use std::ops::Add;
+use std::ops::{Add, Deref};
 
 use uuid::Uuid;
 
 use super::*;
+use std::hash::Hasher;
+use std::sync::Arc;
 
 
 /// A certificate representation.
 ///
 /// Carries an encoded certificate, signature and some decoded
 /// additional information.
-///
 #[derive(Debug)]
-pub struct Certificate<'a> {
+pub struct Certificate {
     pub(crate) cert: Vec<u8>,
     pub(crate) signature: Vec<u8>,
-    pub(crate) infos: CertificateInfoBundle<'a>,
+    pub(crate) infos: CertificateInfoBundle,
 }
 
-impl<'a> Certificate<'a> {
+impl Certificate {
     /// get the encoded certificate
     pub fn encoded_certificate(&self) -> &[u8] {
         self.cert.as_slice()
@@ -38,8 +39,25 @@ impl<'a> Certificate<'a> {
     }
 
     /// get the optional signer certificate
-    pub fn signer_certificate(&self) -> &Option<&'_ Certificate<'_>> {
+    pub fn signer_certificate(&self) -> &Option<Arc<Certificate>> {
         &self.infos.signer_certificate
+    }
+}
+
+impl std::cmp::PartialEq for Certificate {
+    fn eq(&self, other: &Self) -> bool {
+        // quick and dirty -> change this to support inter-codec Eq
+        (self.cert == other.cert) &&
+            (self.signature == other.signature)
+    }
+}
+
+impl Eq for Certificate {}
+
+impl std::hash::Hash for Certificate {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.cert.hash(state);
+        self.signature.hash(state);
     }
 }
 
@@ -47,14 +65,14 @@ impl<'a> Certificate<'a> {
 ///
 /// Contains parsed information about a certificate.
 #[derive(Debug)]
-pub struct CertificateInfoBundle<'a> {
+pub struct CertificateInfoBundle {
     pub(crate) identity: PublicKey,
     pub(crate) expiration: SystemTime,
     pub(crate) serial: String,
-    pub(crate) signer_certificate: Option<&'a Certificate<'a>>,
+    pub(crate) signer_certificate: Option<Arc<Certificate>>,
 }
 
-impl<'a> CertificateInfoBundle<'a> {
+impl CertificateInfoBundle {
     pub fn public_key(&self) -> &PublicKey {
         &self.identity
     }
@@ -67,18 +85,26 @@ impl<'a> CertificateInfoBundle<'a> {
         &self.serial
     }
 
-    pub fn signer_certificate(&self) -> &Option<&'_ Certificate<'_>> {
+    pub fn signer_certificate(&self) -> &Option<Arc<Certificate>> {
         &self.signer_certificate
     }
 }
 
 /// Certificate encoding trait
 pub trait CertificateEncoding {
+    type CertificateType;
+
     /// encode the raw certicate data that is to be signed
-    fn encode_tbs(infos: &CertificateInfoBundle) -> Result<Vec<u8>, CryptoError>;
+    fn serialise_tbs(infos: &CertificateInfoBundle) -> Result<Vec<u8>, CryptoError>;
 
     /// encode certificate
-    fn encode(data: &Certificate) -> Result<Vec<u8>, CryptoError>;
+    fn serialise(data: &Certificate) -> Result<Vec<u8>, CryptoError>;
+
+    fn decode_partial(serialised: Self::CertificateType) -> Result<(Certificate, Option<Self::CertificateType>), CryptoError>;
+
+    /// partially parse a certificate
+    /// returns the certificate itself and an optional (unparsed) signer
+    fn deserialise(bytes: Vec<u8>) -> Result<Self::CertificateType, CryptoError>;
 }
 
 /// Build-a-certificate.
@@ -108,30 +134,30 @@ impl CertificateFactory {
     }
     /// Self-sign the certificate information with the given private key.
     /// The resulting certificate will not carry a signer certificate.
-    pub fn self_sign<'a, E>(self,
-                            signer: &PrivateKey)
-                            -> Result<Certificate<'a>, CryptoError>
+    pub fn self_sign<E>(self,
+                        signer: &PrivateKey)
+                        -> Result<Certificate, CryptoError>
         where E: CertificateEncoding {
         self.sign::<E>(signer, None)
     }
 
     /// Sign the certificate information with the given private key and an
     /// optional certificate
-    pub fn sign<'a, E>(self,
-                       signer: &PrivateKey,
-                       signer_cert: Option<&'a Certificate<'a>>)
-                       -> Result<Certificate<'a>, CryptoError>
+    pub fn sign<E>(self,
+                   signer: &PrivateKey,
+                   signer_cert: Option<&Arc<Certificate>>)
+                   -> Result<Certificate, CryptoError>
         where E: CertificateEncoding {
         let certified = self.certified.ok_or(
             CryptoError::Message {
-                message: "Cannot create a certificate without identity".to_string()
+                message: "cannot create a certificate without a given identity".to_string()
             })?;
 
         // calculate expiration timestamp
         let expiration = SystemTime::now()
             .checked_add(self.validity)
             .ok_or(CryptoError::Message {
-                message: "Error handling validity".to_string()
+                message: "error handling validity".to_string()
             })?;
 
         let serial = Uuid::new_v4().to_string();
@@ -140,10 +166,10 @@ impl CertificateFactory {
             identity: certified,
             expiration,
             serial,
-            signer_certificate: signer_cert,
+            signer_certificate: signer_cert.map(Arc::clone),
         };
 
-        let tbs = E::encode_tbs(&infos)?;
+        let tbs = E::serialise_tbs(&infos)?;
 
         let signature = signer.sign(&tbs[..])?;
 
@@ -186,7 +212,7 @@ mod certificate_tests {
         let signed = CertificateFactory::default()
             .certified(signed_private.id().copy())
             .expiration(Duration::from_secs(1000))
-            .sign::<GrpcCertificateEncoding>(&signer_private, Some(&signer_cert)).unwrap();
+            .sign::<GrpcCertificateEncoding>(&signer_private, Some(&Arc::new(signer_cert))).unwrap();
 
         signer_private.id().verify(signed.encoded_certificate(), signed.signature()).unwrap();
     }

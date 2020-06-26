@@ -8,6 +8,7 @@ use sha2::Sha512;
 
 // TODO resolve cycle
 use super::*;
+use std::hash::Hasher;
 
 //TODO initial implementation is not ready for production!
 //TODO [UPDATE] ... coming closer to be ready for production!
@@ -16,20 +17,20 @@ const COMBINED_PUBLIC_KEY_SIZE: usize = 64;
 
 /// Simple Identities object
 #[derive(Debug)]
-pub struct SimpleDalekIdentities<'a> {
+pub struct SimpleDalekIdentities {
     my_id: PrivateKey,
-    my_certificate: Certificate<'a>,
+    my_certificate: Arc<Certificate>,
 }
 
 /// Dalek identities provider
-impl SimpleDalekIdentities<'_> {
-    pub fn new(private: PrivateKey, certificate: Certificate<'_>) -> SimpleDalekIdentities<'_> {
+impl SimpleDalekIdentities {
+    pub fn new(private: PrivateKey, certificate: Arc<Certificate>) -> SimpleDalekIdentities {
         return SimpleDalekIdentities { my_id: private, my_certificate: certificate };
     }
 }
 
 #[async_trait::async_trait]
-impl<'a> Identities for SimpleDalekIdentities<'a> {
+impl Identities for SimpleDalekIdentities {
     async fn resolve_id(&self, id: &[u8]) -> Result<PublicKey, CryptoError> {
         PublicKey::from_raw_bytes(id)
     }
@@ -38,8 +39,8 @@ impl<'a> Identities for SimpleDalekIdentities<'a> {
         &self.my_id
     }
 
-    fn my_certificate(&self) -> &Certificate<'_> {
-        self.my_certificate.borrow()
+    fn my_certificate(&self) -> &Arc<Certificate> {
+        &self.my_certificate
     }
 }
 
@@ -79,7 +80,7 @@ impl PublicKey {
 
     /// encode public identity as string
     pub fn id_string(&self) -> String {
-        hex::encode(self.ed_public.as_bytes())
+        hex::encode(self.id_bytes())
     }
 
     /// encode public identity as bytes
@@ -132,6 +133,21 @@ impl fmt::Debug for PublicKey {
     }
 }
 
+impl std::cmp::PartialEq for PublicKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.id_bytes() == other.id_bytes()
+    }
+}
+
+impl Eq for PublicKey {}
+
+impl std::hash::Hash for PublicKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id_bytes().hash(state);
+    }
+}
+
+
 /// Dalek private key
 pub struct PrivateKey {
     ed_secret: ed25519_dalek::SecretKey,
@@ -169,10 +185,19 @@ impl PrivateKey {
         Ok(PrivateKey { ed_secret: ed_private, x_secret: x_private, public })
     }
 
+    /// corresponding public key
+    pub fn id(&self) -> &PublicKey {
+        &self.public
+    }
+
+    pub fn secret_bytes(&self) -> &[u8] {
+        self.ed_secret.as_bytes()
+    }
+
+
     pub fn diffie_hellman(&self, public: &PublicKey) -> x25519_dalek::SharedSecret {
         self.x_secret.diffie_hellman(&public.x_public)
     }
-
 
     /// Sign some data using the underlying private key.
     /// Since the digest used is SHA512, output will be 64 bytes
@@ -181,11 +206,6 @@ impl PrivateKey {
                             .sign::<Sha512>(data, &self.public.ed_public);
 
         Ok(Vec::from(&signature.to_bytes()[..]))
-    }
-
-    /// corresponding public key
-    pub fn id(&self) -> &PublicKey {
-        &self.public
     }
 }
 

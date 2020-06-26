@@ -4,12 +4,12 @@ use std::convert::{TryFrom, TryInto};
 use std::ops::Add;
 use std::sync::Arc;
 
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use prost::Message;
 use uuid::Uuid;
 
 use crate::crypto;
-use crate::crypto::CryptoError;
+use crate::crypto::{CryptoError, PublicKey, CertificateInfoBundle};
 
 use super::interfaces::*;
 
@@ -31,7 +31,9 @@ const DEFAULT_CLIENT_CERT_VALIDITY: Duration = Duration::from_secs(2 * 24 * 60 *
 pub struct GrpcCertificateEncoding;
 
 impl crypto::CertificateEncoding for GrpcCertificateEncoding {
-    fn encode_tbs(infos: &crypto::CertificateInfoBundle) -> Result<Vec<u8>, CryptoError> {
+    type CertificateType = common::Certificate;
+
+    fn serialise_tbs(infos: &crypto::CertificateInfoBundle) -> Result<Vec<u8>, CryptoError> {
         let expires = infos.expires().duration_since(UNIX_EPOCH)
                            .map(|d| d.as_secs())
                            .map_err(|e| CryptoError::Message { message: e.to_string() })?;
@@ -46,9 +48,9 @@ impl crypto::CertificateEncoding for GrpcCertificateEncoding {
             signer: None,
         };
 
-        match *infos.signer_certificate() {
+        match infos.signer_certificate() {
             Some(c) => {
-                let gc = Certificate {
+                let gc = common::Certificate {
                     certificate: c.encoded_certificate().to_vec(),
                     signature: c.signature().to_vec(),
                 };
@@ -66,8 +68,8 @@ impl crypto::CertificateEncoding for GrpcCertificateEncoding {
         Ok(buf)
     }
 
-    fn encode(data: &crypto::Certificate) -> Result<Vec<u8>, CryptoError> {
-        let cert = Certificate {
+    fn serialise(data: &crypto::Certificate) -> Result<Vec<u8>, CryptoError> {
+        let cert = common::Certificate {
             certificate: data.encoded_certificate().to_vec(),
             signature: data.signature().to_vec(),
         };
@@ -79,6 +81,48 @@ impl crypto::CertificateEncoding for GrpcCertificateEncoding {
         })?;
 
         Ok(buf)
+    }
+
+    fn decode_partial(serialised: common::Certificate) -> Result<(crypto::Certificate, Option<common::Certificate>), CryptoError> {
+        let buf = Bytes::from(serialised.certificate.to_vec());
+        let tbs_cert = common::certificate::TbsCertificate::decode(buf).map_err(|e| CryptoError::Decoding {
+            message: "failed to decode certificate".to_string(),
+            cause: e,
+        })?;
+
+        let signed_identity = PublicKey::from_raw_bytes(&tbs_cert.identity[..])?;
+
+        let expiration = SystemTime::UNIX_EPOCH
+            .checked_add(Duration::from_secs(tbs_cert.expires))
+            .ok_or(CryptoError::Message {
+                message: format!("is invalid system time '{}'", tbs_cert.expires)
+            })?;
+
+        let cert_info = crypto::CertificateInfoBundle {
+            identity: signed_identity,
+            expiration,
+            serial: tbs_cert.uuid,
+            signer_certificate: None,
+        };
+
+        let cert = crypto::Certificate {
+            cert: serialised.certificate,
+            signature: serialised.signature,
+            infos: cert_info,
+        };
+
+        Ok((cert, tbs_cert.signer))
+    }
+
+
+    fn deserialise(bytes: Vec<u8>) -> Result<common::Certificate, CryptoError> {
+        let buf = Bytes::from(bytes);
+        let cert = common::Certificate::decode(buf).map_err(|e| CryptoError::Decoding {
+            message: "failed to decode certificate".to_string(),
+            cause: e,
+        })?;
+
+        Ok(cert)
     }
 }
 
@@ -100,10 +144,10 @@ impl AccountService for GrpcAccountService {
         // preparing client request
         let now = SystemTime::now().duration_since(UNIX_EPOCH)
                                    .map(|d| d.as_secs()).unwrap();
-        let pulbic = id.id();
+        let public = id.id();
         let challenge = signed_challenge::Challenge {
-            identity: pulbic.id_bytes(),
-            namespace: pulbic.namespace(),
+            identity: public.id_bytes(),
+            namespace: public.namespace(),
             timestamp: now,
         };
 
@@ -148,7 +192,7 @@ impl accounts_server::Accounts for InMemoryAccounts {
     async fn update_attestation(
         &self,
         request: tonic::Request<SignedChallenge>,
-    ) -> Result<tonic::Response<Certificate>, tonic::Status> {
+    ) -> Result<tonic::Response<common::Certificate>, tonic::Status> {
         let inner_req = request.into_inner();
 
         let raw_challenge = BytesMut::from(inner_req.challenge.as_ref() as &[u8]);
@@ -159,6 +203,7 @@ impl accounts_server::Accounts for InMemoryAccounts {
             })?;
 
         // check challenge timestamp
+        // TODO handle error
         let d = SystemTime::now().duration_since(UNIX_EPOCH)
                                  .map(|d| d.as_secs()).map_err(|e| tonic::Status::internal("internal error"))?;
 
@@ -193,7 +238,7 @@ impl accounts_server::Accounts for InMemoryAccounts {
                 tonic::Status::unknown("attestation error")
             })?;
 
-        Ok(tonic::Response::new(Certificate {
+        Ok(tonic::Response::new(common::Certificate {
             certificate: their_cert.encoded_certificate().to_vec(),
             signature: their_cert.signature().to_vec(),
         }))
@@ -201,7 +246,7 @@ impl accounts_server::Accounts for InMemoryAccounts {
 
     async fn check_attestation(
         &self,
-        request: tonic::Request<Certificate>,
+        request: tonic::Request<common::Certificate>,
     ) -> Result<tonic::Response<CheckResult>, tonic::Status> {
         //TODO
         Ok(tonic::Response::new(CheckResult {}))
@@ -242,7 +287,7 @@ mod account_grpc_tests {
             .expiration(Duration::from_secs(1000))
             .self_sign::<GrpcCertificateEncoding>(&server_id).unwrap();
 
-        let ids = Arc::new(crypto::SimpleDalekIdentities::new(server_id, cert));
+        let ids = Arc::new(crypto::SimpleDalekIdentities::new(server_id, Arc::new(cert)));
         let inner_accs = InMemoryAccounts { ids: Arc::clone(&ids) as Arc<dyn crypto::Identities> };
         return (inner_accs, ids);
     }
@@ -301,5 +346,4 @@ mod account_grpc_tests {
 
         return SignedChallenge { challenge: buf, signature };
     }
-
 }
