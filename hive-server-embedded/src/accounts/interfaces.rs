@@ -1,6 +1,4 @@
-use crate::prelude::*;
-
-use crate::crypto::PrivateKey;
+use hive_crypto::PrivateKey;
 
 use failure::{Error, Fail};
 
@@ -28,7 +26,7 @@ pub enum AccountsError {
     #[fail(display = "Cryptography failed: {}", message)]
     Cryptography {
         message: String,
-        #[fail(cause)] cause: crate::crypto::CryptoError,
+        #[fail(cause)] cause: hive_crypto::CryptoError,
     },
 }
 

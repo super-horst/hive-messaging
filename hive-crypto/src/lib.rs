@@ -1,6 +1,14 @@
+
+
+use std::sync::Arc;
+
 mod cryptostorage;
 mod error;
 pub use error::*;
+
+#[cfg(test)]
+mod test_utils;
+
 
 mod dalek_keys;
 mod certificates;
@@ -18,7 +26,6 @@ mod ratchet;
 mod x3dh;
 
 pub use ratchet::*;
-use std::sync::Arc;
 
 /// Identity provider
 #[async_trait::async_trait]

@@ -1,4 +1,5 @@
 use failure::{Error, Fail};
+
 #[derive(Debug, Fail)]
 pub enum CryptoError {
     #[fail(display = "Error message: {}", message)]

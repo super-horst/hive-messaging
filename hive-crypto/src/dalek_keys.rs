@@ -1,6 +1,5 @@
-use crate::prelude::*;
+use std::fmt;
 use std::sync::Arc;
-use std::borrow::Borrow;
 
 use x25519_dalek;
 use ed25519_dalek;

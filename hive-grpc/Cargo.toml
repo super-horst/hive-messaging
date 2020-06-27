@@ -1,0 +1,19 @@
+[package]
+name = "hive-grpc"
+version = "0.1.0"
+authors = ["horst <horst>"]
+edition = "2018"
+build = "build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tonic = "0.2.1"
+prost = "0.6.1"
+
+bytes = "0.5.4"
+
+hive-crypto = { version = "0.1.0", path = "../hive-crypto" }
+
+[build-dependencies]
+tonic-build = "0.2.0"

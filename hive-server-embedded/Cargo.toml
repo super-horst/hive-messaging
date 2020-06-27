@@ -1,0 +1,35 @@
+[package]
+name = "hive-server-embedded"
+version = "0.1.0"
+authors = ["super-horst <super-horst>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bytes = "0.5.4"
+log = "0.4.8"
+simple_logger = "1.6.0"
+env_logger = "0.7.1"
+tracing = "0.1.15"
+tracing-futures = "0.2.4"
+
+tokio = { version = "0.2", features = ["full"] }
+tokio-util = { version = "0.3.1", features = ["codec"] }
+tokio-postgres = "0.5.4"
+async-trait = "0.1.33"
+
+hex = "0.4.2"
+tonic = "0.2.1"
+prost = "0.6.1"
+
+futures = "0.3"
+dashmap = "3.11.4"
+
+failure = "0.1.8"
+
+base64 = "0.12.0"
+uuid = { version = "0.8.1", features = ["v4"] }
+
+hive-crypto = { version = "0.1.0", path = "../hive-crypto" }
+hive-grpc = { version = "0.1.0", path = "../hive-grpc" }

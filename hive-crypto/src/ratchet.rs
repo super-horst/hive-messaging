@@ -1,10 +1,9 @@
 use hkdf::Hkdf;
 use sha2::Sha512;
 
-use crate::crypto::error::*;
+use crate::error::*;
 
 use failure::{Error, Fail};
-
 
 #[derive(Debug, Fail)]
 pub enum RatchetError {

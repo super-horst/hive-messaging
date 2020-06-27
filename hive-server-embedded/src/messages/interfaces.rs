@@ -1,6 +1,4 @@
-use crate::prelude::*;
-
-use crate::crypto::PublicKey;
+use hive_crypto::PublicKey;
 
 use failure::{Error, Fail};
 
@@ -28,7 +26,7 @@ pub enum MessagesError {
     #[fail(display = "Cryptography failed: {}", message)]
     Cryptography {
         message: String,
-        #[fail(cause)] cause: crate::crypto::CryptoError,
+        #[fail(cause)] cause: hive_crypto::CryptoError,
     },
 }
 
@@ -39,7 +37,7 @@ pub struct Message;
 
 pub struct MessageState;
 
-#[async_trait]
+#[async_trait::async_trait]
 pub trait MessageService: Send + Sync {
     async fn send_message(&self, dst: &PublicKey, msg: Message) -> Result<ReceiptFuture, MessagesError>;
 

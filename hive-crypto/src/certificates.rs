@@ -1,15 +1,13 @@
-use crate::prelude::*;
-
 use std::borrow::Borrow;
+use std::hash::Hasher;
+use std::sync::Arc;
 use std::convert::TryFrom;
 use std::ops::{Add, Deref};
+use std::time::{Duration, UNIX_EPOCH, SystemTime};
 
 use uuid::Uuid;
 
-use super::*;
-use std::hash::Hasher;
-use std::sync::Arc;
-
+use crate::*;
 
 /// A certificate representation.
 ///
@@ -23,6 +21,15 @@ pub struct Certificate {
 }
 
 impl Certificate {
+    pub fn new(cert: Vec<u8>, signature: Vec<u8>, infos: CertificateInfoBundle) -> Certificate {
+        Certificate {
+            cert,
+            signature,
+            infos,
+        }
+    }
+
+
     /// get the encoded certificate
     pub fn encoded_certificate(&self) -> &[u8] {
         self.cert.as_slice()
@@ -73,6 +80,15 @@ pub struct CertificateInfoBundle {
 }
 
 impl CertificateInfoBundle {
+    pub fn new(identity: PublicKey, expiration: SystemTime, serial: String, signer_certificate: Option<Arc<Certificate>>) -> CertificateInfoBundle {
+        CertificateInfoBundle {
+            identity,
+            expiration,
+            serial,
+            signer_certificate,
+        }
+    }
+
     pub fn public_key(&self) -> &PublicKey {
         &self.identity
     }
@@ -180,8 +196,8 @@ impl CertificateFactory {
 #[cfg(test)]
 mod certificate_tests {
     use super::*;
-    use crate::crypto::PrivateKey;
-    use crate::accounts::GrpcCertificateEncoding;
+    use crate::PrivateKey;
+    /*use hive_server_embedded::accounts::GrpcCertificateEncoding;
 
     #[test]
     fn test_create_self_signed() {
@@ -215,5 +231,5 @@ mod certificate_tests {
             .sign::<GrpcCertificateEncoding>(&signer_private, Some(&Arc::new(signer_cert))).unwrap();
 
         signer_private.id().verify(signed.encoded_certificate(), signed.signature()).unwrap();
-    }
+    }*/
 }

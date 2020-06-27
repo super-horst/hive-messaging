@@ -1,14 +1,11 @@
-use crate::prelude::*;
-
-use crate::crypto::PrivateKey;
+use std::fmt;
 
 mod interfaces;
 mod grpc;
 
-#[cfg(test)]
-pub use grpc::GrpcCertificateEncoding;
-
 pub use interfaces::*;
+
+use hive_crypto::PrivateKey;
 
 pub struct Accounts<T> {
     wrapped: Box<T>,

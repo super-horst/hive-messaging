@@ -1,0 +1,34 @@
+[package]
+name = "hive-crypto"
+version = "0.1.0"
+authors = ["horst <horst>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# structural
+failure = "0.1.8"
+async-trait = "0.1.33"
+
+# tools
+log = "0.4.8"
+hex = "0.4.2"
+uuid = { version = "0.8.1", features = ["v4"] }
+dashmap = "3.11.4"
+prost = "0.6.1"
+
+# crypto
+rand = "0.6"
+rand_core = "0.5"
+x25519-dalek = "0.6"
+ed25519-dalek = "0.9.1"
+chacha20poly1305 = "0.5.1"
+hkdf = { version = "0.8", features= ["std"] }
+digest = "0.8.1"
+sha2 = "0.8.2"
+
+[dev-dependencies]
+bytes = "0.5.4"
+hive-grpc = { version = "0.1.0", path = "../hive-grpc" }
+tokio = { version = "0.2", features = ["full"] }

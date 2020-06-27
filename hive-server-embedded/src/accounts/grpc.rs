@@ -1,4 +1,5 @@
-use crate::prelude::*;
+use std::time::{SystemTime, Duration, UNIX_EPOCH};
+use std::fmt;
 
 use std::convert::{TryFrom, TryInto};
 use std::ops::Add;
@@ -8,128 +9,30 @@ use bytes::{Bytes, BytesMut};
 use prost::Message;
 use uuid::Uuid;
 
-use crate::crypto;
-use crate::crypto::{CryptoError, PublicKey, CertificateInfoBundle};
+use log::*;
+
+use hive_crypto::{CryptoError,
+                  PublicKey,
+                  PrivateKey,
+                  Identities,
+                  CertificateFactory,
+                  CertificateInfoBundle,
+                  CertificateEncoding};
 
 use super::interfaces::*;
 
-mod common {
-    tonic::include_proto!("common");
-}
-
-mod accounts {
-    tonic::include_proto!("accounts");
-}
-
-use common::*;
-use accounts::*;
-use accounts::accounts_server;
+use hive_grpc::*;
+use hive_grpc::common::*;
+use hive_grpc::accounts::accounts_client::AccountsClient;
+use hive_grpc::accounts::accounts_server;
 
 const CHALLENGE_GRACE_SECONDS: u64 = 11;
 const DEFAULT_CLIENT_CERT_VALIDITY: Duration = Duration::from_secs(2 * 24 * 60 * 60);//2 days
 
-pub struct GrpcCertificateEncoding;
-
-impl crypto::CertificateEncoding for GrpcCertificateEncoding {
-    type CertificateType = common::Certificate;
-
-    fn serialise_tbs(infos: &crypto::CertificateInfoBundle) -> Result<Vec<u8>, CryptoError> {
-        let expires = infos.expires().duration_since(UNIX_EPOCH)
-                           .map(|d| d.as_secs())
-                           .map_err(|e| CryptoError::Message { message: e.to_string() })?;
-
-        let id = infos.public_key();
-
-        let mut tbs_cert = certificate::TbsCertificate {
-            identity: id.id_bytes(),
-            namespace: id.namespace(),
-            expires,
-            uuid: infos.serial().to_string(),
-            signer: None,
-        };
-
-        match infos.signer_certificate() {
-            Some(c) => {
-                let gc = common::Certificate {
-                    certificate: c.encoded_certificate().to_vec(),
-                    signature: c.signature().to_vec(),
-                };
-                tbs_cert.signer = Some(gc);
-            }
-            None => (),
-        }
-
-        let mut buf: Vec<u8> = Vec::with_capacity(tbs_cert.encoded_len());
-        tbs_cert.encode(&mut buf).map_err(|e| CryptoError::Encoding {
-            message: "Failed to encode TBS certificate".to_string(),
-            cause: e,
-        })?;
-
-        Ok(buf)
-    }
-
-    fn serialise(data: &crypto::Certificate) -> Result<Vec<u8>, CryptoError> {
-        let cert = common::Certificate {
-            certificate: data.encoded_certificate().to_vec(),
-            signature: data.signature().to_vec(),
-        };
-
-        let mut buf: Vec<u8> = Vec::with_capacity(cert.encoded_len());
-        cert.encode(&mut buf).map_err(|e| CryptoError::Encoding {
-            message: "Failed to encode certificate".to_string(),
-            cause: e,
-        })?;
-
-        Ok(buf)
-    }
-
-    fn decode_partial(serialised: common::Certificate) -> Result<(crypto::Certificate, Option<common::Certificate>), CryptoError> {
-        let buf = Bytes::from(serialised.certificate.to_vec());
-        let tbs_cert = common::certificate::TbsCertificate::decode(buf).map_err(|e| CryptoError::Decoding {
-            message: "failed to decode certificate".to_string(),
-            cause: e,
-        })?;
-
-        let signed_identity = PublicKey::from_raw_bytes(&tbs_cert.identity[..])?;
-
-        let expiration = SystemTime::UNIX_EPOCH
-            .checked_add(Duration::from_secs(tbs_cert.expires))
-            .ok_or(CryptoError::Message {
-                message: format!("is invalid system time '{}'", tbs_cert.expires)
-            })?;
-
-        let cert_info = crypto::CertificateInfoBundle {
-            identity: signed_identity,
-            expiration,
-            serial: tbs_cert.uuid,
-            signer_certificate: None,
-        };
-
-        let cert = crypto::Certificate {
-            cert: serialised.certificate,
-            signature: serialised.signature,
-            infos: cert_info,
-        };
-
-        Ok((cert, tbs_cert.signer))
-    }
-
-
-    fn deserialise(bytes: Vec<u8>) -> Result<common::Certificate, CryptoError> {
-        let buf = Bytes::from(bytes);
-        let cert = common::Certificate::decode(buf).map_err(|e| CryptoError::Decoding {
-            message: "failed to decode certificate".to_string(),
-            cause: e,
-        })?;
-
-        Ok(cert)
-    }
-}
-
 // #################### client ####################
 
 pub struct GrpcAccountService {
-    client: accounts_client::AccountsClient<tonic::transport::Channel>,
+    client: AccountsClient<tonic::transport::Channel>,
 }
 
 impl fmt::Debug for GrpcAccountService {
@@ -140,7 +43,7 @@ impl fmt::Debug for GrpcAccountService {
 
 #[async_trait::async_trait]
 impl AccountService for GrpcAccountService {
-    async fn update_attestation(&mut self, id: &crypto::PrivateKey) -> Result<(), AccountsError> {
+    async fn update_attestation(&mut self, id: &PrivateKey) -> Result<(), AccountsError> {
         // preparing client request
         let now = SystemTime::now().duration_since(UNIX_EPOCH)
                                    .map(|d| d.as_secs()).unwrap();
@@ -178,7 +81,7 @@ impl AccountService for GrpcAccountService {
 }
 
 pub struct InMemoryAccounts {
-    ids: Arc<dyn crypto::Identities>,
+    ids: Arc<dyn Identities>,
 }
 
 impl fmt::Debug for InMemoryAccounts {
@@ -230,7 +133,7 @@ impl accounts_server::Accounts for InMemoryAccounts {
         let my_id = self.ids.my_id();
         let my_cert = self.ids.my_certificate();
 
-        let their_cert = crypto::CertificateFactory::default()
+        let their_cert = CertificateFactory::default()
             .expiration(DEFAULT_CLIENT_CERT_VALIDITY)
             .certified(id).sign::<GrpcCertificateEncoding>(my_id, Some(my_cert))
             .map_err(|e| {
@@ -247,17 +150,17 @@ impl accounts_server::Accounts for InMemoryAccounts {
     async fn check_attestation(
         &self,
         request: tonic::Request<common::Certificate>,
-    ) -> Result<tonic::Response<CheckResult>, tonic::Status> {
+    ) -> Result<tonic::Response<accounts::CheckResult>, tonic::Status> {
         //TODO
-        Ok(tonic::Response::new(CheckResult {}))
+        Ok(tonic::Response::new(accounts::CheckResult {}))
     }
 
     async fn publish_pre_keys(
         &self,
-        request: tonic::Request<PreKeyBundle>,
-    ) -> Result<tonic::Response<PublishKeyResult>, tonic::Status> {
+        request: tonic::Request<common::PreKeyBundle>,
+    ) -> Result<tonic::Response<accounts::PublishKeyResult>, tonic::Status> {
         //TODO
-        Ok(tonic::Response::new(PublishKeyResult {}))
+        Ok(tonic::Response::new(accounts::PublishKeyResult {}))
     }
 }
 
@@ -265,16 +168,14 @@ impl accounts_server::Accounts for InMemoryAccounts {
 mod account_grpc_tests {
     use super::*;
     use tokio;
-    use crate::crypto;
-    use crypto::PrivateKey;
-    use crypto::Identities;
-    use crate::accounts::interfaces::AccountsError;
-    use crate::accounts::GrpcCertificateEncoding;
+    use hive_crypto::PrivateKey;
+    use hive_crypto::Identities;
+    use hive_crypto::SimpleDalekIdentities;
     use accounts_server::Accounts;
     use std::borrow::Borrow;
 
     pub fn build_server() -> (impl accounts_server::Accounts, Arc<dyn Identities>) {
-        let server_id = crypto::PrivateKey::generate()
+        let server_id = PrivateKey::generate()
             .map_err(|e| AccountsError::Cryptography {
                 message: "Unable to generate new key".to_string(),
                 cause: e,
@@ -282,13 +183,13 @@ mod account_grpc_tests {
 
         let server_public = server_id.id().copy();
 
-        let cert = crypto::CertificateFactory::default()
+        let cert = CertificateFactory::default()
             .certified(server_public)
             .expiration(Duration::from_secs(1000))
             .self_sign::<GrpcCertificateEncoding>(&server_id).unwrap();
 
-        let ids = Arc::new(crypto::SimpleDalekIdentities::new(server_id, Arc::new(cert)));
-        let inner_accs = InMemoryAccounts { ids: Arc::clone(&ids) as Arc<dyn crypto::Identities> };
+        let ids = Arc::new(SimpleDalekIdentities::new(server_id, Arc::new(cert)));
+        let inner_accs = InMemoryAccounts { ids: Arc::clone(&ids) as Arc<dyn Identities> };
         return (inner_accs, ids);
     }
 
@@ -300,7 +201,7 @@ mod account_grpc_tests {
         let now = SystemTime::now().duration_since(UNIX_EPOCH)
                                    .map(|d| d.as_secs()).unwrap();
 
-        let client_id = crypto::PrivateKey::generate()?;
+        let client_id = PrivateKey::generate()?;
         let challenge = signed_challenge::Challenge {
             identity: client_id.id().id_bytes(),
             namespace: client_id.id().namespace(),
@@ -332,7 +233,7 @@ mod account_grpc_tests {
         let now = SystemTime::now().duration_since(UNIX_EPOCH)
                                    .map(|d| d.as_secs()).unwrap();
 
-        let client_id = crypto::PrivateKey::generate().unwrap();
+        let client_id = PrivateKey::generate().unwrap();
         let challenge = signed_challenge::Challenge {
             identity: client_id.id().id_bytes(),
             namespace: client_id.id().namespace(),

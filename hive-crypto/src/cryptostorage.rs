@@ -1,12 +1,8 @@
-use tokio::fs::*;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use std::sync::Arc;
 
 use dashmap::DashMap;
 
-use crate::prelude::*;
-use crate::crypto::*;
-use std::ops::Deref;
-use std::sync::Arc;
+use crate::*;
 
 pub struct CryptoStore {
     certificates: DashMap<PublicKey, Arc<Certificate>>,
@@ -21,24 +17,15 @@ impl CryptoStore {
         }
     }
 
-    pub async fn init_key(&self, filename: &str) -> Result<(), CryptoError> {
-        let mut file = File::open(filename).await.map_err(|e| CryptoError::IOError {
-            message: format!("failed to open key file '{}'", filename),
-            cause: e,
-        })?;
-
-        let mut contents = vec![];
-        file.read_to_end(&mut contents).await.map_err(|e| CryptoError::IOError {
-            message: format!("failed to read from key file '{}'", filename).to_string(),
-            cause: e,
-        })?;
-
+    pub async fn init_key(&self, contents: &[u8]) -> Result<(), CryptoError> {
         let mut key_buf = [0u8; 32];
         if key_buf.len() > contents.len() {
             return Err(CryptoError::Message {
-                message: format!("'{}' contains invalid key format", filename).to_string(),
+                message: format!("received invalid key format").to_string(),
             });
         }
+
+        key_buf.copy_from_slice(contents);
 
         let private = PrivateKey::from_raw_bytes(key_buf)?;
         let public = private.id().copy();
@@ -64,20 +51,9 @@ impl CryptoStore {
         Ok(arc_cert)
     }
 
-    pub async fn init_certificate<E>(&self, filename: &str) -> Result<(), CryptoError>
+    pub async fn init_certificate<E>(&self, contents: &[u8]) -> Result<(), CryptoError>
         where E: CertificateEncoding {
-        let mut file = File::open(filename).await.map_err(|e| CryptoError::IOError {
-            message: format!("failed to open keystore file '{}'", filename),
-            cause: e,
-        })?;
-
-        let mut contents = vec![];
-        file.read_to_end(&mut contents).await.map_err(|e| CryptoError::IOError {
-            message: format!("failed to read from keystore file '{}'", filename).to_string(),
-            cause: e,
-        })?;
-
-        let raw_cert = E::deserialise(contents)?;
+        let raw_cert = E::deserialise(contents.to_vec())?;
         let _result = self.decode_chain_recursive::<E>(raw_cert)?;
 
         Ok(())
@@ -86,18 +62,21 @@ impl CryptoStore {
 
 #[cfg(test)]
 mod crypto_storage_tests {
+    use std::time::Duration;
+
+    use tokio::fs::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
     use super::*;
-    use crate::accounts::GrpcCertificateEncoding;
+    use crate::test_utils::GrpcCertificateEncoding;
+
 
     const CERTFILE: &'static str = "target/testcert.cert";
     const KEYFILE: &'static str = "target/testkey.key";
 
-
     #[tokio::test]
     async fn test_init_key() {
         let _r  = remove_file(KEYFILE).await;
-
-        let key = PrivateKey::generate().unwrap();
 
         let mut file = OpenOptions::new()
             .read(true)
@@ -106,17 +85,23 @@ mod crypto_storage_tests {
             .open(KEYFILE)
             .await.unwrap();
 
+        let key = PrivateKey::generate().unwrap();
+
         file.write_all(key.secret_bytes()).await.unwrap();
         std::mem::drop(file);
 
+        let mut file = File::open(KEYFILE).await.unwrap();
+
+        let mut contents = vec![];
+        file.read_to_end(&mut contents).await.unwrap();
+
         let store = CryptoStore::new();
-        store.init_key(KEYFILE).await.unwrap();
+        store.init_key(&contents[..]).await.unwrap();
 
         println!("contains {:?}", &store.keys);
 
         assert!(!store.keys.is_empty());
     }
-
 
     #[tokio::test]
     async fn test_init_cert_without_signer() {
@@ -141,8 +126,13 @@ mod crypto_storage_tests {
 
         std::mem::drop(file);
 
+        let mut file = File::open(CERTFILE).await.unwrap();
+
+        let mut contents = vec![];
+        file.read_to_end(&mut contents).await.unwrap();
+
         let store = CryptoStore::new();
-        store.init_certificate::<GrpcCertificateEncoding>(CERTFILE).await.unwrap();
+        store.init_certificate::<GrpcCertificateEncoding>(&contents[..]).await.unwrap();
 
         println!("contains {:?}", &store.certificates);
 
@@ -187,8 +177,13 @@ mod crypto_storage_tests {
 
         std::mem::drop(file);
 
+        let mut file = File::open(CERTFILE).await.unwrap();
+
+        let mut contents = vec![];
+        file.read_to_end(&mut contents).await.unwrap();
+
         let store = CryptoStore::new();
-        store.init_certificate::<GrpcCertificateEncoding>(CERTFILE).await.unwrap();
+        store.init_certificate::<GrpcCertificateEncoding>(&contents[..]).await.unwrap();
 
         println!("contains {:?}", &store.certificates);
 

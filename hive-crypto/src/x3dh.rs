@@ -1,4 +1,4 @@
-use crate::crypto::dalek_keys::*;
+use crate::*;
 
 use hkdf::Hkdf;
 use sha2::Sha256;
