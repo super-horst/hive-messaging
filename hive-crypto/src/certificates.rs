@@ -3,7 +3,7 @@ use std::hash::Hasher;
 use std::sync::Arc;
 use std::convert::TryFrom;
 use std::ops::{Add, Deref};
-use std::time::{Duration, UNIX_EPOCH, SystemTime};
+use std::time::{Duration, SystemTime};
 
 use uuid::Uuid;
 
@@ -28,7 +28,6 @@ impl Certificate {
             infos,
         }
     }
-
 
     /// get the encoded certificate
     pub fn encoded_certificate(&self) -> &[u8] {
@@ -80,6 +79,7 @@ pub struct CertificateInfoBundle {
 }
 
 impl CertificateInfoBundle {
+    /// construct a new CertificateInfoBundle
     pub fn new(identity: PublicKey, expiration: SystemTime, serial: String, signer_certificate: Option<Arc<Certificate>>) -> CertificateInfoBundle {
         CertificateInfoBundle {
             identity,
@@ -116,6 +116,8 @@ pub trait CertificateEncoding {
     /// encode certificate
     fn serialise(data: &Certificate) -> Result<Vec<u8>, CryptoError>;
 
+    /// partially decode a certificate
+    /// returns the certificate itself and an optional (encoded) signer
     fn decode_partial(serialised: Self::CertificateType) -> Result<(Certificate, Option<Self::CertificateType>), CryptoError>;
 
     /// partially parse a certificate
@@ -194,13 +196,57 @@ impl CertificateFactory {
 }
 
 #[cfg(test)]
-mod certificate_tests {
+pub mod certificate_tests {
     use super::*;
     use crate::PrivateKey;
-    /*use hive_server_embedded::accounts::GrpcCertificateEncoding;
+    use crate::test_utils::GrpcCertificateEncoding;
 
-    #[test]
-    fn test_create_self_signed() {
+    /// convenience method to create any signed certificate
+    pub fn create_signed_cert() -> Certificate {
+        let signer_key = PrivateKey::generate().unwrap();
+
+        let signer_cert = CertificateFactory::default()
+            .certified(signer_key.id().copy())
+            .expiration(Duration::from_secs(1000))
+            .self_sign::<GrpcCertificateEncoding>(&signer_key).map(Arc::new).unwrap();
+
+        let leaf_key = PrivateKey::generate().unwrap();
+
+        let leaf_cert = CertificateFactory::default()
+            .certified(leaf_key.id().copy())
+            .expiration(Duration::from_secs(1000))
+            .sign::<GrpcCertificateEncoding>(&signer_key, Some(&signer_cert)).unwrap();
+
+        return leaf_cert;
+    }
+
+    pub fn create_two_signed_certs() -> (Certificate, Certificate) {
+        let signer_key = PrivateKey::generate().unwrap();
+
+        let signer_cert = CertificateFactory::default()
+            .certified(signer_key.id().copy())
+            .expiration(Duration::from_secs(1000))
+            .self_sign::<GrpcCertificateEncoding>(&signer_key).map(Arc::new).unwrap();
+
+        let leaf_key_1 = PrivateKey::generate().unwrap();
+
+        let leaf_cert_1 = CertificateFactory::default()
+            .certified(leaf_key_1.id().copy())
+            .expiration(Duration::from_secs(1000))
+            .sign::<GrpcCertificateEncoding>(&signer_key, Some(&signer_cert)).unwrap();
+
+        let leaf_key_2 = PrivateKey::generate().unwrap();
+
+        let leaf_cert_2 = CertificateFactory::default()
+            .certified(leaf_key_2.id().copy())
+            .expiration(Duration::from_secs(1000))
+            .sign::<GrpcCertificateEncoding>(&signer_key, Some(&signer_cert)).unwrap();
+
+        return (leaf_cert_1, leaf_cert_2);
+    }
+
+    /// convenience method to create any self signed certificate
+    pub fn create_self_signed_cert() -> Certificate {
         let private = PrivateKey::generate().unwrap();
 
         let cert = CertificateFactory::default()
@@ -208,28 +254,22 @@ mod certificate_tests {
             .expiration(Duration::from_secs(1000))
             .self_sign::<GrpcCertificateEncoding>(&private).unwrap();
 
-        private.id().verify(cert.encoded_certificate(), cert.signature()).unwrap();
+        return cert;
+    }
+
+    #[test]
+    fn test_create_self_signed() {
+        let cert = create_self_signed_cert();
+
+        cert.public_key().verify(cert.encoded_certificate(), cert.signature()).unwrap();
     }
 
     #[test]
     fn test_create_signed() {
-        let signer_private = PrivateKey::generate().unwrap();
+        let signed = create_signed_cert();
 
-        let signer_cert = CertificateFactory::default()
-            .certified(signer_private.id().copy())
-            .expiration(Duration::from_secs(1000))
-            .self_sign::<GrpcCertificateEncoding>(&signer_private).unwrap();
+        let sig_cert = signed.infos.signer_certificate.unwrap();
 
-        signer_private.id().verify(signer_cert.encoded_certificate(), signer_cert.signature()).unwrap();
-
-        // Sign a foreign certificate
-        let signed_private = PrivateKey::generate().unwrap();
-
-        let signed = CertificateFactory::default()
-            .certified(signed_private.id().copy())
-            .expiration(Duration::from_secs(1000))
-            .sign::<GrpcCertificateEncoding>(&signer_private, Some(&Arc::new(signer_cert))).unwrap();
-
-        signer_private.id().verify(signed.encoded_certificate(), signed.signature()).unwrap();
-    }*/
+        sig_cert.public_key().verify(sig_cert.encoded_certificate(), sig_cert.signature()).unwrap();
+    }
 }

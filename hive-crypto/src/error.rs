@@ -36,4 +36,9 @@ pub enum CryptoError {
         message: String,
         #[fail(cause)] cause: ed25519_dalek::errors::SignatureError,
     },
+    #[fail(display = "KDF encountered an invalid length: {}", message)]
+    InvalidLength {
+        message: String,
+        #[fail(cause)] cause: hkdf::InvalidLength,
+    },
 }

@@ -5,34 +5,68 @@ use dashmap::DashMap;
 use crate::*;
 
 pub struct CryptoStore {
+    my_key: PrivateKey,
+    my_cert: Arc<Certificate>,
     certificates: DashMap<PublicKey, Arc<Certificate>>,
     keys: DashMap<PublicKey, PrivateKey>,
 }
 
-impl CryptoStore {
-    pub fn new() -> CryptoStore {
-        CryptoStore {
-            certificates: DashMap::new(),
-            keys: DashMap::new(),
+#[async_trait::async_trait]
+impl Identities for CryptoStore {
+    async fn resolve_id(&self, id: &[u8]) -> Result<PublicKey, CryptoError> {
+        PublicKey::from_raw_bytes(id)
+    }
+
+    fn my_id(&self) -> &PrivateKey {
+        &self.my_key
+    }
+
+    fn my_certificate(&self) -> &Arc<Certificate> {
+        &self.my_cert
+    }
+}
+
+/// build-a-cryptostore
+pub struct CryptoStoreBuilder {
+    my_key: Option<PrivateKey>,
+    my_cert: Option<Arc<Certificate>>,
+    known_certs: DashMap<PublicKey, Arc<Certificate>>,
+}
+
+impl CryptoStoreBuilder {
+    pub fn new() -> CryptoStoreBuilder {
+        CryptoStoreBuilder {
+            my_key: None,
+            my_cert: None,
+            known_certs: DashMap::new(),
         }
     }
 
-    pub async fn init_key(&self, contents: &[u8]) -> Result<(), CryptoError> {
+    pub fn my_key(mut self, key: PrivateKey) -> Self {
+        self.my_key = Some(key);
+
+        self
+    }
+
+    pub fn my_certificate(mut self, cert: Certificate) -> Self {
+        self.my_cert = Some(Arc::new(cert));
+
+        self
+    }
+
+    pub fn init_my_key(mut self, key_bytes: &[u8]) -> Result<Self, CryptoError> {
         let mut key_buf = [0u8; 32];
-        if key_buf.len() > contents.len() {
+        if key_buf.len() > key_bytes.len() {
             return Err(CryptoError::Message {
                 message: format!("received invalid key format").to_string(),
             });
         }
 
-        key_buf.copy_from_slice(contents);
+        key_buf.copy_from_slice(key_bytes);
 
-        let private = PrivateKey::from_raw_bytes(key_buf)?;
-        let public = private.id().copy();
+        self.my_key = Some(PrivateKey::from_raw_bytes(&key_buf)?);
 
-        self.keys.insert(public, private);
-
-        Ok(())
+        Ok(self)
     }
 
     fn decode_chain_recursive<E>(&self, cert: E::CertificateType) -> Result<Arc<Certificate>, CryptoError>
@@ -43,20 +77,59 @@ impl CryptoStore {
             cert.infos.signer_certificate = Some(self.decode_chain_recursive::<E>(s)?);
         }
 
-        let arc_cert = Arc::new(cert);
-        let public = arc_cert.public_key().copy();
+        let public = cert.public_key().copy();
 
-        self.certificates.insert(public, Arc::clone(&arc_cert));
+        return if self.known_certs.contains_key(&public) {
+            let entry = self.known_certs.get(&public)
+                            .ok_or(CryptoError::Message {
+                                message: "illegal state".to_string()
+                            })?;
 
-        Ok(arc_cert)
+            Ok(Arc::clone(entry.value()))
+        } else {
+            let arc_cert = Arc::new(cert);
+            self.known_certs.insert(public, Arc::clone(&arc_cert));
+            Ok(arc_cert)
+        };
     }
 
-    pub async fn init_certificate<E>(&self, contents: &[u8]) -> Result<(), CryptoError>
+    /// initialise my certificate from bytes
+    pub fn init_my_certificate<E>(mut self, cert_bytes: &[u8]) -> Result<Self, CryptoError>
         where E: CertificateEncoding {
-        let raw_cert = E::deserialise(contents.to_vec())?;
+        let raw_cert = E::deserialise(cert_bytes.to_vec())?;
+        let result = self.decode_chain_recursive::<E>(raw_cert)?;
+
+        self.my_cert = Some(result);
+
+        Ok(self)
+    }
+
+    /// initialise my certificate from bytes
+    pub fn init_other_certificate<E>(mut self, cert_bytes: &[u8]) -> Result<Self, CryptoError>
+        where E: CertificateEncoding {
+        let raw_cert = E::deserialise(cert_bytes.to_vec())?;
         let _result = self.decode_chain_recursive::<E>(raw_cert)?;
 
-        Ok(())
+        Ok(self)
+    }
+
+    pub fn build(self) -> Result<CryptoStore, CryptoError> {
+        let my_key = self.my_key.ok_or(
+            CryptoError::Message {
+                message: "no private key given".to_string()
+            })?;
+
+        // calculate expiration timestamp
+        let my_cert = self.my_cert.ok_or(CryptoError::Message {
+            message: "no certificate given".to_string()
+        })?;
+
+        Ok(CryptoStore {
+            my_key,
+            my_cert,
+            certificates: self.known_certs,
+            keys: DashMap::new(),
+        })
     }
 }
 
@@ -64,136 +137,73 @@ impl CryptoStore {
 mod crypto_storage_tests {
     use std::time::Duration;
 
-    use tokio::fs::*;
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
     use super::*;
     use crate::test_utils::GrpcCertificateEncoding;
-
-
-    const CERTFILE: &'static str = "target/testcert.cert";
-    const KEYFILE: &'static str = "target/testkey.key";
+    use crate::certificates::certificate_tests;
 
     #[tokio::test]
-    async fn test_init_key() {
-        let _r  = remove_file(KEYFILE).await;
+    async fn test_builder_with_signed_cert() {
+        let my_key = PrivateKey::generate().unwrap();
 
-        let mut file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(KEYFILE)
-            .await.unwrap();
-
-        let key = PrivateKey::generate().unwrap();
-
-        file.write_all(key.secret_bytes()).await.unwrap();
-        std::mem::drop(file);
-
-        let mut file = File::open(KEYFILE).await.unwrap();
-
-        let mut contents = vec![];
-        file.read_to_end(&mut contents).await.unwrap();
-
-        let store = CryptoStore::new();
-        store.init_key(&contents[..]).await.unwrap();
-
-        println!("contains {:?}", &store.keys);
-
-        assert!(!store.keys.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_init_cert_without_signer() {
-        let _r  = remove_file(CERTFILE).await;
-
-        let key = PrivateKey::generate().unwrap();
-
-        let cert = CertificateFactory::default()
-            .certified(key.id().copy())
-            .expiration(Duration::from_secs(1000)).self_sign::<GrpcCertificateEncoding>(&key).unwrap();
-
+        let cert = certificate_tests::create_signed_cert();
         let cert_bytes = GrpcCertificateEncoding::serialise(&cert).unwrap();
 
-        let mut file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(CERTFILE)
-            .await.unwrap();
+        let mut csb = CryptoStoreBuilder::new()
+            .init_my_key(my_key.secret_bytes()).unwrap()
+            .init_my_certificate::<GrpcCertificateEncoding>(&cert_bytes[..]).unwrap();
 
-        file.write_all(&cert_bytes[..]).await.unwrap();
+        let store = csb.build().unwrap();
 
-        std::mem::drop(file);
+        println!("contains keys{:?}", &store.keys);
+        println!("contains certs{:?}", &store.certificates);
 
-        let mut file = File::open(CERTFILE).await.unwrap();
-
-        let mut contents = vec![];
-        file.read_to_end(&mut contents).await.unwrap();
-
-        let store = CryptoStore::new();
-        store.init_certificate::<GrpcCertificateEncoding>(&contents[..]).await.unwrap();
-
-        println!("contains {:?}", &store.certificates);
-
+        assert_eq!(store.my_id().secret_bytes(), my_key.secret_bytes());
         assert!(!store.certificates.is_empty());
-
-        let mut contains_signer = false;
-        for (_, ref entry) in store.certificates {
-            contains_signer |= entry.infos.signer_certificate.is_some();
-        }
-
-        assert!(!contains_signer);
+        // signed certificate, so at least 2 certs
+        assert!(store.certificates.len() > 1);
     }
 
     #[tokio::test]
-    async fn test_init_cert_with_signer() {
-        let _r  = remove_file(CERTFILE).await;
+    async fn test_builder_with_multiple_signed_cert() {
+        let my_key = PrivateKey::generate().unwrap();
 
-        let signer_key = PrivateKey::generate().unwrap();
+        let (cert1, cert2) = certificate_tests::create_two_signed_certs();
+        let cert_bytes_1 = GrpcCertificateEncoding::serialise(&cert1).unwrap();
+        let cert_bytes_2 = GrpcCertificateEncoding::serialise(&cert2).unwrap();
 
-        let signer_cert = CertificateFactory::default()
-            .certified(signer_key.id().copy())
-            .expiration(Duration::from_secs(1000))
-            .self_sign::<GrpcCertificateEncoding>(&signer_key).map(Arc::new).unwrap();
+        let mut csb = CryptoStoreBuilder::new()
+            .init_my_key(my_key.secret_bytes()).unwrap()
+            .init_my_certificate::<GrpcCertificateEncoding>(&cert_bytes_1[..]).unwrap()
+            .init_other_certificate::<GrpcCertificateEncoding>(&cert_bytes_2[..]).unwrap();
 
-        let leaf_key = PrivateKey::generate().unwrap();
+        let store = csb.build().unwrap();
 
-        let leaf_cert = CertificateFactory::default()
-            .certified(leaf_key.id().copy())
-            .expiration(Duration::from_secs(1000))
-            .sign::<GrpcCertificateEncoding>(&signer_key, Some(&signer_cert)).unwrap();
+        println!("contains keys{:?}", &store.keys);
+        println!("contains certs{:?}", &store.certificates);
 
-        let cert_bytes = GrpcCertificateEncoding::serialise(&leaf_cert).unwrap();
-
-        let mut file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(CERTFILE)
-            .await.unwrap();
-
-        file.write_all(&cert_bytes[..]).await.unwrap();
-
-        std::mem::drop(file);
-
-        let mut file = File::open(CERTFILE).await.unwrap();
-
-        let mut contents = vec![];
-        file.read_to_end(&mut contents).await.unwrap();
-
-        let store = CryptoStore::new();
-        store.init_certificate::<GrpcCertificateEncoding>(&contents[..]).await.unwrap();
-
-        println!("contains {:?}", &store.certificates);
-
+        assert_eq!(store.my_id().secret_bytes(), my_key.secret_bytes());
         assert!(!store.certificates.is_empty());
+        // 2 leaf_certs & common signer
+        assert_eq!(3, store.certificates.len());
+    }
 
-        let mut contains_signer = false;
-        for (_, ref entry) in store.certificates {
-            contains_signer |= entry.infos.signer_certificate.is_some();
-        }
+    #[tokio::test]
+    async fn test_builder_with_self_signed_cert() {
+        let my_key = PrivateKey::generate().unwrap();
 
-        assert!(contains_signer);
+        let cert = certificate_tests::create_self_signed_cert();
+        let cert_bytes = GrpcCertificateEncoding::serialise(&cert).unwrap();
+
+        let csb = CryptoStoreBuilder::new()
+            .init_my_key(my_key.secret_bytes()).unwrap()
+            .init_my_certificate::<GrpcCertificateEncoding>(&cert_bytes[..]).unwrap();
+
+        let store = csb.build().unwrap();
+
+        println!("contains keys{:?}", &store.keys);
+        println!("contains certs{:?}", &store.certificates);
+
+        assert_eq!(store.my_id().secret_bytes(), my_key.secret_bytes());
+        assert!(!store.certificates.is_empty());
     }
 }

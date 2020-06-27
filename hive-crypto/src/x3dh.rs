@@ -17,14 +17,14 @@ pub fn x3dh_agree_initial(ik_a: &PrivateKey,
     let dh3 = ek_a.diffie_hellman(pre_key);
 
     let mut dh = Vec::with_capacity(DH_BUFFER_SIZE);
-    dh.extend_from_slice(dh1.as_bytes());
-    dh.extend_from_slice(dh2.as_bytes());
-    dh.extend_from_slice(dh3.as_bytes());
+    dh.extend_from_slice(&dh1[..]);
+    dh.extend_from_slice(&dh2[..]);
+    dh.extend_from_slice(&dh3[..]);
 
     if let Some(opk) = onetime_pre_key {
         let dh4 = ek_a.diffie_hellman(&opk);
 
-        dh.extend_from_slice(dh4.as_bytes());
+        dh.extend_from_slice(&dh4[..]);
     }
 
 // shrink buffer if necessary
@@ -47,14 +47,14 @@ pub fn x3dh_agree_respond(ik_a: &PublicKey,
     let dh3 = pre_key.diffie_hellman(ek_a);
 
     let mut dh = Vec::with_capacity(DH_BUFFER_SIZE);
-    dh.extend_from_slice(dh1.as_bytes());
-    dh.extend_from_slice(dh2.as_bytes());
-    dh.extend_from_slice(dh3.as_bytes());
+    dh.extend_from_slice(&dh1[..]);
+    dh.extend_from_slice(&dh2[..]);
+    dh.extend_from_slice(&dh3[..]);
 
     if let Some(opk) = onetime_pre_key {
         let dh4 = opk.diffie_hellman(&ek_a);
 
-        dh.extend_from_slice(dh4.as_bytes());
+        dh.extend_from_slice(&dh4[..]);
     }
 
     // shrink buffer if necessary

@@ -170,7 +170,7 @@ mod account_grpc_tests {
     use tokio;
     use hive_crypto::PrivateKey;
     use hive_crypto::Identities;
-    use hive_crypto::SimpleDalekIdentities;
+    use hive_crypto::{CryptoStore, CryptoStoreBuilder};
     use accounts_server::Accounts;
     use std::borrow::Borrow;
 
@@ -188,8 +188,13 @@ mod account_grpc_tests {
             .expiration(Duration::from_secs(1000))
             .self_sign::<GrpcCertificateEncoding>(&server_id).unwrap();
 
-        let ids = Arc::new(SimpleDalekIdentities::new(server_id, Arc::new(cert)));
-        let inner_accs = InMemoryAccounts { ids: Arc::clone(&ids) as Arc<dyn Identities> };
+        let b = CryptoStoreBuilder::new().my_key(server_id)
+                                         .my_certificate(cert);
+
+        let store = b.build().unwrap();
+
+        let ids = Arc::new(store) as Arc<dyn Identities>;
+        let inner_accs = InMemoryAccounts { ids: Arc::clone(&ids) };
         return (inner_accs, ids);
     }
 

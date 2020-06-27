@@ -9,39 +9,8 @@ use sha2::Sha512;
 use super::*;
 use std::hash::Hasher;
 
-//TODO initial implementation is not ready for production!
-//TODO [UPDATE] ... coming closer to be ready for production!
 
 const COMBINED_PUBLIC_KEY_SIZE: usize = 64;
-
-/// Simple Identities object
-#[derive(Debug)]
-pub struct SimpleDalekIdentities {
-    my_id: PrivateKey,
-    my_certificate: Arc<Certificate>,
-}
-
-/// Dalek identities provider
-impl SimpleDalekIdentities {
-    pub fn new(private: PrivateKey, certificate: Arc<Certificate>) -> SimpleDalekIdentities {
-        return SimpleDalekIdentities { my_id: private, my_certificate: certificate };
-    }
-}
-
-#[async_trait::async_trait]
-impl Identities for SimpleDalekIdentities {
-    async fn resolve_id(&self, id: &[u8]) -> Result<PublicKey, CryptoError> {
-        PublicKey::from_raw_bytes(id)
-    }
-
-    fn my_id(&self) -> &PrivateKey {
-        &self.my_id
-    }
-
-    fn my_certificate(&self) -> &Arc<Certificate> {
-        &self.my_certificate
-    }
-}
 
 /// Dalek public key
 pub struct PublicKey {
@@ -160,11 +129,11 @@ impl PrivateKey {
         use rand_core::OsRng;
         let raw_privates = x25519_dalek::StaticSecret::new(&mut OsRng).to_bytes();
 
-        PrivateKey::from_raw_bytes(raw_privates)
+        PrivateKey::from_raw_bytes(&raw_privates[..])
     }
 
-    pub(crate) fn from_raw_bytes(private: [u8; 32]) -> Result<PrivateKey, CryptoError> {
-        let ed_private = ed25519_dalek::SecretKey::from_bytes(&private[..])
+    pub(crate) fn from_raw_bytes(private: &[u8]) -> Result<PrivateKey, CryptoError> {
+        let ed_private = ed25519_dalek::SecretKey::from_bytes(private)
             .map_err(|e| CryptoError::Key {
                 message: "Failed to process secret key bytes".to_string(),
                 cause: e,
@@ -193,9 +162,8 @@ impl PrivateKey {
         self.ed_secret.as_bytes()
     }
 
-
-    pub fn diffie_hellman(&self, public: &PublicKey) -> x25519_dalek::SharedSecret {
-        self.x_secret.diffie_hellman(&public.x_public)
+    pub fn diffie_hellman(&self, public: &PublicKey) -> [u8; 32] {
+        self.x_secret.diffie_hellman(&public.x_public).as_bytes().clone()
     }
 
     /// Sign some data using the underlying private key.
@@ -248,22 +216,22 @@ mod dalek_crypto_tests {
         use x25519_dalek;
         use rand_core::OsRng;
         let a_x_privates = x25519_dalek::StaticSecret::new(&mut OsRng);
-        let a_my_privates = PrivateKey::from_raw_bytes(a_x_privates.to_bytes()).unwrap();
+        let a_my_privates = PrivateKey::from_raw_bytes(&a_x_privates.to_bytes()[..]).unwrap();
 
         let b_x_privates = x25519_dalek::StaticSecret::new(&mut OsRng);
-        let b_my_privates = PrivateKey::from_raw_bytes(b_x_privates.to_bytes()).unwrap();
+        let b_my_privates = PrivateKey::from_raw_bytes(&b_x_privates.to_bytes()[..]).unwrap();
 
         let dh1 = a_my_privates.diffie_hellman(&b_my_privates.public);
         let dh2 = b_my_privates.diffie_hellman(&a_my_privates.public);
 
-        let dh3 = a_x_privates.diffie_hellman(&x25519_dalek::PublicKey::from(&b_x_privates));
-        let dh4 = b_x_privates.diffie_hellman(&x25519_dalek::PublicKey::from(&a_x_privates));
+        let dh3 = a_x_privates.diffie_hellman(&x25519_dalek::PublicKey::from(&b_x_privates)).as_bytes().clone();
+        let dh4 = b_x_privates.diffie_hellman(&x25519_dalek::PublicKey::from(&a_x_privates)).as_bytes().clone();
 
-        assert_eq!(dh1.as_bytes(), dh2.as_bytes());
-        assert_eq!(dh1.as_bytes(), dh3.as_bytes());
-        assert_eq!(dh1.as_bytes(), dh4.as_bytes());
-        assert_eq!(dh2.as_bytes(), dh3.as_bytes());
-        assert_eq!(dh2.as_bytes(), dh4.as_bytes());
-        assert_eq!(dh3.as_bytes(), dh4.as_bytes());
+        assert_eq!(dh1, dh2);
+        assert_eq!(dh1, dh3);
+        assert_eq!(dh1, dh4);
+        assert_eq!(dh2, dh3);
+        assert_eq!(dh2, dh4);
+        assert_eq!(dh3, dh4);
     }
 }

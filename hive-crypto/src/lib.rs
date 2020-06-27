@@ -1,11 +1,7 @@
-
-
 use std::sync::Arc;
 
 mod cryptostorage;
 mod error;
-pub use error::*;
-
 #[cfg(test)]
 mod test_utils;
 
@@ -13,19 +9,27 @@ mod test_utils;
 mod dalek_keys;
 mod certificates;
 
+pub use error::*;
+
 pub use dalek_keys::{PrivateKey,
-                     PublicKey,
-                     SimpleDalekIdentities};
+                     PublicKey};
 
 pub use certificates::{Certificate,
                        CertificateInfoBundle,
                        CertificateEncoding,
                        CertificateFactory};
 
+pub use cryptostorage::*;
+
 mod ratchet;
 mod x3dh;
 
 pub use ratchet::*;
+
+//TODO initial implementation is not ready for production!
+//TODO [UPDATE] ... coming closer to be ready for production!
+//TODO [UPDATE] ... some more cool stuff & moved this block!
+
 
 /// Identity provider
 #[async_trait::async_trait]
