@@ -111,18 +111,18 @@ pub trait CertificateEncoding {
     type CertificateType;
 
     /// encode the raw certicate data that is to be signed
-    fn serialise_tbs(infos: &CertificateInfoBundle) -> Result<Vec<u8>, CryptoError>;
+    fn serialise_tbs(infos: &CertificateInfoBundle) -> Result<Vec<u8>, failure::Error>;
 
     /// encode certificate
-    fn serialise(data: &Certificate) -> Result<Vec<u8>, CryptoError>;
+    fn serialise(data: &Certificate) -> Result<Vec<u8>, failure::Error>;
 
     /// partially decode a certificate
     /// returns the certificate itself and an optional (encoded) signer
-    fn decode_partial(serialised: Self::CertificateType) -> Result<(Certificate, Option<Self::CertificateType>), CryptoError>;
+    fn decode_partial(serialised: Self::CertificateType) -> Result<(Certificate, Option<Self::CertificateType>), failure::Error>;
 
     /// partially parse a certificate
     /// returns the certificate itself and an optional (unparsed) signer
-    fn deserialise(bytes: Vec<u8>) -> Result<Self::CertificateType, CryptoError>;
+    fn deserialise(bytes: Vec<u8>) -> Result<Self::CertificateType, failure::Error>;
 }
 
 /// Build-a-certificate.
@@ -187,7 +187,11 @@ impl CertificateFactory {
             signer_certificate: signer_cert.map(Arc::clone),
         };
 
-        let tbs = E::serialise_tbs(&infos)?;
+        let tbs = E::serialise_tbs(&infos)
+            .map_err(|e| CryptoError::Unspecified {
+                message: "failed to serialise tbs certificate".to_string(),
+                cause: e,
+            })?;
 
         let signature = signer.sign(&tbs[..])?;
 

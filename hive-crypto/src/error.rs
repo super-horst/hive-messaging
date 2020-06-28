@@ -11,16 +11,6 @@ pub enum CryptoError {
         message: String,
         #[fail(cause)] cause: Error,
     },
-    #[fail(display = "Decoding failed: {}", message)]
-    Decoding {
-        message: String,
-        #[fail(cause)] cause: prost::DecodeError,
-    },
-    #[fail(display = "Encoding failed: {}", message)]
-    Encoding {
-        message: String,
-        #[fail(cause)] cause: prost::EncodeError,
-    },
     #[fail(display = "I/O operation failed: {}", message)]
     IOError {
         message: String,

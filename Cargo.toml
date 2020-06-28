@@ -1,6 +1,6 @@
 [workspace]
 members = [
     "hive-crypto",
-    "hive-server-embedded",
     "hive-grpc",
+    "hive-server-embedded",
 ]

@@ -16,7 +16,6 @@ log = "0.4.8"
 hex = "0.4.2"
 uuid = { version = "0.8.1", features = ["v4"] }
 dashmap = "3.11.4"
-prost = "0.6.1"
 
 # crypto
 rand = "0.6"
@@ -30,5 +29,6 @@ sha2 = "0.8.2"
 
 [dev-dependencies]
 bytes = "0.5.4"
-hive-grpc = { version = "0.1.0", path = "../hive-grpc" }
+prost = "0.6.1"
 tokio = { version = "0.2", features = ["full"] }
+hive-grpc = { version = "0.1.0", path = "../hive-grpc" }

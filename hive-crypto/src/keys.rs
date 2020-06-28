@@ -1,14 +1,12 @@
 use std::fmt;
+use std::hash::Hasher;
 use std::sync::Arc;
 
 use x25519_dalek;
 use ed25519_dalek;
 use sha2::Sha512;
 
-// TODO resolve cycle
-use super::*;
-use std::hash::Hasher;
-
+use crate::error::*;
 
 const COMBINED_PUBLIC_KEY_SIZE: usize = 64;
 
@@ -183,7 +181,7 @@ impl fmt::Debug for PrivateKey {
 }
 
 #[cfg(test)]
-mod dalek_crypto_tests {
+mod key_tests {
     use super::*;
 
     #[test]

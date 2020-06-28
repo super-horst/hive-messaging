@@ -6,13 +6,13 @@ mod error;
 mod test_utils;
 
 
-mod dalek_keys;
+mod keys;
 mod certificates;
 
 pub use error::*;
 
-pub use dalek_keys::{PrivateKey,
-                     PublicKey};
+pub use keys::{PrivateKey,
+               PublicKey};
 
 pub use certificates::{Certificate,
                        CertificateInfoBundle,
@@ -24,7 +24,7 @@ pub use cryptostorage::*;
 mod ratchet;
 mod x3dh;
 
-pub use ratchet::*;
+pub use ratchet::DoubleRatchet;
 
 //TODO initial implementation is not ready for production!
 //TODO [UPDATE] ... coming closer to be ready for production!

@@ -69,7 +69,7 @@ impl CryptoStoreBuilder {
         Ok(self)
     }
 
-    fn decode_chain_recursive<E>(&self, cert: E::CertificateType) -> Result<Arc<Certificate>, CryptoError>
+    fn decode_chain_recursive<E>(&self, cert: E::CertificateType) -> Result<Arc<Certificate>, failure::Error>
         where E: CertificateEncoding {
         let (mut cert, signer) = E::decode_partial(cert)?;
 
@@ -96,8 +96,16 @@ impl CryptoStoreBuilder {
     /// initialise my certificate from bytes
     pub fn init_my_certificate<E>(mut self, cert_bytes: &[u8]) -> Result<Self, CryptoError>
         where E: CertificateEncoding {
-        let raw_cert = E::deserialise(cert_bytes.to_vec())?;
-        let result = self.decode_chain_recursive::<E>(raw_cert)?;
+        let raw_cert = E::deserialise(cert_bytes.to_vec())
+            .map_err(|e| CryptoError::Unspecified {
+                message: "failed to deserialise raw certificate".to_string(),
+                cause: e,
+            })?;
+        let result = self.decode_chain_recursive::<E>(raw_cert)
+                         .map_err(|e| CryptoError::Unspecified {
+                             message: "failed to deserialise raw certificate".to_string(),
+                             cause: e,
+                         })?;
 
         self.my_cert = Some(result);
 
@@ -105,10 +113,19 @@ impl CryptoStoreBuilder {
     }
 
     /// initialise my certificate from bytes
-    pub fn init_other_certificate<E>(mut self, cert_bytes: &[u8]) -> Result<Self, CryptoError>
+    pub fn init_other_certificate<E>(self, cert_bytes: &[u8]) -> Result<Self, CryptoError>
         where E: CertificateEncoding {
-        let raw_cert = E::deserialise(cert_bytes.to_vec())?;
-        let _result = self.decode_chain_recursive::<E>(raw_cert)?;
+        let raw_cert = E::deserialise(cert_bytes.to_vec())
+            .map_err(|e| CryptoError::Unspecified {
+                message: "failed to deserialise raw certificate".to_string(),
+                cause: e,
+            })?;
+
+        let _result = self.decode_chain_recursive::<E>(raw_cert)
+                          .map_err(|e| CryptoError::Unspecified {
+                              message: "failed to deserialise raw certificate".to_string(),
+                              cause: e,
+                          })?;
 
         Ok(self)
     }
@@ -148,7 +165,7 @@ mod crypto_storage_tests {
         let cert = certificate_tests::create_signed_cert();
         let cert_bytes = GrpcCertificateEncoding::serialise(&cert).unwrap();
 
-        let mut csb = CryptoStoreBuilder::new()
+        let csb = CryptoStoreBuilder::new()
             .init_my_key(my_key.secret_bytes()).unwrap()
             .init_my_certificate::<GrpcCertificateEncoding>(&cert_bytes[..]).unwrap();
 
@@ -171,7 +188,7 @@ mod crypto_storage_tests {
         let cert_bytes_1 = GrpcCertificateEncoding::serialise(&cert1).unwrap();
         let cert_bytes_2 = GrpcCertificateEncoding::serialise(&cert2).unwrap();
 
-        let mut csb = CryptoStoreBuilder::new()
+        let csb = CryptoStoreBuilder::new()
             .init_my_key(my_key.secret_bytes()).unwrap()
             .init_my_certificate::<GrpcCertificateEncoding>(&cert_bytes_1[..]).unwrap()
             .init_other_certificate::<GrpcCertificateEncoding>(&cert_bytes_2[..]).unwrap();
