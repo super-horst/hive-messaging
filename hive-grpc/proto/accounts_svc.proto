@@ -6,24 +6,21 @@ option java_multiple_files = true;
 option java_package = "hive.svc.accounts";
 option java_outer_classname = "AccountsSvc";
 
-import "hive_common.proto";
+import "common.proto";
 
 // Account service definition.
 service Accounts {
   // refresh attestation
   rpc UpdateAttestation (common.SignedChallenge) returns (common.Certificate);
 
-  // check attestation
-  rpc CheckAttestation (common.Certificate) returns (CheckResult);
-
   // publish new prekeys
-  rpc PublishPreKeys (common.PreKeyBundle) returns (PublishKeyResult);
+  rpc UpdatePreKeys (common.PreKeyBundle) returns (UpdateKeyResult);
+
+  // get a prekey bundle for the peer
+  rpc GetPreKeys (common.Peer) returns (common.PreKeyBundle);
+
 }
 
-message CheckResult {
-  //TODO
-}
-
-message PublishKeyResult {
+message UpdateKeyResult {
   //TODO
 }

@@ -27,7 +27,7 @@ pub fn x3dh_agree_initial(ik_a: &PrivateKey,
         dh.extend_from_slice(&dh4[..]);
     }
 
-// shrink buffer if necessary
+    // shrink buffer if necessary
     dh.shrink_to_fit();
 
     let h = Hkdf::<Sha256>::new(None, &dh);
@@ -67,10 +67,8 @@ pub fn x3dh_agree_respond(ik_a: &PublicKey,
     return okm;
 }
 
-
 #[cfg(test)]
 mod x3dh_tests {
-    // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
 
     #[test]

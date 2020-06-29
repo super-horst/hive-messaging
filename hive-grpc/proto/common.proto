@@ -2,6 +2,11 @@ syntax = "proto3";
 
 package common;
 
+message Peer {
+  bytes identity = 1;
+  string namespace = 2;
+}
+
 message PreKeyBundle {
   bytes identity = 1;
   string namespace = 2;
@@ -32,8 +37,8 @@ message Certificate {
     fixed64 expires = 3;
     string uuid = 4;
 
-    // if there is no signer given,
-    // the certificate must be self signed
+    /// if there is no signer given,
+    /// the certificate must be self signed
     Certificate signer = 5;
   }
 

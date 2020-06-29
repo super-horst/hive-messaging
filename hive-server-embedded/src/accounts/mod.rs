@@ -4,11 +4,12 @@ mod interfaces;
 mod grpc;
 
 pub use interfaces::*;
+pub use grpc::InMemoryAccounts;
 
 use hive_crypto::PrivateKey;
 
 pub struct Accounts<T> {
-    wrapped: Box<T>,
+    wrapped: T,
 }
 
 #[async_trait::async_trait]

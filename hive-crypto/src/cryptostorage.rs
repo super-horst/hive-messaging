@@ -8,7 +8,7 @@ pub struct CryptoStore {
     my_key: PrivateKey,
     my_cert: Arc<Certificate>,
     certificates: DashMap<PublicKey, Arc<Certificate>>,
-    keys: DashMap<PublicKey, PrivateKey>,
+    keys: DashMap<PublicKey, Arc<PrivateKey>>,
 }
 
 #[async_trait::async_trait]
@@ -24,6 +24,10 @@ impl Identities for CryptoStore {
     fn my_certificate(&self) -> &Arc<Certificate> {
         &self.my_cert
     }
+
+    fn known_private(&self, public: &PublicKey) -> Option<Arc<PrivateKey>> {
+        self.keys.get(public).map(|f| Arc::clone(f.value()))
+    }
 }
 
 /// build-a-cryptostore
@@ -31,6 +35,7 @@ pub struct CryptoStoreBuilder {
     my_key: Option<PrivateKey>,
     my_cert: Option<Arc<Certificate>>,
     known_certs: DashMap<PublicKey, Arc<Certificate>>,
+    known_keys: DashMap<PublicKey, Arc<PrivateKey>>,
 }
 
 impl CryptoStoreBuilder {
@@ -39,6 +44,7 @@ impl CryptoStoreBuilder {
             my_key: None,
             my_cert: None,
             known_certs: DashMap::new(),
+            known_keys: DashMap::new(),
         }
     }
 
@@ -65,6 +71,23 @@ impl CryptoStoreBuilder {
         key_buf.copy_from_slice(key_bytes);
 
         self.my_key = Some(PrivateKey::from_raw_bytes(&key_buf)?);
+
+        Ok(self)
+    }
+
+    pub fn init_other_key(mut self, key_bytes: &[u8]) -> Result<Self, CryptoError> {
+        let mut key_buf = [0u8; 32];
+        if key_buf.len() > key_bytes.len() {
+            return Err(CryptoError::Message {
+                message: format!("received invalid key format").to_string(),
+            });
+        }
+
+        key_buf.copy_from_slice(key_bytes);
+
+        let key = PrivateKey::from_raw_bytes(&key_buf)?;
+
+        self.known_keys.insert(key.id().copy(), Arc::new(key));
 
         Ok(self)
     }
@@ -145,7 +168,7 @@ impl CryptoStoreBuilder {
             my_key,
             my_cert,
             certificates: self.known_certs,
-            keys: DashMap::new(),
+            keys: self.known_keys,
         })
     }
 }

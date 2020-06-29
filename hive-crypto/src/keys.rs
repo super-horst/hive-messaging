@@ -1,6 +1,5 @@
 use std::fmt;
 use std::hash::Hasher;
-use std::sync::Arc;
 
 use x25519_dalek;
 use ed25519_dalek;
@@ -130,7 +129,7 @@ impl PrivateKey {
         PrivateKey::from_raw_bytes(&raw_privates[..])
     }
 
-    pub(crate) fn from_raw_bytes(private: &[u8]) -> Result<PrivateKey, CryptoError> {
+    pub fn from_raw_bytes(private: &[u8]) -> Result<PrivateKey, CryptoError> {
         let ed_private = ed25519_dalek::SecretKey::from_bytes(private)
             .map_err(|e| CryptoError::Key {
                 message: "Failed to process secret key bytes".to_string(),

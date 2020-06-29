@@ -8,6 +8,7 @@ use std::sync::Arc;
 use bytes::{Bytes, BytesMut};
 use prost::Message;
 use uuid::Uuid;
+use dashmap::DashMap;
 
 use log::*;
 
@@ -82,6 +83,16 @@ impl AccountService for GrpcAccountService {
 
 pub struct InMemoryAccounts {
     ids: Arc<dyn Identities>,
+    pre_keys: DashMap<PublicKey, common::PreKeyBundle>,
+}
+
+impl InMemoryAccounts {
+    pub fn new(ids: Arc<dyn Identities>) -> InMemoryAccounts {
+        InMemoryAccounts {
+            ids,
+            pre_keys: DashMap::new(),
+        }
+    }
 }
 
 impl fmt::Debug for InMemoryAccounts {
@@ -147,20 +158,61 @@ impl accounts_server::Accounts for InMemoryAccounts {
         }))
     }
 
-    async fn check_attestation(
+    async fn get_pre_keys(
         &self,
-        request: tonic::Request<common::Certificate>,
-    ) -> Result<tonic::Response<accounts::CheckResult>, tonic::Status> {
-        //TODO
-        Ok(tonic::Response::new(accounts::CheckResult {}))
+        request: tonic::Request<common::Peer>,
+    ) -> Result<tonic::Response<common::PreKeyBundle>, tonic::Status> {
+        let peer = request.into_inner();
+
+        //TODO error handling
+        let public = self.ids.resolve_id(&peer.identity[..]).await
+                         .map_err(|e| tonic::Status::not_found("invalid peer"))?;
+
+        //TODO error handling
+        let mut entry_ref = self.pre_keys.get_mut(&public)
+                                .ok_or(tonic::Status::not_found("invalid peer"))?;
+
+        let pre_key_ref = entry_ref.value_mut();
+
+        let otp: &mut Vec<Vec<u8>> = &mut pre_key_ref.one_time_pre_keys;
+
+        let otp_response: Vec<Vec<u8>>;
+
+        if otp.len() > 1 {
+            let key = otp.remove(0);
+            otp_response = vec![key];
+        } else {
+            otp_response = vec![];
+        }
+
+        let pre_key_response = common::PreKeyBundle {
+            identity: pre_key_ref.identity.clone(),
+            namespace: pre_key_ref.namespace.clone(),
+            pre_key: pre_key_ref.pre_key.clone(),
+            pre_key_signature: pre_key_ref.pre_key_signature.clone(),
+            one_time_pre_keys: otp_response,
+        };
+
+        Ok(tonic::Response::new(pre_key_response))
     }
 
-    async fn publish_pre_keys(
+    async fn update_pre_keys(
         &self,
         request: tonic::Request<common::PreKeyBundle>,
-    ) -> Result<tonic::Response<accounts::PublishKeyResult>, tonic::Status> {
-        //TODO
-        Ok(tonic::Response::new(accounts::PublishKeyResult {}))
+    ) -> Result<tonic::Response<accounts::UpdateKeyResult>, tonic::Status> {
+        let pre_key_update = request.into_inner();
+
+        //TODO error handling
+        let public = self.ids.resolve_id(&pre_key_update.identity[..]).await
+                         .map_err(|e| tonic::Status::not_found("invalid identity"))?;
+
+        //TODO error handling
+        public.verify(&pre_key_update.pre_key[..], &pre_key_update.pre_key_signature[..])
+              .map_err(|e| tonic::Status::failed_precondition("signature error"))?;
+
+        self.pre_keys.insert(public, pre_key_update);
+
+        Ok(tonic::Response::new(accounts::UpdateKeyResult {}))
     }
 }
 
@@ -168,11 +220,14 @@ impl accounts_server::Accounts for InMemoryAccounts {
 mod account_grpc_tests {
     use super::*;
     use tokio;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use hive_crypto::PrivateKey;
     use hive_crypto::Identities;
     use hive_crypto::{CryptoStore, CryptoStoreBuilder};
-    use accounts_server::Accounts;
+    use accounts_server::*;
     use std::borrow::Borrow;
+    use tonic::{transport::Server, Request, Response, Status};
+    use std::io::Write;
 
     pub fn build_server() -> (impl accounts_server::Accounts, Arc<dyn Identities>) {
         let server_id = PrivateKey::generate()
@@ -194,8 +249,120 @@ mod account_grpc_tests {
         let store = b.build().unwrap();
 
         let ids = Arc::new(store) as Arc<dyn Identities>;
-        let inner_accs = InMemoryAccounts { ids: Arc::clone(&ids) };
+        let inner_accs = InMemoryAccounts { ids: Arc::clone(&ids), pre_keys: DashMap::new() };
         return (inner_accs, ids);
+    }
+
+    #[tokio::test]
+    async fn test_run_server() {
+        let (accs, ids) = build_server();
+
+        let addr = "[::1]:50051".parse().unwrap();
+
+        println!("Server listening on {}", addr);
+
+        Server::builder()
+            .add_service(AccountsServer::new(accs))
+            .serve(addr)
+            .await.unwrap();
+    }
+
+    fn prepare_identity(name: &str) {
+        let my_key = PrivateKey::generate().unwrap();
+
+        let pre_private_key = PrivateKey::generate().unwrap();
+        let pre_public_key = pre_private_key.id().copy();
+
+        let signed_pre_key = my_key.sign(&pre_public_key.id_bytes()[..]).unwrap();
+
+        let otp_1 = PrivateKey::generate().unwrap();
+        let otp_2 = PrivateKey::generate().unwrap();
+        let otp_3 = PrivateKey::generate().unwrap();
+        let otp_4 = PrivateKey::generate().unwrap();
+        let otp_5 = PrivateKey::generate().unwrap();
+
+        let otp_privates = vec![otp_1.secret_bytes().to_vec(),
+                                otp_2.secret_bytes().to_vec(),
+                                otp_3.secret_bytes().to_vec(),
+                                otp_4.secret_bytes().to_vec(),
+                                otp_5.secret_bytes().to_vec()];
+
+        let otp_publics = vec![otp_1.id().id_bytes(),
+                               otp_2.id().id_bytes(),
+                               otp_3.id().id_bytes(),
+                               otp_4.id().id_bytes(),
+                               otp_5.id().id_bytes()];
+
+        let private_bundle = common::PreKeyBundle {
+            identity: my_key.secret_bytes().to_vec(),
+            namespace: "my_namespace".to_string(),
+            pre_key: pre_private_key.secret_bytes().to_vec(),
+            pre_key_signature: vec![],
+            one_time_pre_keys: otp_privates,
+        };
+
+        let public_bundle = common::PreKeyBundle {
+            identity: my_key.id().id_bytes(),
+            namespace: "my_namespace".to_string(),
+            pre_key: pre_public_key.id_bytes(),
+            pre_key_signature: signed_pre_key,
+            one_time_pre_keys: otp_publics,
+        };
+
+        std::fs::create_dir("../target/server_tests");
+
+        let mut privates = std::fs::OpenOptions::new().create(true).write(true)
+                                                      .open(format!("../target/server_tests/{}_private_bundle", name)).unwrap();
+
+        let mut privates_bytes = BytesMut::with_capacity(private_bundle.encoded_len());
+        private_bundle.encode(&mut privates_bytes).unwrap();
+
+        privates.write_all(&privates_bytes[..]).unwrap();
+
+        let mut publics = std::fs::OpenOptions::new().create(true).write(true)
+                                                     .open(format!("../target/server_tests/{}_public_bundle", name)).unwrap();
+
+        let mut public_bytes = BytesMut::with_capacity(public_bundle.encoded_len());
+        public_bundle.encode(&mut public_bytes).unwrap();
+
+        publics.write_all(&public_bytes[..]).unwrap();
+    }
+
+    #[test]
+    fn prepare_pre_key() {
+        prepare_identity("alice");
+    }
+
+    #[tokio::test]
+    async fn publish_alice_to_server() {
+        let mut client = AccountsClient::connect("http://[::1]:50051").await.unwrap();
+        let mut file = tokio::fs::File::open("../target/server_tests/alice_public_bundle").await.unwrap();
+
+        let mut contents = vec![];
+        file.read_to_end(&mut contents).await.unwrap();
+
+        let pre_keys = common::PreKeyBundle::decode(Bytes::from(contents)).unwrap();
+
+        client.update_pre_keys(tonic::Request::new(pre_keys)).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn get_alice_from_server() {
+        let mut client = AccountsClient::connect("http://[::1]:50051").await.unwrap();
+        let mut file = tokio::fs::File::open("../target/server_tests/alice_public_bundle").await.unwrap();
+
+        let mut contents = vec![];
+        file.read_to_end(&mut contents).await.unwrap();
+
+        let pre_keys = common::PreKeyBundle::decode(Bytes::from(contents)).unwrap();
+
+        let peer = common::Peer {
+            identity: pre_keys.identity.clone(),
+            namespace: pre_keys.namespace.clone(),
+        };
+
+        let bundle = client.get_pre_keys(tonic::Request::new(peer.clone())).await.unwrap().into_inner();
+        println!("{:?}", bundle);
     }
 
     #[tokio::test]

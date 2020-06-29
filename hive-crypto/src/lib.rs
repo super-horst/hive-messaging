@@ -43,9 +43,10 @@ pub trait Identities: Send + Sync {
 
     /// the current main identity
     fn my_certificate(&self) -> &Arc<Certificate>;
+
+    /// is there any known private key
+    fn known_private(&self, public: &PublicKey) -> Option<Arc<PrivateKey>>;
 }
-
-
 
 // TODO IMPLEMENTATION RUINS -> RECYCLE IF POSSIBLE
 

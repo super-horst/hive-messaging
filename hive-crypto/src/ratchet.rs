@@ -89,7 +89,6 @@ impl DoubleRatchet {
     }
 }
 
-
 struct CountingChain {
     chain: KdfChain,
     counter: u64,
