@@ -24,6 +24,8 @@ pub use cryptostorage::*;
 mod ratchet;
 mod x3dh;
 
+pub use x3dh::*;
+
 pub use ratchet::DoubleRatchet;
 
 //TODO initial implementation is not ready for production!

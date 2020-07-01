@@ -22,10 +22,11 @@ impl DoubleRatchet {
         let root_chain = KdfChain(root_key.clone());
         let send_chain = CountingChain::new(init_private.diffie_hellman(other_public));
 
-        // leave the receiving chain detached
         Ok(DoubleRatchet {
             send_chain,
-            recv_chain: CountingChain::new(root_key.clone()),
+            // leave the receiving chain detached
+            // the next asymmetric step will sync all chains
+            recv_chain: CountingChain::new([0u8; 32]),
             root_chain,
             current_private: init_private,
             current_other: other_public.copy(),
@@ -149,7 +150,6 @@ pub mod ratchet_tests {
         let b = PrivateKey::generate().unwrap();
 
         let root = a.diffie_hellman(b.id());
-
 
         // alice starts the conversation & sends bob her current ratchet key
         let mut alice = DoubleRatchet::initialise_to_send(&root, b.id()).unwrap();

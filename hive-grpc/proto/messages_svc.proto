@@ -10,10 +10,8 @@ import "common.proto";
 
 // Messages service definition.
 service Messages {
-  // refresh attestation
-  rpc GetMessages (MessageFilter) returns (stream MessageEnvelope);
+  rpc GetMessages (MessageFilter) returns (MessageEnvelope);
 
-  // refresh attestation
   rpc SendMessage (MessageEnvelope) returns (MessageSendResult);
 }
 
@@ -24,15 +22,16 @@ message MessageFilter {
   }
 
   State state = 1;
+  common.Peer dst = 2;
 }
-
-
 
 message MessageEnvelope {
 
-  bytes ratchet_key = 1;
+  Payload payload = 1;
 
-  Payload payload = 2;
+  common.Peer dst = 2;
+  bytes ratchet_key = 3;
+  uint64 chain_idx = 4;
 }
 
 message Payload {

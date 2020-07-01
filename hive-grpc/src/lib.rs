@@ -7,11 +7,10 @@ use prost::Message;
 
 use hive_crypto::{CryptoError,
                   PublicKey,
-                  PrivateKey,
-                  Identities,
-                  CertificateFactory,
                   CertificateInfoBundle,
                   CertificateEncoding};
+
+use std::hash::{Hash, Hasher};
 
 pub mod common {
     tonic::include_proto!("common");
@@ -24,6 +23,26 @@ pub mod accounts {
 pub mod messages {
     tonic::include_proto!("messages");
 }
+
+impl Eq for messages::MessageEnvelope {}
+
+impl std::hash::Hash for messages::MessageEnvelope {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.ratchet_key.hash(state);
+
+        state.write_u64(self.chain_idx);
+    }
+}
+
+impl Eq for common::Peer {}
+
+impl std::hash::Hash for common::Peer {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.identity.hash(state);
+        self.namespace.hash(state);
+    }
+}
+
 
 #[derive(Debug, Fail)]
 pub enum GrpcEncodingError {
