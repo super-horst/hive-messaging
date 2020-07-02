@@ -98,8 +98,15 @@ impl fmt::Debug for PublicKey {
     }
 }
 
-impl std::cmp::PartialEq for PublicKey {
-    fn eq(&self, other: &Self) -> bool {
+impl std::cmp::PartialEq<PublicKey> for PublicKey {
+    fn eq(&self, other: &PublicKey) -> bool {
+        self.id_bytes() == other.id_bytes()
+    }
+}
+
+impl<'a> std::cmp::PartialEq<PublicKey> for &'a PublicKey {
+
+    fn eq(&self, other: &PublicKey) -> bool {
         self.id_bytes() == other.id_bytes()
     }
 }
