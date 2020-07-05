@@ -12,7 +12,8 @@ mod certificates;
 pub use error::*;
 
 pub use keys::{PrivateKey,
-               PublicKey};
+               PublicKey,
+               FromBytes};
 
 pub use certificates::{Certificate,
                        CertificateInfoBundle,
@@ -26,7 +27,7 @@ mod x3dh;
 
 pub use x3dh::*;
 
-pub use ratchet::DoubleRatchet;
+pub use ratchet::{ManagedRatchet, SendStep, RecvStep};
 
 //TODO initial implementation is not ready for production!
 //TODO [UPDATE] ... coming closer to be ready for production!

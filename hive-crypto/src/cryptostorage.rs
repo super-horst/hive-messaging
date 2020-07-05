@@ -14,7 +14,7 @@ pub struct CryptoStore {
 #[async_trait::async_trait]
 impl Identities for CryptoStore {
     async fn resolve_id(&self, id: &[u8]) -> Result<PublicKey, CryptoError> {
-        PublicKey::from_raw_bytes(id)
+        PublicKey::from_bytes(id)
     }
 
     fn my_id(&self) -> &PrivateKey {
@@ -70,12 +70,12 @@ impl CryptoStoreBuilder {
 
         key_buf.copy_from_slice(key_bytes);
 
-        self.my_key = Some(PrivateKey::from_raw_bytes(&key_buf)?);
+        self.my_key = Some(PrivateKey::from_bytes(&key_buf)?);
 
         Ok(self)
     }
 
-    pub fn init_other_key(mut self, key_bytes: &[u8]) -> Result<Self, CryptoError> {
+    pub fn init_other_key(self, key_bytes: &[u8]) -> Result<Self, CryptoError> {
         let mut key_buf = [0u8; 32];
         if key_buf.len() > key_bytes.len() {
             return Err(CryptoError::Message {
@@ -85,7 +85,7 @@ impl CryptoStoreBuilder {
 
         key_buf.copy_from_slice(key_bytes);
 
-        let key = PrivateKey::from_raw_bytes(&key_buf)?;
+        let key = PrivateKey::from_bytes(&key_buf)?;
 
         self.known_keys.insert(key.id().copy(), Arc::new(key));
 
@@ -175,8 +175,6 @@ impl CryptoStoreBuilder {
 
 #[cfg(test)]
 mod crypto_storage_tests {
-    use std::time::Duration;
-
     use super::*;
     use crate::test_utils::GrpcCertificateEncoding;
     use crate::certificates::certificate_tests;

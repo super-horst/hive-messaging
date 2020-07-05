@@ -73,7 +73,7 @@ impl CertificateEncoding for GrpcCertificateEncoding {
                 cause: e,
             })?;
 
-        let signed_identity = PublicKey::from_raw_bytes(&tbs_cert.identity[..])?;
+        let signed_identity = PublicKey::from_bytes(&tbs_cert.identity[..])?;
 
         let expiration = SystemTime::UNIX_EPOCH
             .checked_add(Duration::from_secs(tbs_cert.expires))
