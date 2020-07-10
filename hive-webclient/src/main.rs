@@ -29,7 +29,19 @@ fn request(req: Request<Body>) -> Response<Body> {
                 Cow::Owned(bytes) => bytes.into(),
             };
 
-            Response::builder().status(200).body(body).unwrap()
+            let mut builder = Response::builder();
+
+            if path.ends_with(".html") {
+                builder.header("Content-Type", "text/html; charset=UTF-8");
+            } else if path.ends_with(".js") {
+                builder.header("Content-Type", "application/javascript; charset=UTF-8");
+            }else if path.ends_with(".wasm") {
+                builder.header("Content-Type", "application/wasm");
+            }
+
+            builder.status(200)
+                   .body(body)
+                   .unwrap()
         }
         None => Response::builder()
             .status(404)
@@ -44,6 +56,8 @@ fn main() {
     let server = Server::bind(&addr).serve(|| service_fn_ok(request));
     // query the port assigned by the os
     let port = server.local_addr().port();
+
+    println!("http://127.0.0.1:{}", port);
 
     thread::spawn(move || {
         // spawn `server` onto an Executor in its own thread
