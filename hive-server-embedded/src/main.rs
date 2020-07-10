@@ -7,7 +7,6 @@ use simple_logger;
 use tokio;
 use tokio::prelude::*;
 use tokio::fs;
-use tokio::io::{AsyncRead, AsyncWrite};
 
 mod messages;
 mod accounts;
@@ -58,7 +57,7 @@ async fn load_private_key() -> PrivateKey {
         let mut contents = vec![];
         file.read_to_end(&mut contents).await.unwrap();
 
-        return PrivateKey::from_raw_bytes(&contents[..]).unwrap();
+        return PrivateKey::from_bytes(&contents[..]).unwrap();
     } else {
         let server_id = PrivateKey::generate().unwrap();
 
@@ -102,12 +101,11 @@ async fn load_certificate(server_id: &PrivateKey) -> Certificate {
 mod account_grpc_tests {
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tonic::{transport::Server, Request, Response, Status};
     use std::io::Write;
     use bytes::{Bytes, BytesMut};
     use prost::Message;
 
-    fn prepare_identity(name: &str) {
+    /*fn prepare_identity(name: &str) {
         let my_key = PrivateKey::generate().unwrap();
 
         let pre_private_key = PrivateKey::generate().unwrap();
@@ -149,7 +147,7 @@ mod account_grpc_tests {
             one_time_pre_keys: otp_publics,
         };
 
-        std::fs::create_dir("../target/server_tests");
+        let _r = std::fs::create_dir("../target/server_tests");
 
         let mut privates = std::fs::OpenOptions::new().create(true).write(true)
                                                       .open(format!("../target/server_tests/{}_private_bundle", name)).unwrap();
@@ -185,7 +183,7 @@ mod account_grpc_tests {
 
         client.update_pre_keys(tonic::Request::new(alice_pre_keys.clone())).await.unwrap();
 
-        /// ############# finished account preparation
+        // ############# finished account preparation
 
         let mut file = tokio::fs::File::open("../target/server_tests/alice_private_bundle").await.unwrap();
 
@@ -194,8 +192,8 @@ mod account_grpc_tests {
 
         let private_pre_keys = common::PreKeyBundle::decode(Bytes::from(contents)).unwrap();
 
-        let ik = PrivateKey::from_raw_bytes(&private_pre_keys.identity[..]).unwrap();
-        let pre_key = PrivateKey::from_raw_bytes(&private_pre_keys.pre_key[..]).unwrap();
+        let ik = PrivateKey::from_bytes(&private_pre_keys.identity[..]).unwrap();
+        let pre_key = PrivateKey::from_bytes(&private_pre_keys.pre_key[..]).unwrap();
 
         let mut msg_client = hive_grpc::messages::messages_client::MessagesClient::connect("http://[::1]:50051").await.unwrap();
 
@@ -208,7 +206,7 @@ mod account_grpc_tests {
             state: 0,
             dst: Some(peer),
         };
-
+        let ratchet_key: PublicKey;
         let mut ratchet;
         loop {
             let response = msg_client.get_messages(tonic::Request::new(filter.clone())).await;
@@ -224,21 +222,23 @@ mod account_grpc_tests {
             let key_ex = msg.payload.unwrap().key_ex.unwrap();
             let other_peer = key_ex.origin.unwrap();
 
-            let ik_b = PublicKey::from_raw_bytes(&other_peer.identity[..]).unwrap();
-            let ek_b = PublicKey::from_raw_bytes(&key_ex.ephemeral_key[..]).unwrap();
+            let ik_b = PublicKey::from_bytes(&other_peer.identity[..]).unwrap();
+            let ek_b = PublicKey::from_bytes(&key_ex.ephemeral_key[..]).unwrap();
 
-            let ratchet_key = PublicKey::from_raw_bytes(&msg.ratchet_key[..]).unwrap();
+            ratchet_key = PublicKey::from_bytes(&msg.ratchet_key[..]).unwrap();
 
             let sk = x3dh_agree_respond(&ik_b, &ik, &ek_b, &pre_key, None);
 
             println!("alice sk {:?}", &sk);
 
-            ratchet = DoubleRatchet::initialise_received(&sk, &ik, &ratchet_key).unwrap();
+            ratchet = ManagedRatchet::initialise_received(&sk, &ik, &ratchet_key).unwrap();
 
             break;
         }
 
-        println!("alice ratchet {:?}", ratchet.recv_step());
+        let recv_step = ratchet.recv_step_for(&ratchet_key, );
+
+        println!("alice ratchet {:?}", recv_step.secret);
     }
 
     #[tokio::test]
@@ -258,8 +258,8 @@ mod account_grpc_tests {
 
         let bundle = client.get_pre_keys(tonic::Request::new(peer.clone())).await.unwrap().into_inner();
 
-        let ik_a = PublicKey::from_raw_bytes(&bundle.identity[..]).unwrap();
-        let pre_key = PublicKey::from_raw_bytes(&bundle.pre_key[..]).unwrap();
+        let ik_a = PublicKey::from_bytes(&bundle.identity[..]).unwrap();
+        let pre_key = PublicKey::from_bytes(&bundle.pre_key[..]).unwrap();
 
         let mut file = tokio::fs::File::open("../target/server_tests/bob_private_bundle").await.unwrap();
 
@@ -267,15 +267,17 @@ mod account_grpc_tests {
         file.read_to_end(&mut contents).await.unwrap();
 
         let private_pre_keys = common::PreKeyBundle::decode(Bytes::from(contents)).unwrap();
-        let ik_b = PrivateKey::from_raw_bytes(&private_pre_keys.identity[..]).unwrap();
+        let ik_b = PrivateKey::from_bytes(&private_pre_keys.identity[..]).unwrap();
 
         let (eph_b, sk) = x3dh_agree_initial(&ik_b, &ik_a, &pre_key, None);
 
         println!("bob sk {:?}", &sk);
 
-        let mut ratchet = DoubleRatchet::initialise_to_send(&sk, &ik_a).unwrap();
+        let mut ratchet = ManagedRatchet::initialise_to_send(&sk, &ik_a).unwrap();
 
-        println!("bob ratchet {:?}", ratchet.send_step());
+        let send_step = ratchet.send_step();
+
+        println!("bob ratchet {:?}", send_step.secret);
 
         let origin = hive_grpc::common::Peer {
             identity: ik_b.id().id_bytes(),
@@ -303,5 +305,5 @@ mod account_grpc_tests {
         let mut msg_client = hive_grpc::messages::messages_client::MessagesClient::connect("http://[::1]:50051").await.unwrap();
 
         msg_client.send_message(tonic::Request::new(envelope)).await.unwrap();
-    }
+    }*/
 }

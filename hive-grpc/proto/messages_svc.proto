@@ -26,12 +26,18 @@ message MessageFilter {
 }
 
 message MessageEnvelope {
-
   Payload payload = 1;
+  EncryptionParameters params = 2;
 
-  common.Peer dst = 2;
-  bytes ratchet_key = 3;
-  uint64 chain_idx = 4;
+  common.Peer dst = 3;
+}
+
+message EncryptionParameters {
+
+  bytes ratchet_key = 1;
+  uint64 chain_idx = 2;
+  uint64 prev_chain_count = 3;
+
 }
 
 message Payload {
