@@ -1,0 +1,60 @@
+body {
+  margin: 0;
+  font-family: Arial;
+}
+
+.box {
+  color: #fff;
+  text-align: center;
+}
+
+.center {
+  margin: 0;
+  position: relative;
+  top: 50%;
+  left: 50%;
+  -ms-transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);
+}
+
+.app_layout {
+  display: grid;
+  grid-template-columns: 1fr 3fr;
+  grid-template-rows: 100vh;
+}
+
+.contacts {
+    padding: 8px;
+    background-color: #A2DED0;
+}
+
+.contact {
+    display: box;
+    background-color: #FFA4FF;
+    spacing: 8px;
+    margin: 8px;
+}
+
+.contact:hover {
+    background-color: #AFA4FF;
+}
+
+.msg_view_layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 30px auto 50px;
+}
+
+.msg_header  { background-color: #F4D03F; }
+.msg_view   { background-color: #6C7A89; }
+
+.msg_input_view {
+    background-color: #59ABE3;
+    text-align: left;
+    padding: 8px;
+
+    display: grid;
+    grid-template-columns: 5fr 1fr;
+    grid-template-rows: auto;
+
+ }
