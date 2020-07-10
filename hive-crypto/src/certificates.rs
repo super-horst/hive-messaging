@@ -221,6 +221,7 @@ pub mod certificate_tests {
         return leaf_cert;
     }
 
+    /// convenience method to create two certificate with the same signer
     pub fn create_two_signed_certs() -> (Certificate, Certificate) {
         let signer_key = PrivateKey::generate().unwrap();
 

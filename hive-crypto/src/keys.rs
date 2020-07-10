@@ -6,7 +6,6 @@ use ed25519_dalek;
 use sha2::Sha512;
 
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
-use serde::forward_to_deserialize_any;
 use serde::de::{Visitor, SeqAccess};
 
 use crate::error::*;

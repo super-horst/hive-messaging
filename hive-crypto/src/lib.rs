@@ -35,11 +35,9 @@ pub use ratchet::{ManagedRatchet, SendStep, RecvStep};
 
 
 /// Identity provider
-#[async_trait::async_trait]
 pub trait Identities: Send + Sync {
     /// resolve identity from the given bytes
-    /// async covers I/O use cases
-    async fn resolve_id(&self, id: &[u8]) -> Result<PublicKey, CryptoError>;
+    fn resolve_id(&self, id: &[u8]) -> Result<PublicKey, CryptoError>;
 
     /// the current main identity
     fn my_id(&self) -> &PrivateKey;

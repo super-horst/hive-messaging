@@ -11,9 +11,9 @@ pub struct CryptoStore {
     keys: DashMap<PublicKey, Arc<PrivateKey>>,
 }
 
-#[async_trait::async_trait]
 impl Identities for CryptoStore {
-    async fn resolve_id(&self, id: &[u8]) -> Result<PublicKey, CryptoError> {
+
+    fn resolve_id(&self, id: &[u8]) -> Result<PublicKey, CryptoError> {
         PublicKey::from_bytes(id)
     }
 

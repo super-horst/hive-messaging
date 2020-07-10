@@ -9,7 +9,6 @@ edition = "2018"
 [dependencies]
 # structural
 failure = "0.1.8"
-async-trait = "0.1.33"
 
 # tools
 log = "0.4.8"
