@@ -2,41 +2,44 @@ use std::time::{SystemTime, UNIX_EPOCH, Duration};
 
 use bytes::Bytes;
 
-use failure::{Error, Fail};
+use failure::Fail;
 use prost::Message;
 
-use hive_crypto::{CryptoError,
+use hive_crypto::{FromBytes,
+                  CryptoError,
                   PublicKey,
                   CertificateInfoBundle,
                   CertificateEncoding};
 
 use std::hash::{Hash, Hasher};
 
+/// common protos
 pub mod common {
     tonic::include_proto!("common");
 }
 
+/// account protos
 pub mod accounts {
     tonic::include_proto!("accounts");
 }
 
+/// message protos
 pub mod messages {
     tonic::include_proto!("messages");
 }
 
+
 impl Eq for messages::MessageEnvelope {}
 
-impl std::hash::Hash for messages::MessageEnvelope {
+impl Hash for messages::MessageEnvelope {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.ratchet_key.hash(state);
-
-        state.write_u64(self.chain_idx);
+        self.dst.hash(state);
     }
 }
 
 impl Eq for common::Peer {}
 
-impl std::hash::Hash for common::Peer {
+impl Hash for common::Peer {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.identity.hash(state);
         self.namespace.hash(state);
@@ -58,6 +61,7 @@ pub enum GrpcEncodingError {
     },
 }
 
+/// Encode certificates in protobuf messages
 pub struct GrpcCertificateEncoding;
 
 impl CertificateEncoding for GrpcCertificateEncoding {
@@ -122,7 +126,7 @@ impl CertificateEncoding for GrpcCertificateEncoding {
                 cause: e,
             })?;
 
-        let signed_identity = PublicKey::from_raw_bytes(&tbs_cert.identity[..])?;
+        let signed_identity = PublicKey::from_bytes(&tbs_cert.identity[..])?;
 
         let expiration = SystemTime::UNIX_EPOCH
             .checked_add(Duration::from_secs(tbs_cert.expires))

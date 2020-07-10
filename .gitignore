@@ -1,5 +1,7 @@
 # Default ignored files
-target/**
+**/target/**
+**/app/
+
 .project
 *.iml
 .idea/**

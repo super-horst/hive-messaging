@@ -3,4 +3,9 @@ members = [
     "hive-crypto",
     "hive-grpc",
     "hive-server-embedded",
+    "hive-webclient",
+]
+
+exclude = [
+    "hive-webapp"
 ]

@@ -1,24 +1,20 @@
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 use std::fmt;
 
-use std::convert::{TryFrom, TryInto};
-use std::ops::Add;
 use std::sync::Arc;
 
 use bytes::{Bytes, BytesMut};
 use prost::Message;
-use uuid::Uuid;
 use dashmap::DashMap;
 
 use log::*;
 
-use hive_crypto::{CryptoError,
-                  PublicKey,
-                  PrivateKey,
-                  Identities,
-                  CertificateFactory,
-                  CertificateInfoBundle,
-                  CertificateEncoding};
+use hive_crypto::{
+    PublicKey,
+    PrivateKey,
+    Identities,
+    CertificateFactory,
+};
 
 use super::interfaces::*;
 
@@ -127,7 +123,7 @@ impl accounts_server::Accounts for InMemoryAccounts {
         }
 
         // identity is verified inside Identities
-        let id = self.ids.resolve_id(&challenge.identity).await
+        let id = self.ids.resolve_id(&challenge.identity)
                      .map_err(|e| {
                          debug!("Received unknown identity '{}': {}", hex::encode(challenge.identity), e);
                          tonic::Status::not_found("unable to verify identity")
@@ -165,7 +161,7 @@ impl accounts_server::Accounts for InMemoryAccounts {
         let peer = request.into_inner();
 
         //TODO error handling
-        let public = self.ids.resolve_id(&peer.identity[..]).await
+        let public = self.ids.resolve_id(&peer.identity[..])
                          .map_err(|e| tonic::Status::not_found("invalid peer"))?;
 
         //TODO error handling
@@ -203,7 +199,7 @@ impl accounts_server::Accounts for InMemoryAccounts {
         let pre_key_update = request.into_inner();
 
         //TODO error handling
-        let public = self.ids.resolve_id(&pre_key_update.identity[..]).await
+        let public = self.ids.resolve_id(&pre_key_update.identity[..])
                          .map_err(|e| tonic::Status::not_found("invalid identity"))?;
 
         //TODO error handling
@@ -309,7 +305,7 @@ mod account_grpc_tests {
             one_time_pre_keys: otp_publics,
         };
 
-        std::fs::create_dir("../target/server_tests");
+        let _r = std::fs::create_dir("../target/server_tests");
 
         let mut privates = std::fs::OpenOptions::new().create(true).write(true)
                                                       .open(format!("../target/server_tests/{}_private_bundle", name)).unwrap();

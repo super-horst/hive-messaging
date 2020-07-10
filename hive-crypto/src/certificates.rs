@@ -175,7 +175,9 @@ impl CertificateFactory {
                 message: "error handling validity".to_string()
             })?;
 
-        let serial = Uuid::new_v4().to_string();
+        //TODO
+        //let serial = Uuid::new_v4().to_string();
+        let serial = "some unique serial".to_string();
 
         let infos = CertificateInfoBundle {
             identity: certified,
