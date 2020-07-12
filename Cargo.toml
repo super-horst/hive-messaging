@@ -3,9 +3,10 @@ members = [
     "hive-crypto",
     "hive-grpc",
     "hive-server-embedded",
-    "hive-webclient",
 ]
 
 exclude = [
-    "hive-webapp"
+    "hive-webapp",
+# exclude client for now
+    "hive-webclient"
 ]

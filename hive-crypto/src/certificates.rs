@@ -5,6 +5,7 @@ use std::time::{Duration, SystemTime};
 use uuid::Uuid;
 
 use crate::*;
+use rand_core::RngCore;
 
 /// A certificate representation.
 ///
@@ -147,6 +148,7 @@ impl CertificateFactory {
 
         self
     }
+
     /// Self-sign the certificate information with the given private key.
     /// The resulting certificate will not carry a signer certificate.
     pub fn self_sign<E>(self,
@@ -163,6 +165,9 @@ impl CertificateFactory {
                    signer_cert: Option<&Arc<Certificate>>)
                    -> Result<Certificate, CryptoError>
         where E: CertificateEncoding {
+        use uuid::{Builder, Variant, Version};
+        use rand_core::OsRng;
+
         let certified = self.certified.ok_or(
             CryptoError::Message {
                 message: "cannot create a certificate without a given identity".to_string()
@@ -175,9 +180,13 @@ impl CertificateFactory {
                 message: "error handling validity".to_string()
             })?;
 
-        //TODO
-        //let serial = Uuid::new_v4().to_string();
-        let serial = "some unique serial".to_string();
+        let mut bytes = [0; 16];
+        OsRng::default().fill_bytes(&mut bytes);
+
+        let serial = Builder::from_bytes(bytes)
+            .set_variant(Variant::RFC4122)
+            .set_version(Version::Random)
+            .build().to_string();
 
         let infos = CertificateInfoBundle {
             identity: certified,
