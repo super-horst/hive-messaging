@@ -1,26 +1,65 @@
-/* The sidebar menu */
-.sidenav {
-  height: 100%; /* Full-height: remove this if you want "auto" height */
-  width: 160px; /* Set the width of the sidebar */
-  position: fixed; /* Fixed Sidebar (stay in place on scroll) */
-  z-index: 1; /* Stay on top */
-  top: 0; /* Stay at the top */
-  left: 0;
-  background-color: #111; /* Black */
-  overflow-x: hidden; /* Disable horizontal scroll */
-  padding-top: 20px;
+body {
+  margin: 0;
+  font-family: Arial;
 }
 
-/* The navigation menu links */
-.sidenav a {
-  padding: 6px 8px 6px 16px;
-  text-decoration: none;
-  font-size: 25px;
-  color: #818181;
-  display: block;
+.box {
+  color: #fff;
+  text-align: center;
 }
 
-/* When you mouse over the navigation links, change their color */
-.sidenav a:hover {
-  color: #f1f1f1;
+.center {
+  margin: 0;
+  position: relative;
+  top: 50%;
+  left: 50%;
+  -ms-transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);
 }
+
+.app_layout {
+  display: grid;
+  grid-template-columns: 1fr 3fr;
+  grid-template-rows: 100vh;
+}
+
+.contacts {
+    padding: 8px;
+    background-color: #A2DED0;
+}
+
+.contact {
+    display: box;
+    background-color: #FFA4FF;
+    spacing: 8px;
+    margin: 8px;
+}
+
+.contact:hover {
+    background-color: #AFA4FF;
+}
+
+.contact_add_field {
+    background-color: #59AB33;
+    text-align: left;
+    padding: 8px;
+}
+
+.msg_view_layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 30px auto 50px;
+}
+
+.msg_header  { background-color: #F4D03F; }
+.msg_view   { background-color: #6C7A89; }
+
+.msg_input_view {
+    background-color: #59ABE3;
+    text-align: left;
+    padding: 8px;
+
+    display: grid;
+    grid-template-columns: 5fr 1fr;
+    grid-template-rows: auto;
+ }

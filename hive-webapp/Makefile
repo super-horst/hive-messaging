@@ -1,16 +1,20 @@
-webapp-release-websys:
+webapp-release-wasmbind:
+	mkdir -p app
+
 	cargo build --release --target wasm32-unknown-unknown \
-		&& wasm-bindgen --target web --no-typescript --out-dir target/ --out-name wasm ../target/wasm32-unknown-unknown/release/hive-webapp.wasm
-	#mv static/wasm_bg.wasm static/hive-webapp_bg.wasm
-	#mv static/wasm.js static/hive-webapp.js
+		&& wasm-bindgen --target web --no-typescript --out-dir app/ --out-name hive-webapp target/wasm32-unknown-unknown/release/hive-webapp.wasm
 
-webapp-debug-websys:
+	cp static/* app
+
+webapp-debug-wasmbind:
+	mkdir -p app
+
 	cargo build --target wasm32-unknown-unknown \
-		&& wasm-bindgen --target web --no-typescript --out-dir target/ --out-name wasm ../target/wasm32-unknown-unknown/debug/hive-webapp.wasm
-	#mv static/wasm_bg.wasm static/hive-webapp_bg.wasm
-	#mv static/wasm.js static/hive-webapp.js
+		&& wasm-bindgen --target web --no-typescript --out-dir app/ --out-name hive-webapp target/wasm32-unknown-unknown/debug/hive-webapp.wasm
 
-## Don't use websys ... not yet stable!
+	cp static/* app
+
+## Don't use wasm-bindgen ... not yet stable!
 
 webapp-debug:
 	cargo web build --target wasm32-unknown-unknown

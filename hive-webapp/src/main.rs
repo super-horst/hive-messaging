@@ -1,3 +1,3 @@
 fn main() {
-    yew::start_app::<hive_webapp::Model>();
+    yew::start_app::<hive_webapp::AppContainer>();
 }

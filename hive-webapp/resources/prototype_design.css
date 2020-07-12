@@ -39,6 +39,12 @@ body {
     background-color: #AFA4FF;
 }
 
+.contact_add_field {
+    background-color: #59AB33;
+    text-align: left;
+    padding: 8px;
+ }
+
 .msg_view_layout {
   display: grid;
   grid-template-columns: 1fr;
@@ -56,5 +62,4 @@ body {
     display: grid;
     grid-template-columns: 5fr 1fr;
     grid-template-rows: auto;
-
  }
