@@ -1,0 +1,17 @@
+[package]
+name = "hive-accounts-svc"
+version = "0.1.0"
+authors = ["horst <horst>"]
+edition = "2018"
+
+[dependencies]
+
+failure = "0.1.8"
+async-trait = "0.1.33"
+
+tokio = { version = "0.2", features = ["full"] }
+
+hive-crypto = { version = "0.1.0", path = "../hive-crypto" }
+hive-grpc = { version = "0.1.0", path = "../hive-grpc" }
+
+hive-postgres-wrapper = { version = "0.1.0", path = "../hive-postgres-wrapper" }

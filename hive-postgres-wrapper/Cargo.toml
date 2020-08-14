@@ -1,0 +1,11 @@
+[package]
+name = "hive-postgres-wrapper"
+version = "0.1.0"
+authors = ["horst <horst>"]
+edition = "2018"
+
+[dependencies]
+
+async-trait = "0.1.33"
+tokio = { version = "0.2", features = ["full"] }
+tokio-postgres = "0.5.5"

@@ -2,7 +2,9 @@
 members = [
     "hive-crypto",
     "hive-grpc",
+    "hive-postgres-wrapper",
     "hive-server-embedded",
+    "hive-svc-accounts",
 ]
 
 exclude = [
