@@ -79,28 +79,13 @@ impl ManagedRatchet {
 
     /// step the sending ratchet
     pub fn send_step(&mut self) -> SendStep {
-        let (c, s) = self.ratchet.send_step();
-
-        // my ratchet key
-        SendStep {
-            counter: c,
-            prev_ratchet_counter: self.ratchet.prev_send_counter,
-            ratchet_key: self.ratchet.current_public.copy(),
-            secret: s,
-        }
+        self.ratchet.send_step()
     }
 
     fn save_recv_until(&mut self, counter: u64) {
         while self.ratchet.recv_chain.1 < counter {
-            let (counter, secret) = self.ratchet.recv_step();
-
             // save for later, mapped by other ratchet key
-            self.unused_keys.insert(
-                RecvStep {
-                    counter,
-                    ratchet_key: self.ratchet.current_other.copy(),
-                    secret,
-                });
+            self.unused_keys.insert(self.ratchet.recv_step());
         }
     }
 
@@ -108,9 +93,9 @@ impl ManagedRatchet {
     pub fn recv_step_for(&mut self, ratchet_key: PublicKey, counter: u64, prev_counter: u64) -> Result<RecvStep, CryptoError> {
         // is it already saved?
         let step_dummy = RecvStep { counter, ratchet_key: ratchet_key.copy(), secret: [0u8; 32] };
-        let unused = self.unused_keys.take(&step_dummy);
-        if unused.is_some() {
-            return Ok(unused.unwrap());
+        match self.unused_keys.take(&step_dummy) {
+            Some(key) => return Ok(key),
+            _ => (),
         }
 
         if ratchet_key != self.ratchet.current_other {
@@ -118,17 +103,10 @@ impl ManagedRatchet {
         }
 
         self.ratchet.asymmetric_step(ratchet_key)?;
-
         self.save_recv_until(counter - 1);
 
-        let (counter, secret) = self.ratchet.recv_step();
-
         // other ratchet key
-        Ok(RecvStep {
-            counter,
-            ratchet_key: self.ratchet.current_other.copy(),
-            secret,
-        })
+        Ok(self.ratchet.recv_step())
     }
 }
 
@@ -216,46 +194,46 @@ impl DoubleRatchet {
     }
 
     /// step the sending ratchet
-    fn send_step(&mut self) -> (u64, [u8; 32]) {
-        self.send_chain.update()
+    fn send_step(&mut self) -> SendStep {
+        let (counter, secret) = self.send_chain.update();
+
+        SendStep {
+            counter,
+            prev_ratchet_counter: self.prev_send_counter,
+            ratchet_key: self.current_public.copy(),
+            secret,
+        }
     }
 
     /// step the receiving ratchet
-    fn recv_step(&mut self) -> (u64, [u8; 32]) {
-        self.recv_chain.update()
+    fn recv_step(&mut self) -> RecvStep {
+        let (counter, secret) = self.recv_chain.update();
+
+        RecvStep {
+            counter,
+            ratchet_key: self.current_other.copy(),
+            secret,
+        }
     }
 }
 
 /// 1-based counting chain
 #[derive(Serialize, Deserialize, Debug)]
-struct CountingChain([u8; 32], u64);
+struct CountingChain(KdfChain, u64);
 
 impl CountingChain {
     fn new(key: [u8; 32]) -> CountingChain {
-        CountingChain(key, 0)
+        CountingChain(KdfChain(key), 0)
     }
 
     fn update(&mut self) -> (u64, [u8; 32]) {
-        let h = Hkdf::<Sha512>::new(None, &self.0);
-
-        let mut okm = [0u8; 64];
-        // ignore the error, length should always match
-        let _r = h.expand(&[0u8; 32], &mut okm);
-
-        let mut kdf_update = [0u8; 32];
-        let mut output = [0u8; 32];
-
-        kdf_update.clone_from_slice(&okm[..32]);
-        output.clone_from_slice(&okm[32..]);
-
-        self.0 = kdf_update;
         self.1 += 1;
 
-        (self.1, output)
+        (self.1, (self.0).update(&[0u8; 32]))
     }
 
     fn reset(&mut self, key: [u8; 32]) {
-        self.0 = key;
+        self.0 = KdfChain(key);
         self.1 = 0;
     }
 }
@@ -304,6 +282,12 @@ pub mod ratchet_tests {
         (alice, bob)
     }
 
+    fn assert_send_recv(send: SendStep, recv: RecvStep) {
+        assert_eq!(send.secret, recv.secret);
+        assert_eq!(send.counter, recv.counter);
+        assert_eq!(send.ratchet_key, recv.ratchet_key);
+    }
+
     #[test]
     fn test_ratchet_manager_lost_messages_across_multiple_ratchet_keys() {
         let (alice, bob) = entangled_ratchets();
@@ -313,11 +297,11 @@ pub mod ratchet_tests {
 
         let a1 = alice_mgmt.send_step();
         let b1 = bob_mgmt.recv_step_for(a1.ratchet_key.copy(), a1.counter, alice_mgmt.ratchet.prev_send_counter).unwrap();
-        assert_eq!(a1.secret, b1.secret);
+        assert_send_recv(a1, b1);
 
         let b1 = bob_mgmt.send_step();
         let a1 = alice_mgmt.recv_step_for(b1.ratchet_key.copy(), b1.counter, bob_mgmt.ratchet.prev_send_counter).unwrap();
-        assert_eq!(a1.secret, b1.secret);
+        assert_send_recv(b1, a1);
 
         let a2 = alice_mgmt.send_step();
         let a3 = alice_mgmt.send_step();
@@ -326,7 +310,7 @@ pub mod ratchet_tests {
         // "loose" a2 & a3
         let b4 = bob_mgmt.recv_step_for(a4.ratchet_key.copy(), a4.counter, alice_mgmt.ratchet.prev_send_counter).unwrap();
 
-        assert_eq!(a4.secret, b4.secret);
+        assert_send_recv(a4, b4);
 
         let b5 = bob_mgmt.send_step();
         let b6 = bob_mgmt.send_step();
@@ -335,7 +319,7 @@ pub mod ratchet_tests {
         // "loose" b5 & b6
         let a7 = alice_mgmt.recv_step_for(b7.ratchet_key.copy(), b7.counter, b7.prev_ratchet_counter).unwrap();
 
-        assert_eq!(a7.secret, b7.secret);
+        assert_send_recv(b7, a7);
 
         // recover "lost" keys
         let b2 = bob_mgmt.recv_step_for(a2.ratchet_key.copy(), a2.counter, a2.prev_ratchet_counter).unwrap();
@@ -344,10 +328,10 @@ pub mod ratchet_tests {
         let a5 = alice_mgmt.recv_step_for(b5.ratchet_key.copy(), b5.counter, b5.prev_ratchet_counter).unwrap();
         let a6 = alice_mgmt.recv_step_for(b6.ratchet_key.copy(), b6.counter, b6.prev_ratchet_counter).unwrap();
 
-        assert_eq!(a2.secret, b2.secret);
-        assert_eq!(a3.secret, b3.secret);
-        assert_eq!(a5.secret, b5.secret);
-        assert_eq!(a6.secret, b6.secret);
+        assert_send_recv(a2, b2);
+        assert_send_recv(a3, b3);
+        assert_send_recv(b5, a5);
+        assert_send_recv(b6, a6);
 
         // key caches should be empty
         assert_eq!(0, bob_mgmt.unused_keys.len());
@@ -363,7 +347,7 @@ pub mod ratchet_tests {
 
         let a1 = alice_mgmt.send_step();
         let b1 = bob_mgmt.recv_step_for(a1.ratchet_key.copy(), a1.counter, a1.prev_ratchet_counter).unwrap();
-        assert_eq!(a1.secret, b1.secret);
+        assert_send_recv(a1, b1);
 
         let a2 = alice_mgmt.send_step();
         let a3 = alice_mgmt.send_step();
@@ -372,13 +356,13 @@ pub mod ratchet_tests {
         // "loose" a2 & a3
         let b4 = bob_mgmt.recv_step_for(a4.ratchet_key.copy(), a4.counter, a4.prev_ratchet_counter).unwrap();
 
-        assert_eq!(a4.secret, b4.secret);
+        assert_send_recv(a4, b4);
 
         let b2 = bob_mgmt.recv_step_for(a2.ratchet_key.copy(), a2.counter, a2.prev_ratchet_counter).unwrap();
         let b3 = bob_mgmt.recv_step_for(a3.ratchet_key.copy(), a3.counter, a3.prev_ratchet_counter).unwrap();
 
-        assert_eq!(a2.secret, b2.secret);
-        assert_eq!(a3.secret, b3.secret);
+        assert_send_recv(a2, b2);
+        assert_send_recv(a3, b3);
     }
 
     #[test]
@@ -391,12 +375,12 @@ pub mod ratchet_tests {
         let a1 = alice_mgmt.send_step();
         let b1 = bob_mgmt.recv_step_for(a1.ratchet_key.copy(), a1.counter, a1.prev_ratchet_counter).unwrap();
 
-        assert_eq!(a1.secret, b1.secret);
+        assert_send_recv(a1, b1);
 
         let b2 = bob_mgmt.send_step();
         let a2 = alice_mgmt.recv_step_for(b2.ratchet_key.copy(), b2.counter, b2.prev_ratchet_counter).unwrap();
 
-        assert_eq!(a2.secret, b2.secret);
+        assert_send_recv(b2, a2);
 
         let a3 = alice_mgmt.send_step();
         let a4 = alice_mgmt.send_step();
@@ -406,33 +390,33 @@ pub mod ratchet_tests {
         let b4 = bob_mgmt.recv_step_for(a4.ratchet_key.copy(), a4.counter, a4.prev_ratchet_counter).unwrap();
         let b5 = bob_mgmt.recv_step_for(a5.ratchet_key.copy(), a5.counter, a5.prev_ratchet_counter).unwrap();
 
-        assert_eq!(a3.secret, b3.secret);
-        assert_eq!(a4.secret, b4.secret);
-        assert_eq!(a5.secret, b5.secret);
+        assert_send_recv(a3, b3);
+        assert_send_recv(a4, b4);
+        assert_send_recv(a5, b5);
     }
 
     #[test]
     fn test_double_ratchet_interaction() {
         let (mut alice, mut bob) = entangled_ratchets();
 
-        assert_eq!(alice.send_step(), bob.recv_step());
-        assert_eq!(alice.send_step(), bob.recv_step());
-        assert_eq!(alice.send_step(), bob.recv_step());
+        assert_send_recv(alice.send_step(), bob.recv_step());
+        assert_send_recv(alice.send_step(), bob.recv_step());
+        assert_send_recv(alice.send_step(), bob.recv_step());
 
         // bob answers with his new ratchet key, which alice needs to include before processing the step
         alice.asymmetric_step(bob.current_public.copy()).unwrap();
-        assert_eq!(bob.send_step(), alice.recv_step());
-        assert_eq!(bob.send_step(), alice.recv_step());
-        assert_eq!(bob.send_step(), alice.recv_step());
+        assert_send_recv(bob.send_step(), alice.recv_step());
+        assert_send_recv(bob.send_step(), alice.recv_step());
+        assert_send_recv(bob.send_step(), alice.recv_step());
 
         bob.asymmetric_step(alice.current_public.copy()).unwrap();
-        assert_eq!(alice.send_step(), bob.recv_step());
+        assert_send_recv(alice.send_step(), bob.recv_step());
 
         alice.asymmetric_step(bob.current_public.copy()).unwrap();
 
         alice.asymmetric_step(bob.current_public.copy()).unwrap();
         bob.asymmetric_step(alice.current_public.copy()).unwrap();
-        assert_eq!(alice.send_step(), bob.recv_step());
+        assert_send_recv(alice.send_step(), bob.recv_step());
     }
 
     #[test]
