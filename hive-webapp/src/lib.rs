@@ -9,6 +9,7 @@ use crate::messages::Message;
 use serde::{Deserialize, Serialize};
 
 use yew::{html, Component, ComponentLink, Href, Html, InputData, KeyPressEvent, ShouldRender};
+use yew::format::Json;
 use std::sync::Arc;
 use std::collections::HashMap;
 use hive_crypto::{PublicKey, FromBytes};

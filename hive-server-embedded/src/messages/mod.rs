@@ -3,7 +3,7 @@ use dashmap::*;
 mod interfaces;
 
 pub use interfaces::*;
-
+use tonic::Request;
 use hive_grpc::common;
 use hive_grpc::messages;
 use messages::messages_server;
@@ -23,7 +23,7 @@ impl InMemoryMessageServer {
 
 #[async_trait::async_trait]
 impl messages_server::Messages for InMemoryMessageServer {
-    async fn get_messages(&self, request: tonic::Request<messages::MessageFilter>,
+    async fn get_messages(&self, request: Request<messages::MessageFilter>,
     ) -> Result<tonic::Response<messages::MessageEnvelope>, tonic::Status> {
         let message = request.into_inner();
 

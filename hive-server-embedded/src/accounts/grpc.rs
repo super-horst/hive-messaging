@@ -99,6 +99,15 @@ impl fmt::Debug for InMemoryAccounts {
 
 #[async_trait::async_trait]
 impl accounts_server::Accounts for InMemoryAccounts {
+
+    async fn create_account(
+        &self,
+        request: tonic::Request<SignedChallenge>,
+    ) -> Result<tonic::Response<Certificate>, tonic::Status> {
+        Err(tonic::Status::unimplemented("none"))
+    }
+
+
     async fn update_attestation(
         &self,
         request: tonic::Request<SignedChallenge>,
@@ -154,6 +163,25 @@ impl accounts_server::Accounts for InMemoryAccounts {
         }))
     }
 
+    async fn update_pre_keys(
+        &self,
+        request: tonic::Request<common::PreKeyBundle>,
+    ) -> Result<tonic::Response<accounts::UpdateKeyResult>, tonic::Status> {
+        let pre_key_update = request.into_inner();
+
+        //TODO error handling
+        let public = self.ids.resolve_id(&pre_key_update.identity[..])
+                         .map_err(|e| tonic::Status::not_found("invalid identity"))?;
+
+        //TODO error handling
+        public.verify(&pre_key_update.pre_key[..], &pre_key_update.pre_key_signature[..])
+              .map_err(|e| tonic::Status::failed_precondition("signature error"))?;
+
+        self.pre_keys.insert(public, pre_key_update);
+
+        Ok(tonic::Response::new(accounts::UpdateKeyResult {}))
+    }
+
     async fn get_pre_keys(
         &self,
         request: tonic::Request<common::Peer>,
@@ -190,25 +218,6 @@ impl accounts_server::Accounts for InMemoryAccounts {
         };
 
         Ok(tonic::Response::new(pre_key_response))
-    }
-
-    async fn update_pre_keys(
-        &self,
-        request: tonic::Request<common::PreKeyBundle>,
-    ) -> Result<tonic::Response<accounts::UpdateKeyResult>, tonic::Status> {
-        let pre_key_update = request.into_inner();
-
-        //TODO error handling
-        let public = self.ids.resolve_id(&pre_key_update.identity[..])
-                         .map_err(|e| tonic::Status::not_found("invalid identity"))?;
-
-        //TODO error handling
-        public.verify(&pre_key_update.pre_key[..], &pre_key_update.pre_key_signature[..])
-              .map_err(|e| tonic::Status::failed_precondition("signature error"))?;
-
-        self.pre_keys.insert(public, pre_key_update);
-
-        Ok(tonic::Response::new(accounts::UpdateKeyResult {}))
     }
 }
 

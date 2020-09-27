@@ -2,13 +2,12 @@
 members = [
     "hive-crypto",
     "hive-grpc",
-    "hive-postgres-wrapper",
     "hive-server-embedded",
-    "hive-svc-accounts",
+    "hive-webclient",
+    "hive-accounts-svc",
 ]
 
 exclude = [
     "hive-webapp",
 # exclude client for now
-    "hive-webclient"
 ]

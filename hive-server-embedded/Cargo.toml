@@ -15,11 +15,10 @@ tracing = "0.1.15"
 tracing-futures = "0.2.4"
 
 tokio = { version = "0.2", features = ["full"] }
-tokio-postgres = "0.5.4"
 async-trait = "0.1.33"
 
 hex = "0.4.2"
-tonic = "0.2.1"
+tonic = "0.3.1"
 prost = "0.6.1"
 
 futures = "0.3"

@@ -10,7 +10,7 @@ build = "build.rs"
 [dependencies]
 failure = "0.1.8"
 
-tonic = "0.2.1"
+tonic = "0.3.1"
 prost = "0.6.1"
 
 bytes = "0.5.4"
@@ -18,4 +18,4 @@ bytes = "0.5.4"
 hive-crypto = { version = "0.1.0", path = "../hive-crypto" }
 
 [build-dependencies]
-tonic-build = "0.2.0"
+tonic-build = "0.3.1"

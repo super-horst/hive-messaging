@@ -46,6 +46,10 @@ impl Certificate {
     pub fn signer_certificate(&self) -> &Option<Arc<Certificate>> {
         &self.infos.signer_certificate
     }
+    /// get the optional signer certificate
+    pub fn expires(&self) -> &SystemTime {
+        &self.infos.expires()
+    }
 }
 
 impl std::cmp::PartialEq for Certificate {

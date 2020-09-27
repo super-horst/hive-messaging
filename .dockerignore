@@ -1,0 +1,6 @@
+**/target/**
+**/*.lock
+.project
+*.iml
+.idea/**
+/.git/

@@ -6,6 +6,9 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+storage = ["tokio"]
+
 [dependencies]
 # structural
 failure = "0.1.8"
@@ -26,6 +29,8 @@ chacha20poly1305 = "0.5.1"
 hkdf = { version = "0.8", features= ["std"] }
 digest = "0.8.1"
 sha2 = "0.8.2"
+
+tokio = { version = "0.2.22", features = ["full"] , optional= true}
 
 [dev-dependencies]
 bytes = "0.5.4"

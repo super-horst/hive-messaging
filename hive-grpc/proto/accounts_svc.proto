@@ -10,6 +10,9 @@ import "common.proto";
 
 // Account service definition.
 service Accounts {
+
+  rpc CreateAccount (common.SignedChallenge) returns (common.Certificate);
+
   // refresh attestation
   rpc UpdateAttestation (common.SignedChallenge) returns (common.Certificate);
 

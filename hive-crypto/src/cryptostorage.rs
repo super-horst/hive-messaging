@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time:: Duration;
 
 use dashmap::DashMap;
 
@@ -12,7 +13,6 @@ pub struct CryptoStore {
 }
 
 impl Identities for CryptoStore {
-
     fn resolve_id(&self, id: &[u8]) -> Result<PublicKey, CryptoError> {
         PublicKey::from_bytes(id)
     }
@@ -172,6 +172,65 @@ impl CryptoStoreBuilder {
         })
     }
 }
+
+//TODO cleanup
+#[cfg(feature = "storage")]
+pub async fn load_private_key(path: &str) -> PrivateKey {
+    use tokio::prelude::*;
+    use tokio::fs;
+
+    let f = fs::File::open(path).await;
+    if f.is_ok() {
+        let mut file = f.unwrap();
+
+        let mut contents = vec![];
+        file.read_to_end(&mut contents).await.unwrap();
+
+        return PrivateKey::from_bytes(&contents[..]).unwrap();
+    } else {
+        let server_id = PrivateKey::generate().unwrap();
+
+        let mut f = fs::File::create(path).await.unwrap();
+        f.write_all(server_id.secret_bytes()).await.unwrap();
+
+        return server_id;
+    }
+}
+
+//TODO cleanup
+#[cfg(feature = "storage")]
+pub async fn load_certificate<T>(server_id: &PrivateKey, path: &str) -> Certificate
+    where T: CertificateEncoding {
+    use tokio::prelude::*;
+    use tokio::fs;
+
+    let f = fs::File::open(path).await;
+    if f.is_ok() {
+        let mut file = f.unwrap();
+
+        let mut contents = vec![];
+        file.read_to_end(&mut contents).await.unwrap();
+
+        let raw_cert = T::deserialise(contents).unwrap();
+
+        let (cert, _) = T::decode_partial(raw_cert).unwrap();
+
+        return cert;
+    } else {
+        let server_public = server_id.id().copy();
+
+        let cert = CertificateFactory::default()
+            .certified(server_public)
+            .expiration(Duration::from_secs(1000))
+            .self_sign::<T>(server_id).unwrap();
+
+        let mut f = fs::File::create(path).await.unwrap();
+        f.write_all(&T::serialise(&cert).unwrap()[..]).await.unwrap();
+
+        return cert;
+    }
+}
+
 
 #[cfg(test)]
 mod crypto_storage_tests {

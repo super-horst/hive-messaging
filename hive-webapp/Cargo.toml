@@ -18,3 +18,6 @@ hive-crypto = { version = "0.1.0", path = "../hive-crypto" }
 
 # incompatible due to missing wasm support
 # hive-grpc = { version = "0.1.0", path = "../hive-grpc" }
+
+[profile.release]
+opt-level = "s"

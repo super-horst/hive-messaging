@@ -16,66 +16,15 @@ use hive_crypto::{
     CertificateFactory,
 };
 
-use super::interfaces::*;
+use crate::errors::*;
 
 use hive_grpc::*;
 use hive_grpc::common::*;
-use hive_grpc::accounts::accounts_client::AccountsClient;
+pub use hive_grpc::accounts::accounts_client::AccountsClient;
 use hive_grpc::accounts::accounts_server;
 
 const CHALLENGE_GRACE_SECONDS: u64 = 11;
 const DEFAULT_CLIENT_CERT_VALIDITY: Duration = Duration::from_secs(2 * 24 * 60 * 60);//2 days
-
-// #################### client ####################
-
-pub struct GrpcAccountService {
-    client: AccountsClient<tonic::transport::Channel>,
-}
-
-impl fmt::Debug for GrpcAccountService {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "GrpcAccountService")
-    }
-}
-
-#[async_trait::async_trait]
-impl AccountService for GrpcAccountService {
-    async fn update_attestation(&mut self, id: &PrivateKey) -> Result<(), AccountsError> {
-        // preparing client request
-        let now = SystemTime::now().duration_since(UNIX_EPOCH)
-                                   .map(|d| d.as_secs()).unwrap();
-        let public = id.id();
-        let challenge = signed_challenge::Challenge {
-            identity: public.id_bytes(),
-            namespace: public.namespace(),
-            timestamp: now,
-        };
-
-        let mut buf: Vec<u8> = Vec::with_capacity(challenge.encoded_len());
-        challenge.encode(&mut buf).map_err(|e| AccountsError::Encoding {
-            message: "unable to serialise challenge".to_string(),
-            cause: e,
-        })?;
-
-        let signature = id.sign(&buf)
-                          .map_err(|e| AccountsError::Cryptography {
-                              message: "failed to sign challenge".to_string(),
-                              cause: e,
-                          })?;
-
-        let signed = SignedChallenge { challenge: buf, signature };
-
-        let request = tonic::Request::new(signed);
-
-        let _result = self.client.update_attestation(request).await
-                          .map_err(|e| AccountsError::Transport {
-                              message: "failed to update attestation".to_string(),
-                              cause: e,
-                          })?;
-
-        Ok(())
-    }
-}
 
 pub struct InMemoryAccounts {
     ids: Arc<dyn Identities>,
@@ -99,6 +48,14 @@ impl fmt::Debug for InMemoryAccounts {
 
 #[async_trait::async_trait]
 impl accounts_server::Accounts for InMemoryAccounts {
+
+    async fn create_account(
+        &self,
+        request: tonic::Request<SignedChallenge>,
+    ) -> Result<tonic::Response<Certificate>, tonic::Status> {
+        Err(tonic::Status::unimplemented("none"))
+    }
+
     async fn update_attestation(
         &self,
         request: tonic::Request<SignedChallenge>,
@@ -154,6 +111,25 @@ impl accounts_server::Accounts for InMemoryAccounts {
         }))
     }
 
+    async fn update_pre_keys(
+        &self,
+        request: tonic::Request<common::PreKeyBundle>,
+    ) -> Result<tonic::Response<accounts::UpdateKeyResult>, tonic::Status> {
+        let pre_key_update = request.into_inner();
+
+        //TODO error handling
+        let public = self.ids.resolve_id(&pre_key_update.identity[..])
+                         .map_err(|e| tonic::Status::not_found("invalid identity"))?;
+
+        //TODO error handling
+        public.verify(&pre_key_update.pre_key[..], &pre_key_update.pre_key_signature[..])
+              .map_err(|e| tonic::Status::failed_precondition("signature error"))?;
+
+        self.pre_keys.insert(public, pre_key_update);
+
+        Ok(tonic::Response::new(accounts::UpdateKeyResult {}))
+    }
+
     async fn get_pre_keys(
         &self,
         request: tonic::Request<common::Peer>,
@@ -190,25 +166,6 @@ impl accounts_server::Accounts for InMemoryAccounts {
         };
 
         Ok(tonic::Response::new(pre_key_response))
-    }
-
-    async fn update_pre_keys(
-        &self,
-        request: tonic::Request<common::PreKeyBundle>,
-    ) -> Result<tonic::Response<accounts::UpdateKeyResult>, tonic::Status> {
-        let pre_key_update = request.into_inner();
-
-        //TODO error handling
-        let public = self.ids.resolve_id(&pre_key_update.identity[..])
-                         .map_err(|e| tonic::Status::not_found("invalid identity"))?;
-
-        //TODO error handling
-        public.verify(&pre_key_update.pre_key[..], &pre_key_update.pre_key_signature[..])
-              .map_err(|e| tonic::Status::failed_precondition("signature error"))?;
-
-        self.pre_keys.insert(public, pre_key_update);
-
-        Ok(tonic::Response::new(accounts::UpdateKeyResult {}))
     }
 }
 
@@ -249,7 +206,7 @@ mod account_grpc_tests {
         return (inner_accs, ids);
     }
 
-    #[tokio::test]
+    //#[tokio::test]
     async fn test_run_server() {
         let (accs, ids) = build_server();
 
@@ -324,12 +281,12 @@ mod account_grpc_tests {
         publics.write_all(&public_bytes[..]).unwrap();
     }
 
-    #[test]
+    //#[test]
     fn prepare_pre_key() {
         prepare_identity("alice");
     }
 
-    #[tokio::test]
+    //#[tokio::test]
     async fn publish_alice_to_server() {
         let mut client = AccountsClient::connect("http://[::1]:50051").await.unwrap();
         let mut file = tokio::fs::File::open("../target/server_tests/alice_public_bundle").await.unwrap();
@@ -342,7 +299,7 @@ mod account_grpc_tests {
         client.update_pre_keys(tonic::Request::new(pre_keys)).await.unwrap();
     }
 
-    #[tokio::test]
+    //#[tokio::test]
     async fn get_alice_from_server() {
         let mut client = AccountsClient::connect("http://[::1]:50051").await.unwrap();
         let mut file = tokio::fs::File::open("../target/server_tests/alice_public_bundle").await.unwrap();
@@ -361,7 +318,7 @@ mod account_grpc_tests {
         println!("{:?}", bundle);
     }
 
-    #[tokio::test]
+   // #[tokio::test]
     async fn test_refresh_attestation() -> Result<(), failure::Error> {
         let (accs, ids) = build_server();
 

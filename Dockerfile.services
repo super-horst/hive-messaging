@@ -1,0 +1,40 @@
+FROM rust:1.46.0 as builder
+
+ARG PROJECT_NAME
+ENV RUST_BACKTRACE=full
+
+# Compiler
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends musl-tools
+
+# Tooling
+RUN rustup target add x86_64-unknown-linux-musl && \
+    rustup component add rustfmt
+
+# Dummy project
+WORKDIR /build
+RUN USER=root cargo new --bin $PROJECT_NAME
+
+# Build dependencies & generated code for caching
+COPY hive-crypto ./hive-crypto
+COPY hive-grpc ./hive-grpc
+COPY $PROJECT_NAME/Cargo.toml rust-toolchain ./$PROJECT_NAME/
+WORKDIR /build/$PROJECT_NAME
+RUN cargo build --target x86_64-unknown-linux-musl --release
+
+# Copy the source and build the application.
+COPY $PROJECT_NAME/src ./src
+RUN cargo install --target x86_64-unknown-linux-musl --path .
+
+# Assemble final container
+FROM scratch
+EXPOSE 8080
+
+ARG PROJECT_NAME
+ENV RUST_BACKTRACE=full
+ENV CONFIG=config
+
+COPY --from=builder /usr/local/cargo/bin/$PROJECT_NAME ./service
+
+USER 1000
+CMD [ "./service" ]
