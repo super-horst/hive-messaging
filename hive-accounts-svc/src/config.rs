@@ -1,8 +1,8 @@
 use std::env;
 
-use failure::{Error, Fail};
+use failure::Fail;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json;
 
 #[derive(Serialize, Deserialize)]
@@ -10,6 +10,8 @@ pub struct Config {
     pub port: u16,
     pub loglevel: String,
     pub db_config: DbConfig,
+    pub certificate: String,
+    pub key: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -27,27 +29,28 @@ pub enum ConfigurationError {
     #[fail(display = "Error accessing env: {}", message)]
     EnvironmentError {
         message: String,
-        #[fail(cause)] cause: env::VarError,
+        #[fail(cause)]
+        cause: env::VarError,
     },
     #[fail(display = "Invalid format: {}", message)]
     FormatError {
         message: String,
-        #[fail(cause)] cause: serde_json::Error,
+        #[fail(cause)]
+        cause: serde_json::Error,
     },
 }
 
 pub fn load_config_from_env() -> Result<Config, ConfigurationError> {
-    let serialised_config = env::var("CONFIG")
-        .map_err(|e| ConfigurationError::EnvironmentError {
+    let serialised_config =
+        env::var("CONFIG").map_err(|e| ConfigurationError::EnvironmentError {
             message: "No configuration given".to_string(),
             cause: e,
         })?;
 
-    serde_json::from_str(&serialised_config)
-        .map_err(|e| ConfigurationError::FormatError {
-            message: "Configuration".to_string(),
-            cause: e,
-        })
+    serde_json::from_str(&serialised_config).map_err(|e| ConfigurationError::FormatError {
+        message: "Configuration".to_string(),
+        cause: e,
+    })
 }
 
 #[cfg(test)]
@@ -69,6 +72,8 @@ mod config_tests {
             port: 8080,
             loglevel: "debug".to_string(),
             db_config: db_conf,
+            certificate: "certfile".to_string(),
+            key: "keyfile".to_string(),
         };
 
         let s = serde_json::to_string(&config).unwrap();

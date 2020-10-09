@@ -1,18 +1,15 @@
-use failure::Error;
-use std::env;
-use tonic::transport::Server;
-use log::*;
-pub use oxidizer::{DB, entity::IEntity};
-use hive_grpc::GrpcCertificateEncoding;
-use std::sync::Arc;
 use env_logger;
+use hive_grpc::GrpcCertificateEncoding;
+use log::*;
+pub use oxidizer::{entity::IEntity, DB};
+use std::env;
+use std::sync::Arc;
+use tonic::transport::Server;
 
 mod config;
+mod errors;
 mod persistence;
 mod service;
-mod errors;
-
-const DB_CONNECTION: &'static str = "postgres://postgres:docker@172.17.0.2:5432/postgres";
 
 // SERVICE entry
 #[tokio::main]
@@ -25,21 +22,24 @@ async fn main() -> Result<(), String> {
     let addr = format!("0.0.0.0:{}", cfg.port).parse().unwrap();
     info!("Server listening on {}", addr);
 
-    let my_key = hive_crypto::load_private_key("./privates").await;
-    let cert = hive_crypto::load_certificate::<GrpcCertificateEncoding>(&my_key, "./certs").await;
+    let my_key = hive_crypto::load_private_key(&cfg.key).await;
+    let cert =
+        hive_crypto::load_certificate::<GrpcCertificateEncoding>(&my_key, &cfg.certificate).await;
     let my_certificate = Arc::new(cert);
 
-    let db = persistence::connect_db(&cfg.db_config).await?;
+    let db_repo = persistence::DatabaseRepository::connect(&cfg.db_config)
+        .await
+        .unwrap();
 
-    let inner = service::AccountService::new(
-        my_key, my_certificate, db, );
+    let inner = service::AccountService::new(my_key, my_certificate, Box::new(db_repo));
 
     let service = service::AccountsServer::new(inner);
 
     Server::builder()
         .add_service(service)
-        .serve(addr).await
-        .map_err(|e| e.to_string())?;
+        .serve(addr)
+        .await
+        .unwrap();
 
     Ok(())
 }
