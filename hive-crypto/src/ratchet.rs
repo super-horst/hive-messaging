@@ -4,11 +4,10 @@ use std::hash::{Hash, Hasher};
 use hkdf::Hkdf;
 use sha2::Sha512;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::error::*;
 use crate::{PrivateKey, PublicKey};
-
 
 /// a single sending ratchet step
 #[derive(Debug)]
@@ -56,8 +55,10 @@ pub struct ManagedRatchet {
 
 impl ManagedRatchet {
     /// Initialise a ratchet prior to the first send
-    pub fn initialise_to_send(root_key: &[u8; 32], other_public: &PublicKey)
-                              -> Result<ManagedRatchet, CryptoError> {
+    pub fn initialise_to_send(
+        root_key: &[u8; 32],
+        other_public: &PublicKey,
+    ) -> Result<ManagedRatchet, CryptoError> {
         Ok(ManagedRatchet {
             ratchet: DoubleRatchet::initialise_to_send(root_key, other_public)?,
             unused_keys: HashSet::new(),
@@ -65,8 +66,11 @@ impl ManagedRatchet {
     }
 
     /// Initialise a ratchet after the initial message is received
-    pub fn initialise_received(root_key: &[u8; 32], my_private: &PrivateKey, other_public: PublicKey)
-                               -> Result<ManagedRatchet, CryptoError> {
+    pub fn initialise_received(
+        root_key: &[u8; 32],
+        my_private: &PrivateKey,
+        other_public: PublicKey,
+    ) -> Result<ManagedRatchet, CryptoError> {
         Ok(ManagedRatchet {
             ratchet: DoubleRatchet::initialise_received(root_key, my_private, other_public)?,
             unused_keys: HashSet::new(),
@@ -86,9 +90,18 @@ impl ManagedRatchet {
     }
 
     /// step the receiving ratchet
-    pub fn recv_step_for(&mut self, ratchet_key: PublicKey, counter: u64, prev_counter: u64) -> Result<RecvStep, CryptoError> {
+    pub fn recv_step_for(
+        &mut self,
+        ratchet_key: PublicKey,
+        counter: u64,
+        prev_counter: u64,
+    ) -> Result<RecvStep, CryptoError> {
         // is it already saved?
-        let step_dummy = RecvStep { counter, ratchet_key: ratchet_key.copy(), secret: [0u8; 32] };
+        let step_dummy = RecvStep {
+            counter,
+            ratchet_key: ratchet_key.copy(),
+            secret: [0u8; 32],
+        };
         match self.unused_keys.take(&step_dummy) {
             Some(key) => return Ok(key),
             _ => (),
@@ -122,8 +135,10 @@ struct DoubleRatchet {
 }
 
 impl DoubleRatchet {
-    fn initialise_to_send(root_key: &[u8; 32], other_public: &PublicKey)
-                          -> Result<DoubleRatchet, CryptoError> {
+    fn initialise_to_send(
+        root_key: &[u8; 32],
+        other_public: &PublicKey,
+    ) -> Result<DoubleRatchet, CryptoError> {
         let init_private = PrivateKey::generate()?;
         let init_public = init_private.id().copy();
 
@@ -143,8 +158,11 @@ impl DoubleRatchet {
         })
     }
 
-    fn initialise_received(root_key: &[u8; 32], my_private: &PrivateKey, other_public: PublicKey)
-                           -> Result<DoubleRatchet, CryptoError> {
+    fn initialise_received(
+        root_key: &[u8; 32],
+        my_private: &PrivateKey,
+        other_public: PublicKey,
+    ) -> Result<DoubleRatchet, CryptoError> {
         let mut root_chain = KdfChain(root_key.clone());
         let recv_chain = CountingChain::new(my_private.diffie_hellman(&other_public));
 
@@ -273,7 +291,8 @@ pub mod ratchet_tests {
 
         // alice starts the conversation & sends bob her current ratchet key
         let alice = DoubleRatchet::initialise_to_send(&root, b.id()).unwrap();
-        let bob = DoubleRatchet::initialise_received(&root, &b, alice.current_public.copy()).unwrap();
+        let bob =
+            DoubleRatchet::initialise_received(&root, &b, alice.current_public.copy()).unwrap();
 
         (alice, bob)
     }
@@ -288,15 +307,33 @@ pub mod ratchet_tests {
     fn test_ratchet_manager_lost_messages_across_multiple_ratchet_keys() {
         let (alice, bob) = entangled_ratchets();
 
-        let mut alice_mgmt = ManagedRatchet { ratchet: alice, unused_keys: HashSet::new() };
-        let mut bob_mgmt = ManagedRatchet { ratchet: bob, unused_keys: HashSet::new() };
+        let mut alice_mgmt = ManagedRatchet {
+            ratchet: alice,
+            unused_keys: HashSet::new(),
+        };
+        let mut bob_mgmt = ManagedRatchet {
+            ratchet: bob,
+            unused_keys: HashSet::new(),
+        };
 
         let a1 = alice_mgmt.send_step();
-        let b1 = bob_mgmt.recv_step_for(a1.ratchet_key.copy(), a1.counter, alice_mgmt.ratchet.prev_send_counter).unwrap();
+        let b1 = bob_mgmt
+            .recv_step_for(
+                a1.ratchet_key.copy(),
+                a1.counter,
+                alice_mgmt.ratchet.prev_send_counter,
+            )
+            .unwrap();
         assert_send_recv(a1, b1);
 
         let b1 = bob_mgmt.send_step();
-        let a1 = alice_mgmt.recv_step_for(b1.ratchet_key.copy(), b1.counter, bob_mgmt.ratchet.prev_send_counter).unwrap();
+        let a1 = alice_mgmt
+            .recv_step_for(
+                b1.ratchet_key.copy(),
+                b1.counter,
+                bob_mgmt.ratchet.prev_send_counter,
+            )
+            .unwrap();
         assert_send_recv(b1, a1);
 
         let a2 = alice_mgmt.send_step();
@@ -304,7 +341,13 @@ pub mod ratchet_tests {
         let a4 = alice_mgmt.send_step();
 
         // "loose" a2 & a3
-        let b4 = bob_mgmt.recv_step_for(a4.ratchet_key.copy(), a4.counter, alice_mgmt.ratchet.prev_send_counter).unwrap();
+        let b4 = bob_mgmt
+            .recv_step_for(
+                a4.ratchet_key.copy(),
+                a4.counter,
+                alice_mgmt.ratchet.prev_send_counter,
+            )
+            .unwrap();
 
         assert_send_recv(a4, b4);
 
@@ -313,16 +356,26 @@ pub mod ratchet_tests {
         let b7 = bob_mgmt.send_step();
 
         // "loose" b5 & b6
-        let a7 = alice_mgmt.recv_step_for(b7.ratchet_key.copy(), b7.counter, b7.prev_ratchet_counter).unwrap();
+        let a7 = alice_mgmt
+            .recv_step_for(b7.ratchet_key.copy(), b7.counter, b7.prev_ratchet_counter)
+            .unwrap();
 
         assert_send_recv(b7, a7);
 
         // recover "lost" keys
-        let b2 = bob_mgmt.recv_step_for(a2.ratchet_key.copy(), a2.counter, a2.prev_ratchet_counter).unwrap();
-        let b3 = bob_mgmt.recv_step_for(a3.ratchet_key.copy(), a3.counter, a3.prev_ratchet_counter).unwrap();
+        let b2 = bob_mgmt
+            .recv_step_for(a2.ratchet_key.copy(), a2.counter, a2.prev_ratchet_counter)
+            .unwrap();
+        let b3 = bob_mgmt
+            .recv_step_for(a3.ratchet_key.copy(), a3.counter, a3.prev_ratchet_counter)
+            .unwrap();
 
-        let a5 = alice_mgmt.recv_step_for(b5.ratchet_key.copy(), b5.counter, b5.prev_ratchet_counter).unwrap();
-        let a6 = alice_mgmt.recv_step_for(b6.ratchet_key.copy(), b6.counter, b6.prev_ratchet_counter).unwrap();
+        let a5 = alice_mgmt
+            .recv_step_for(b5.ratchet_key.copy(), b5.counter, b5.prev_ratchet_counter)
+            .unwrap();
+        let a6 = alice_mgmt
+            .recv_step_for(b6.ratchet_key.copy(), b6.counter, b6.prev_ratchet_counter)
+            .unwrap();
 
         assert_send_recv(a2, b2);
         assert_send_recv(a3, b3);
@@ -338,11 +391,19 @@ pub mod ratchet_tests {
     fn test_ratchet_manager_lost_messages() {
         let (alice, bob) = entangled_ratchets();
 
-        let mut alice_mgmt = ManagedRatchet { ratchet: alice, unused_keys: HashSet::new() };
-        let mut bob_mgmt = ManagedRatchet { ratchet: bob, unused_keys: HashSet::new() };
+        let mut alice_mgmt = ManagedRatchet {
+            ratchet: alice,
+            unused_keys: HashSet::new(),
+        };
+        let mut bob_mgmt = ManagedRatchet {
+            ratchet: bob,
+            unused_keys: HashSet::new(),
+        };
 
         let a1 = alice_mgmt.send_step();
-        let b1 = bob_mgmt.recv_step_for(a1.ratchet_key.copy(), a1.counter, a1.prev_ratchet_counter).unwrap();
+        let b1 = bob_mgmt
+            .recv_step_for(a1.ratchet_key.copy(), a1.counter, a1.prev_ratchet_counter)
+            .unwrap();
         assert_send_recv(a1, b1);
 
         let a2 = alice_mgmt.send_step();
@@ -350,12 +411,18 @@ pub mod ratchet_tests {
         let a4 = alice_mgmt.send_step();
 
         // "loose" a2 & a3
-        let b4 = bob_mgmt.recv_step_for(a4.ratchet_key.copy(), a4.counter, a4.prev_ratchet_counter).unwrap();
+        let b4 = bob_mgmt
+            .recv_step_for(a4.ratchet_key.copy(), a4.counter, a4.prev_ratchet_counter)
+            .unwrap();
 
         assert_send_recv(a4, b4);
 
-        let b2 = bob_mgmt.recv_step_for(a2.ratchet_key.copy(), a2.counter, a2.prev_ratchet_counter).unwrap();
-        let b3 = bob_mgmt.recv_step_for(a3.ratchet_key.copy(), a3.counter, a3.prev_ratchet_counter).unwrap();
+        let b2 = bob_mgmt
+            .recv_step_for(a2.ratchet_key.copy(), a2.counter, a2.prev_ratchet_counter)
+            .unwrap();
+        let b3 = bob_mgmt
+            .recv_step_for(a3.ratchet_key.copy(), a3.counter, a3.prev_ratchet_counter)
+            .unwrap();
 
         assert_send_recv(a2, b2);
         assert_send_recv(a3, b3);
@@ -365,16 +432,26 @@ pub mod ratchet_tests {
     fn test_ratchet_manager_linear_operation() {
         let (alice, bob) = entangled_ratchets();
 
-        let mut alice_mgmt = ManagedRatchet { ratchet: alice, unused_keys: HashSet::new() };
-        let mut bob_mgmt = ManagedRatchet { ratchet: bob, unused_keys: HashSet::new() };
+        let mut alice_mgmt = ManagedRatchet {
+            ratchet: alice,
+            unused_keys: HashSet::new(),
+        };
+        let mut bob_mgmt = ManagedRatchet {
+            ratchet: bob,
+            unused_keys: HashSet::new(),
+        };
 
         let a1 = alice_mgmt.send_step();
-        let b1 = bob_mgmt.recv_step_for(a1.ratchet_key.copy(), a1.counter, a1.prev_ratchet_counter).unwrap();
+        let b1 = bob_mgmt
+            .recv_step_for(a1.ratchet_key.copy(), a1.counter, a1.prev_ratchet_counter)
+            .unwrap();
 
         assert_send_recv(a1, b1);
 
         let b2 = bob_mgmt.send_step();
-        let a2 = alice_mgmt.recv_step_for(b2.ratchet_key.copy(), b2.counter, b2.prev_ratchet_counter).unwrap();
+        let a2 = alice_mgmt
+            .recv_step_for(b2.ratchet_key.copy(), b2.counter, b2.prev_ratchet_counter)
+            .unwrap();
 
         assert_send_recv(b2, a2);
 
@@ -382,9 +459,15 @@ pub mod ratchet_tests {
         let a4 = alice_mgmt.send_step();
         let a5 = alice_mgmt.send_step();
 
-        let b3 = bob_mgmt.recv_step_for(a3.ratchet_key.copy(), a3.counter, a3.prev_ratchet_counter).unwrap();
-        let b4 = bob_mgmt.recv_step_for(a4.ratchet_key.copy(), a4.counter, a4.prev_ratchet_counter).unwrap();
-        let b5 = bob_mgmt.recv_step_for(a5.ratchet_key.copy(), a5.counter, a5.prev_ratchet_counter).unwrap();
+        let b3 = bob_mgmt
+            .recv_step_for(a3.ratchet_key.copy(), a3.counter, a3.prev_ratchet_counter)
+            .unwrap();
+        let b4 = bob_mgmt
+            .recv_step_for(a4.ratchet_key.copy(), a4.counter, a4.prev_ratchet_counter)
+            .unwrap();
+        let b5 = bob_mgmt
+            .recv_step_for(a5.ratchet_key.copy(), a5.counter, a5.prev_ratchet_counter)
+            .unwrap();
 
         assert_send_recv(a3, b3);
         assert_send_recv(a4, b4);

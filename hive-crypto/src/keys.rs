@@ -1,12 +1,12 @@
 use std::fmt;
 use std::hash::Hasher;
 
-use x25519_dalek;
 use ed25519_dalek;
 use sha2::Sha512;
+use x25519_dalek;
 
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
-use serde::de::{Visitor, SeqAccess};
+use serde::de::{SeqAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::error::*;
 use std::marker::PhantomData;
@@ -22,15 +22,18 @@ struct FromBytesVisitor<K> {
 }
 
 impl<K> FromBytesVisitor<K> {
-    fn new() -> FromBytesVisitor<K> where K: FromBytes, {
-        FromBytesVisitor {
-            _a: PhantomData,
-        }
+    fn new() -> FromBytesVisitor<K>
+    where
+        K: FromBytes,
+    {
+        FromBytesVisitor { _a: PhantomData }
     }
 }
 
 impl<'de, K> Visitor<'de> for FromBytesVisitor<K>
-    where K: FromBytes, {
+where
+    K: FromBytes,
+{
     type Value = K;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -38,18 +41,20 @@ impl<'de, K> Visitor<'de> for FromBytesVisitor<K>
     }
 
     fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error, {
+    where
+        E: serde::de::Error,
+    {
         K::from_bytes(v).map_err(|_ce| E::invalid_length(v.len(), &self))
     }
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        where
-            A: SeqAccess<'de>,
-            A::Error: serde::de::Error,
+    where
+        A: SeqAccess<'de>,
+        A::Error: serde::de::Error,
     {
-        let mut buff = seq.size_hint()
-                          .map_or_else(|| Vec::new(), |size| Vec::with_capacity(size));
+        let mut buff = seq
+            .size_hint()
+            .map_or_else(|| Vec::new(), |size| Vec::with_capacity(size));
 
         // Update the max while there are additional values.
         while let Some(value) = seq.next_element()? {
@@ -60,7 +65,6 @@ impl<'de, K> Visitor<'de> for FromBytesVisitor<K>
     }
 }
 
-
 /// Dalek public key
 pub struct PublicKey {
     ed_public: ed25519_dalek::PublicKey,
@@ -68,8 +72,14 @@ pub struct PublicKey {
 }
 
 impl PublicKey {
-    fn new(ed_public: ed25519_dalek::PublicKey, x_public: x25519_dalek::PublicKey) -> Result<PublicKey, CryptoError> {
-        Ok(PublicKey { ed_public, x_public })
+    fn new(
+        ed_public: ed25519_dalek::PublicKey,
+        x_public: x25519_dalek::PublicKey,
+    ) -> Result<PublicKey, CryptoError> {
+        Ok(PublicKey {
+            ed_public,
+            x_public,
+        })
     }
 
     /// encode public identity as string
@@ -96,13 +106,15 @@ impl PublicKey {
 
     ///Verify a raw byte signature
     pub fn verify(&self, data: &[u8], signature: &[u8]) -> Result<(), CryptoError> {
-        let signature = ed25519_dalek::Signature::from_bytes(signature)
-            .map_err(|e| CryptoError::Signature {
+        let signature = ed25519_dalek::Signature::from_bytes(signature).map_err(|e| {
+            CryptoError::Signature {
                 message: "Failed to convert signature".to_string(),
                 cause: e,
-            })?;
+            }
+        })?;
 
-        self.ed_public.verify::<Sha512>(&data[..], &signature)
+        self.ed_public
+            .verify::<Sha512>(&data[..], &signature)
             .map_err(|e| CryptoError::Signature {
                 message: "Failed to verify signature".to_string(),
                 cause: e,
@@ -116,8 +128,7 @@ impl PublicKey {
         let bytes = self.id_bytes();
 
         // expect no errors ... just recycling
-        PublicKey::from_bytes(&bytes[..])
-            .expect("Failed to copy DalekEd25519PublicId")
+        PublicKey::from_bytes(&bytes[..]).expect("Failed to copy DalekEd25519PublicId")
     }
 }
 
@@ -125,7 +136,9 @@ impl FromBytes for PublicKey {
     /// parse an identity from raw bytes
     fn from_bytes(bytes: &[u8]) -> Result<PublicKey, CryptoError> {
         if bytes.len() < COMBINED_PUBLIC_KEY_SIZE {
-            return Err(CryptoError::Message { message: "Invalid public key format".to_string() });
+            return Err(CryptoError::Message {
+                message: "Invalid public key format".to_string(),
+            });
         }
 
         let mut ed_bytes = [0u8; 32];
@@ -134,28 +147,35 @@ impl FromBytes for PublicKey {
         ed_bytes.clone_from_slice(&bytes[..32]);
         x_bytes.clone_from_slice(&bytes[32..]);
 
-        let ed_public = ed25519_dalek::PublicKey::from_bytes(&ed_bytes[..])
-            .map_err(|e| CryptoError::Key {
+        let ed_public =
+            ed25519_dalek::PublicKey::from_bytes(&ed_bytes[..]).map_err(|e| CryptoError::Key {
                 message: "ed25519 decode failed".to_string(),
                 cause: e,
             })?;
 
         let x_public = x25519_dalek::PublicKey::from(x_bytes);
 
-        Ok(PublicKey { ed_public, x_public })
+        Ok(PublicKey {
+            ed_public,
+            x_public,
+        })
     }
 }
 
 impl Serialize for PublicKey {
-    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error> where
-        S: Serializer {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
         serializer.serialize_bytes(&self.id_bytes()[..])
     }
 }
 
 impl<'de> Deserialize<'de> for PublicKey {
-    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error> where
-        D: Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
         deserializer.deserialize_bytes(FromBytesVisitor::<PublicKey>::new())
     }
 }
@@ -186,7 +206,6 @@ impl std::hash::Hash for PublicKey {
     }
 }
 
-
 /// Dalek private key
 pub struct PrivateKey {
     ed_secret: ed25519_dalek::SecretKey,
@@ -211,7 +230,11 @@ impl PrivateKey {
 
         let public = PublicKey::new(ed_public, x_public)?;
 
-        Ok(PrivateKey { ed_secret: ed_private, x_secret: x_private, public })
+        Ok(PrivateKey {
+            ed_secret: ed_private,
+            x_secret: x_private,
+            public,
+        })
     }
 
     /// corresponding public key
@@ -224,14 +247,19 @@ impl PrivateKey {
     }
 
     pub fn diffie_hellman(&self, public: &PublicKey) -> [u8; 32] {
-        self.x_secret.diffie_hellman(&public.x_public).as_bytes().clone()
+        self.x_secret
+            .diffie_hellman(&public.x_public)
+            .as_bytes()
+            .clone()
     }
 
     /// Sign some data using the underlying private key.
     /// Since the digest used is SHA512, output will be 64 bytes
     pub fn sign(&self, data: &[u8]) -> Result<Vec<u8>, CryptoError> {
-        let signature = self.ed_secret.expand::<Sha512>()
-                            .sign::<Sha512>(data, &self.public.ed_public);
+        let signature = self
+            .ed_secret
+            .expand::<Sha512>()
+            .sign::<Sha512>(data, &self.public.ed_public);
 
         Ok(Vec::from(&signature.to_bytes()[..]))
     }
@@ -239,8 +267,8 @@ impl PrivateKey {
 
 impl FromBytes for PrivateKey {
     fn from_bytes(private: &[u8]) -> Result<PrivateKey, CryptoError> {
-        let ed_private = ed25519_dalek::SecretKey::from_bytes(private)
-            .map_err(|e| CryptoError::Key {
+        let ed_private =
+            ed25519_dalek::SecretKey::from_bytes(private).map_err(|e| CryptoError::Key {
                 message: "Failed to process secret key bytes".to_string(),
                 cause: e,
             })?;
@@ -250,15 +278,19 @@ impl FromBytes for PrivateKey {
 }
 
 impl Serialize for PrivateKey {
-    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error> where
-        S: Serializer {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
         serializer.serialize_bytes(&self.secret_bytes()[..])
     }
 }
 
 impl<'de> Deserialize<'de> for PrivateKey {
-    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error> where
-        D: Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
         deserializer.deserialize_bytes(FromBytesVisitor::<PrivateKey>::new())
     }
 }
@@ -282,7 +314,6 @@ impl<'a> std::cmp::PartialEq<PrivateKey> for &'a PrivateKey {
 }
 
 impl Eq for PrivateKey {}
-
 
 #[cfg(test)]
 mod key_tests {
@@ -334,8 +365,14 @@ mod key_tests {
 
         let recycled_public = PublicKey::from_bytes(&buffer[..]).unwrap();
 
-        assert_eq!(original_public.ed_public.to_bytes(), recycled_public.ed_public.to_bytes());
-        assert_eq!(original_public.x_public.as_bytes(), recycled_public.x_public.as_bytes());
+        assert_eq!(
+            original_public.ed_public.to_bytes(),
+            recycled_public.ed_public.to_bytes()
+        );
+        assert_eq!(
+            original_public.x_public.as_bytes(),
+            recycled_public.x_public.as_bytes()
+        );
     }
 
     #[test]
@@ -348,14 +385,20 @@ mod key_tests {
 
         let recycled_public = PublicKey::from_bytes(&buffer[..]).unwrap();
 
-        assert_eq!(original_public.ed_public.to_bytes(), recycled_public.ed_public.to_bytes());
-        assert_eq!(original_public.x_public.as_bytes(), recycled_public.x_public.as_bytes());
+        assert_eq!(
+            original_public.ed_public.to_bytes(),
+            recycled_public.ed_public.to_bytes()
+        );
+        assert_eq!(
+            original_public.x_public.as_bytes(),
+            recycled_public.x_public.as_bytes()
+        );
     }
 
     #[test]
     fn test_dalek_dh() {
-        use x25519_dalek;
         use rand_core::OsRng;
+        use x25519_dalek;
         let a_x_privates = x25519_dalek::StaticSecret::new(&mut OsRng);
         let a_my_privates = PrivateKey::from_bytes(&a_x_privates.to_bytes()[..]).unwrap();
 
@@ -365,8 +408,14 @@ mod key_tests {
         let dh1 = a_my_privates.diffie_hellman(&b_my_privates.public);
         let dh2 = b_my_privates.diffie_hellman(&a_my_privates.public);
 
-        let dh3 = a_x_privates.diffie_hellman(&x25519_dalek::PublicKey::from(&b_x_privates)).as_bytes().clone();
-        let dh4 = b_x_privates.diffie_hellman(&x25519_dalek::PublicKey::from(&a_x_privates)).as_bytes().clone();
+        let dh3 = a_x_privates
+            .diffie_hellman(&x25519_dalek::PublicKey::from(&b_x_privates))
+            .as_bytes()
+            .clone();
+        let dh4 = b_x_privates
+            .diffie_hellman(&x25519_dalek::PublicKey::from(&a_x_privates))
+            .as_bytes()
+            .clone();
 
         assert_eq!(dh1, dh2);
         assert_eq!(dh1, dh3);

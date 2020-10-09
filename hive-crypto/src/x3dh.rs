@@ -6,10 +6,12 @@ use sha2::Sha256;
 // max dh buffer size needed
 const DH_BUFFER_SIZE: usize = 128;
 
-pub fn x3dh_agree_initial(ik_a: &PrivateKey,
-                          ik_b: &PublicKey,
-                          pre_key: &PublicKey,
-                          onetime_pre_key: Option<PublicKey>) -> (PublicKey, [u8; 32]) {
+pub fn x3dh_agree_initial(
+    ik_a: &PrivateKey,
+    ik_b: &PublicKey,
+    pre_key: &PublicKey,
+    onetime_pre_key: Option<PublicKey>,
+) -> (PublicKey, [u8; 32]) {
     let ek_a = PrivateKey::generate().unwrap();
 
     let dh1 = ik_a.diffie_hellman(pre_key);
@@ -37,11 +39,13 @@ pub fn x3dh_agree_initial(ik_a: &PrivateKey,
     return (ek_a.id().copy(), okm);
 }
 
-pub fn x3dh_agree_respond(ik_a: &PublicKey,
-                          ik_b: &PrivateKey,
-                          ek_a: &PublicKey,
-                          pre_key: &PrivateKey,
-                          onetime_pre_key: Option<PrivateKey>) -> [u8; 32] {
+pub fn x3dh_agree_respond(
+    ik_a: &PublicKey,
+    ik_b: &PrivateKey,
+    ek_a: &PublicKey,
+    pre_key: &PrivateKey,
+    onetime_pre_key: Option<PrivateKey>,
+) -> [u8; 32] {
     let dh1 = pre_key.diffie_hellman(&ik_a);
     let dh2 = ik_b.diffie_hellman(ek_a);
     let dh3 = pre_key.diffie_hellman(ek_a);
@@ -90,7 +94,8 @@ mod x3dh_tests {
         let pre_key = PrivateKey::generate().unwrap();
         let opk = PrivateKey::generate().unwrap();
 
-        let (eph_pub, dh1) = x3dh_agree_initial(&ik_a, ik_b.id(), pre_key.id(), Some(opk.id().copy()));
+        let (eph_pub, dh1) =
+            x3dh_agree_initial(&ik_a, ik_b.id(), pre_key.id(), Some(opk.id().copy()));
         let dh2 = x3dh_agree_respond(&ik_a.id(), &ik_b, &eph_pub, &pre_key, Some(opk));
 
         assert_eq!(dh1, dh2);

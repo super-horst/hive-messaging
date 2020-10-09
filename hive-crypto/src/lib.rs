@@ -5,20 +5,16 @@ mod error;
 #[cfg(test)]
 mod test_utils;
 
-
-mod keys;
 mod certificates;
+mod keys;
 
 pub use error::*;
 
-pub use keys::{PrivateKey,
-               PublicKey,
-               FromBytes};
+pub use keys::{FromBytes, PrivateKey, PublicKey};
 
-pub use certificates::{Certificate,
-                       CertificateInfoBundle,
-                       CertificateEncoding,
-                       CertificateFactory};
+pub use certificates::{
+    Certificate, CertificateEncoding, CertificateFactory, CertificateInfoBundle,
+};
 
 pub use cryptostorage::*;
 
@@ -27,12 +23,11 @@ mod x3dh;
 
 pub use x3dh::*;
 
-pub use ratchet::{ManagedRatchet, SendStep, RecvStep};
+pub use ratchet::{ManagedRatchet, RecvStep, SendStep};
 
 //TODO initial implementation is not ready for production!
 //TODO [UPDATE] ... coming closer to be ready for production!
 //TODO [UPDATE] ... some more cool stuff & moved this block!
-
 
 /// Identity provider
 pub trait Identities: Send + Sync {

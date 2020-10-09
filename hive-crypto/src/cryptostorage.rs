@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time:: Duration;
+use std::time::Duration;
 
 use dashmap::DashMap;
 
@@ -92,8 +92,13 @@ impl CryptoStoreBuilder {
         Ok(self)
     }
 
-    fn decode_chain_recursive<E>(&self, cert: E::CertificateType) -> Result<Arc<Certificate>, failure::Error>
-        where E: CertificateEncoding {
+    fn decode_chain_recursive<E>(
+        &self,
+        cert: E::CertificateType,
+    ) -> Result<Arc<Certificate>, failure::Error>
+    where
+        E: CertificateEncoding,
+    {
         let (mut cert, signer) = E::decode_partial(cert)?;
 
         if let Some(s) = signer {
@@ -103,10 +108,9 @@ impl CryptoStoreBuilder {
         let public = cert.public_key().copy();
 
         return if self.known_certs.contains_key(&public) {
-            let entry = self.known_certs.get(&public)
-                            .ok_or(CryptoError::Message {
-                                message: "illegal state".to_string()
-                            })?;
+            let entry = self.known_certs.get(&public).ok_or(CryptoError::Message {
+                message: "illegal state".to_string(),
+            })?;
 
             Ok(Arc::clone(entry.value()))
         } else {
@@ -118,17 +122,20 @@ impl CryptoStoreBuilder {
 
     /// initialise my certificate from bytes
     pub fn init_my_certificate<E>(mut self, cert_bytes: &[u8]) -> Result<Self, CryptoError>
-        where E: CertificateEncoding {
-        let raw_cert = E::deserialise(cert_bytes.to_vec())
-            .map_err(|e| CryptoError::Unspecified {
+    where
+        E: CertificateEncoding,
+    {
+        let raw_cert =
+            E::deserialise(cert_bytes.to_vec()).map_err(|e| CryptoError::Unspecified {
                 message: "failed to deserialise raw certificate".to_string(),
                 cause: e,
             })?;
-        let result = self.decode_chain_recursive::<E>(raw_cert)
-                         .map_err(|e| CryptoError::Unspecified {
-                             message: "failed to deserialise raw certificate".to_string(),
-                             cause: e,
-                         })?;
+        let result =
+            self.decode_chain_recursive::<E>(raw_cert)
+                .map_err(|e| CryptoError::Unspecified {
+                    message: "failed to deserialise raw certificate".to_string(),
+                    cause: e,
+                })?;
 
         self.my_cert = Some(result);
 
@@ -137,31 +144,33 @@ impl CryptoStoreBuilder {
 
     /// initialise my certificate from bytes
     pub fn init_other_certificate<E>(self, cert_bytes: &[u8]) -> Result<Self, CryptoError>
-        where E: CertificateEncoding {
-        let raw_cert = E::deserialise(cert_bytes.to_vec())
-            .map_err(|e| CryptoError::Unspecified {
+    where
+        E: CertificateEncoding,
+    {
+        let raw_cert =
+            E::deserialise(cert_bytes.to_vec()).map_err(|e| CryptoError::Unspecified {
                 message: "failed to deserialise raw certificate".to_string(),
                 cause: e,
             })?;
 
-        let _result = self.decode_chain_recursive::<E>(raw_cert)
-                          .map_err(|e| CryptoError::Unspecified {
-                              message: "failed to deserialise raw certificate".to_string(),
-                              cause: e,
-                          })?;
+        let _result =
+            self.decode_chain_recursive::<E>(raw_cert)
+                .map_err(|e| CryptoError::Unspecified {
+                    message: "failed to deserialise raw certificate".to_string(),
+                    cause: e,
+                })?;
 
         Ok(self)
     }
 
     pub fn build(self) -> Result<CryptoStore, CryptoError> {
-        let my_key = self.my_key.ok_or(
-            CryptoError::Message {
-                message: "no private key given".to_string()
-            })?;
+        let my_key = self.my_key.ok_or(CryptoError::Message {
+            message: "no private key given".to_string(),
+        })?;
 
         // calculate expiration timestamp
         let my_cert = self.my_cert.ok_or(CryptoError::Message {
-            message: "no certificate given".to_string()
+            message: "no certificate given".to_string(),
         })?;
 
         Ok(CryptoStore {
@@ -176,8 +185,8 @@ impl CryptoStoreBuilder {
 //TODO cleanup
 #[cfg(feature = "storage")]
 pub async fn load_private_key(path: &str) -> PrivateKey {
-    use tokio::prelude::*;
     use tokio::fs;
+    use tokio::prelude::*;
 
     let f = fs::File::open(path).await;
     if f.is_ok() {
@@ -200,9 +209,11 @@ pub async fn load_private_key(path: &str) -> PrivateKey {
 //TODO cleanup
 #[cfg(feature = "storage")]
 pub async fn load_certificate<T>(server_id: &PrivateKey, path: &str) -> Certificate
-    where T: CertificateEncoding {
-    use tokio::prelude::*;
+where
+    T: CertificateEncoding,
+{
     use tokio::fs;
+    use tokio::prelude::*;
 
     let f = fs::File::open(path).await;
     if f.is_ok() {
@@ -222,21 +233,23 @@ pub async fn load_certificate<T>(server_id: &PrivateKey, path: &str) -> Certific
         let cert = CertificateFactory::default()
             .certified(server_public)
             .expiration(Duration::from_secs(1000))
-            .self_sign::<T>(server_id).unwrap();
+            .self_sign::<T>(server_id)
+            .unwrap();
 
         let mut f = fs::File::create(path).await.unwrap();
-        f.write_all(&T::serialise(&cert).unwrap()[..]).await.unwrap();
+        f.write_all(&T::serialise(&cert).unwrap()[..])
+            .await
+            .unwrap();
 
         return cert;
     }
 }
 
-
 #[cfg(test)]
 mod crypto_storage_tests {
     use super::*;
-    use crate::test_utils::GrpcCertificateEncoding;
     use crate::certificates::certificate_tests;
+    use crate::test_utils::GrpcCertificateEncoding;
 
     #[tokio::test]
     async fn test_builder_with_signed_cert() {
@@ -246,8 +259,10 @@ mod crypto_storage_tests {
         let cert_bytes = GrpcCertificateEncoding::serialise(&cert).unwrap();
 
         let csb = CryptoStoreBuilder::new()
-            .init_my_key(my_key.secret_bytes()).unwrap()
-            .init_my_certificate::<GrpcCertificateEncoding>(&cert_bytes[..]).unwrap();
+            .init_my_key(my_key.secret_bytes())
+            .unwrap()
+            .init_my_certificate::<GrpcCertificateEncoding>(&cert_bytes[..])
+            .unwrap();
 
         let store = csb.build().unwrap();
 
@@ -269,9 +284,12 @@ mod crypto_storage_tests {
         let cert_bytes_2 = GrpcCertificateEncoding::serialise(&cert2).unwrap();
 
         let csb = CryptoStoreBuilder::new()
-            .init_my_key(my_key.secret_bytes()).unwrap()
-            .init_my_certificate::<GrpcCertificateEncoding>(&cert_bytes_1[..]).unwrap()
-            .init_other_certificate::<GrpcCertificateEncoding>(&cert_bytes_2[..]).unwrap();
+            .init_my_key(my_key.secret_bytes())
+            .unwrap()
+            .init_my_certificate::<GrpcCertificateEncoding>(&cert_bytes_1[..])
+            .unwrap()
+            .init_other_certificate::<GrpcCertificateEncoding>(&cert_bytes_2[..])
+            .unwrap();
 
         let store = csb.build().unwrap();
 
@@ -292,8 +310,10 @@ mod crypto_storage_tests {
         let cert_bytes = GrpcCertificateEncoding::serialise(&cert).unwrap();
 
         let csb = CryptoStoreBuilder::new()
-            .init_my_key(my_key.secret_bytes()).unwrap()
-            .init_my_certificate::<GrpcCertificateEncoding>(&cert_bytes[..]).unwrap();
+            .init_my_key(my_key.secret_bytes())
+            .unwrap()
+            .init_my_certificate::<GrpcCertificateEncoding>(&cert_bytes[..])
+            .unwrap();
 
         let store = csb.build().unwrap();
 

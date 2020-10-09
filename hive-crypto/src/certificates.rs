@@ -55,8 +55,7 @@ impl Certificate {
 impl std::cmp::PartialEq for Certificate {
     fn eq(&self, other: &Self) -> bool {
         // quick and dirty -> change this to support inter-codec Eq
-        (self.cert == other.cert) &&
-            (self.signature == other.signature)
+        (self.cert == other.cert) && (self.signature == other.signature)
     }
 }
 
@@ -82,7 +81,12 @@ pub struct CertificateInfoBundle {
 
 impl CertificateInfoBundle {
     /// construct a new CertificateInfoBundle
-    pub fn new(identity: PublicKey, expiration: SystemTime, serial: String, signer_certificate: Option<Arc<Certificate>>) -> CertificateInfoBundle {
+    pub fn new(
+        identity: PublicKey,
+        expiration: SystemTime,
+        serial: String,
+        signer_certificate: Option<Arc<Certificate>>,
+    ) -> CertificateInfoBundle {
         CertificateInfoBundle {
             identity,
             expiration,
@@ -120,7 +124,9 @@ pub trait CertificateEncoding {
 
     /// partially decode a certificate
     /// returns the certificate itself and an optional (encoded) signer
-    fn decode_partial(serialised: Self::CertificateType) -> Result<(Certificate, Option<Self::CertificateType>), failure::Error>;
+    fn decode_partial(
+        serialised: Self::CertificateType,
+    ) -> Result<(Certificate, Option<Self::CertificateType>), failure::Error>;
 
     /// partially parse a certificate
     /// returns the certificate itself and an optional (unparsed) signer
@@ -138,16 +144,14 @@ pub struct CertificateFactory {
 
 impl CertificateFactory {
     /// Certify the given identity
-    pub fn certified(mut self, certified: PublicKey)
-                     -> CertificateFactory {
+    pub fn certified(mut self, certified: PublicKey) -> CertificateFactory {
         self.certified = Some(certified);
 
         self
     }
 
     /// Define when the new certificate expires
-    pub fn expiration(mut self, validity: Duration)
-                      -> CertificateFactory {
+    pub fn expiration(mut self, validity: Duration) -> CertificateFactory {
         self.validity = validity;
 
         self
@@ -155,34 +159,37 @@ impl CertificateFactory {
 
     /// Self-sign the certificate information with the given private key.
     /// The resulting certificate will not carry a signer certificate.
-    pub fn self_sign<E>(self,
-                        signer: &PrivateKey)
-                        -> Result<Certificate, CryptoError>
-        where E: CertificateEncoding {
+    pub fn self_sign<E>(self, signer: &PrivateKey) -> Result<Certificate, CryptoError>
+    where
+        E: CertificateEncoding,
+    {
         self.sign::<E>(signer, None)
     }
 
     /// Sign the certificate information with the given private key and an
     /// optional certificate
-    pub fn sign<E>(self,
-                   signer: &PrivateKey,
-                   signer_cert: Option<&Arc<Certificate>>)
-                   -> Result<Certificate, CryptoError>
-        where E: CertificateEncoding {
-        use uuid::{Builder, Variant, Version};
+    pub fn sign<E>(
+        self,
+        signer: &PrivateKey,
+        signer_cert: Option<&Arc<Certificate>>,
+    ) -> Result<Certificate, CryptoError>
+    where
+        E: CertificateEncoding,
+    {
         use rand_core::OsRng;
+        use uuid::{Builder, Variant, Version};
 
-        let certified = self.certified.ok_or(
-            CryptoError::Message {
-                message: "cannot create a certificate without a given identity".to_string()
-            })?;
+        let certified = self.certified.ok_or(CryptoError::Message {
+            message: "cannot create a certificate without a given identity".to_string(),
+        })?;
 
         // calculate expiration timestamp
-        let expiration = SystemTime::now()
-            .checked_add(self.validity)
-            .ok_or(CryptoError::Message {
-                message: "error handling validity".to_string()
-            })?;
+        let expiration =
+            SystemTime::now()
+                .checked_add(self.validity)
+                .ok_or(CryptoError::Message {
+                    message: "error handling validity".to_string(),
+                })?;
 
         let mut bytes = [0; 16];
         OsRng::default().fill_bytes(&mut bytes);
@@ -190,7 +197,8 @@ impl CertificateFactory {
         let serial = Builder::from_bytes(bytes)
             .set_variant(Variant::RFC4122)
             .set_version(Version::Random)
-            .build().to_string();
+            .build()
+            .to_string();
 
         let infos = CertificateInfoBundle {
             identity: certified,
@@ -199,23 +207,26 @@ impl CertificateFactory {
             signer_certificate: signer_cert.map(Arc::clone),
         };
 
-        let tbs = E::serialise_tbs(&infos)
-            .map_err(|e| CryptoError::Unspecified {
-                message: "failed to serialise tbs certificate".to_string(),
-                cause: e,
-            })?;
+        let tbs = E::serialise_tbs(&infos).map_err(|e| CryptoError::Unspecified {
+            message: "failed to serialise tbs certificate".to_string(),
+            cause: e,
+        })?;
 
         let signature = signer.sign(&tbs[..])?;
 
-        Ok(Certificate { cert: tbs, signature, infos })
+        Ok(Certificate {
+            cert: tbs,
+            signature,
+            infos,
+        })
     }
 }
 
 #[cfg(test)]
 pub mod certificate_tests {
     use super::*;
-    use crate::PrivateKey;
     use crate::test_utils::GrpcCertificateEncoding;
+    use crate::PrivateKey;
 
     /// convenience method to create any signed certificate
     pub fn create_signed_cert() -> Certificate {
@@ -224,14 +235,17 @@ pub mod certificate_tests {
         let signer_cert = CertificateFactory::default()
             .certified(signer_key.id().copy())
             .expiration(Duration::from_secs(1000))
-            .self_sign::<GrpcCertificateEncoding>(&signer_key).map(Arc::new).unwrap();
+            .self_sign::<GrpcCertificateEncoding>(&signer_key)
+            .map(Arc::new)
+            .unwrap();
 
         let leaf_key = PrivateKey::generate().unwrap();
 
         let leaf_cert = CertificateFactory::default()
             .certified(leaf_key.id().copy())
             .expiration(Duration::from_secs(1000))
-            .sign::<GrpcCertificateEncoding>(&signer_key, Some(&signer_cert)).unwrap();
+            .sign::<GrpcCertificateEncoding>(&signer_key, Some(&signer_cert))
+            .unwrap();
 
         return leaf_cert;
     }
@@ -243,21 +257,25 @@ pub mod certificate_tests {
         let signer_cert = CertificateFactory::default()
             .certified(signer_key.id().copy())
             .expiration(Duration::from_secs(1000))
-            .self_sign::<GrpcCertificateEncoding>(&signer_key).map(Arc::new).unwrap();
+            .self_sign::<GrpcCertificateEncoding>(&signer_key)
+            .map(Arc::new)
+            .unwrap();
 
         let leaf_key_1 = PrivateKey::generate().unwrap();
 
         let leaf_cert_1 = CertificateFactory::default()
             .certified(leaf_key_1.id().copy())
             .expiration(Duration::from_secs(1000))
-            .sign::<GrpcCertificateEncoding>(&signer_key, Some(&signer_cert)).unwrap();
+            .sign::<GrpcCertificateEncoding>(&signer_key, Some(&signer_cert))
+            .unwrap();
 
         let leaf_key_2 = PrivateKey::generate().unwrap();
 
         let leaf_cert_2 = CertificateFactory::default()
             .certified(leaf_key_2.id().copy())
             .expiration(Duration::from_secs(1000))
-            .sign::<GrpcCertificateEncoding>(&signer_key, Some(&signer_cert)).unwrap();
+            .sign::<GrpcCertificateEncoding>(&signer_key, Some(&signer_cert))
+            .unwrap();
 
         return (leaf_cert_1, leaf_cert_2);
     }
@@ -269,7 +287,8 @@ pub mod certificate_tests {
         let cert = CertificateFactory::default()
             .certified(private.id().copy())
             .expiration(Duration::from_secs(1000))
-            .self_sign::<GrpcCertificateEncoding>(&private).unwrap();
+            .self_sign::<GrpcCertificateEncoding>(&private)
+            .unwrap();
 
         return cert;
     }
@@ -278,7 +297,9 @@ pub mod certificate_tests {
     fn test_create_self_signed() {
         let cert = create_self_signed_cert();
 
-        cert.public_key().verify(cert.encoded_certificate(), cert.signature()).unwrap();
+        cert.public_key()
+            .verify(cert.encoded_certificate(), cert.signature())
+            .unwrap();
     }
 
     #[test]
@@ -287,6 +308,9 @@ pub mod certificate_tests {
 
         let sig_cert = signed.infos.signer_certificate.unwrap();
 
-        sig_cert.public_key().verify(sig_cert.encoded_certificate(), sig_cert.signature()).unwrap();
+        sig_cert
+            .public_key()
+            .verify(sig_cert.encoded_certificate(), sig_cert.signature())
+            .unwrap();
     }
 }
