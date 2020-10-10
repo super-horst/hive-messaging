@@ -1,22 +1,22 @@
-
-mod errors;
-pub use errors::*;
-
-mod entities;
-
-use crate::config::DbConfig;
+use chrono::{DateTime, Utc};
+use oxidizer::{entity::IEntity, DB};
 
 use hive_crypto as crypto;
 use hive_grpc::*;
 
-use chrono::{DateTime, Utc};
-pub use oxidizer::{entity::IEntity, migration::Migration, DB};
+use crate::config::DbConfig;
 
-use log::*;
+pub mod entities;
+mod errors;
 
+pub use errors::*;
+
+#[cfg(test)]
+use mockall::automock;
 #[cfg(test)]
 mod tests;
 
+#[cfg_attr(test, automock)]
 #[async_trait::async_trait]
 pub(crate) trait AccountsRepository: Send + Sync {
     async fn create_account(
@@ -68,23 +68,13 @@ impl AccountsRepository for DatabaseRepository {
         let mut account = entities::Account::for_public_key(peer.id_string());
 
         match account.save(&self.db).await {
-            Ok(true) => {
-                info!("Account saved");
-                Ok(())
-            }
-            Ok(false) => {
-                error!("Failed to save account");
-                Err(RepositoryError::AlreadyExists {
-                    message: format!("Account already exists"),
-                })
-            }
-            Err(error) => {
-                //error!(error = format!("{:?}", error).as_str(), "Failed to save account");
-                error!("Failed to save account {:?}", error);
-                Err(RepositoryError::Database {
-                    message: format!("Account save failed {:?}", error),
-                })
-            }
+            Ok(true) => Ok(()),
+            Ok(false) => Err(RepositoryError::AlreadyExists {
+                message: format!("Account already exists"),
+            }),
+            Err(error) => Err(RepositoryError::Database {
+                message: format!("Account save failed {:?}", error),
+            }),
         }?;
 
         Ok(account)
@@ -128,23 +118,13 @@ impl AccountsRepository for DatabaseRepository {
         };
 
         match bundle_update.save(&self.db).await {
-            Ok(true) => {
-                info!("Pre key update saved");
-                Ok(())
-            }
-            Ok(false) => {
-                error!("Failed to save pre key update");
-                Err(RepositoryError::AlreadyExists {
-                    message: format!("Prekey already exists failed"),
-                })
-            }
-            Err(error) => {
-                //error!(error = format!("{:?}", error).as_str(), "Failed to save account");
-                error!("Failed to save pre key update {:?}", error);
-                Err(RepositoryError::Database {
-                    message: format!("Prekey save failed {:?}", error),
-                })
-            }
+            Ok(true) => Ok(()),
+            Ok(false) => Err(RepositoryError::AlreadyExists {
+                message: format!("Prekey already exists failed"),
+            }),
+            Err(error) => Err(RepositoryError::Database {
+                message: format!("Prekey save failed {:?}", error),
+            }),
         }?;
 
         for mut bundle in bundles {
@@ -196,10 +176,11 @@ impl AccountsRepository for DatabaseRepository {
                 })?;
 
         let bundled_otk = if let Some(mut key) = otk {
-            let decoded = hex::decode(key.key.clone()).map_err(|e| RepositoryError::Conversion {
-                message: "Hex decoding failed".to_string(),
-                cause: e,
-            })?;
+            let decoded =
+                hex::decode(key.key.clone()).map_err(|e| RepositoryError::Conversion {
+                    message: "Hex decoding failed".to_string(),
+                    cause: e,
+                })?;
 
             key.delete(&self.db)
                 .await
@@ -245,23 +226,13 @@ impl AccountsRepository for DatabaseRepository {
         cert_entity.signature = hex::encode(cert_update.signature().to_vec());
 
         match cert_entity.save(&self.db).await {
-            Ok(true) => {
-                info!("Certificate update saved");
-                Ok(())
-            }
-            Ok(false) => {
-                error!("Failed to save certificate update");
-                Err(RepositoryError::AlreadyExists {
-                    message: format!("Certificate already exists"),
-                })
-            }
-            Err(error) => {
-                //error!(error = format!("{:?}", error).as_str(), "Failed to save account");
-                error!("Failed to save certificate update {:?}", error);
-                Err(RepositoryError::Database {
-                    message: format!("Certificate save failed {:?}", error),
-                })
-            }
+            Ok(true) => Ok(()),
+            Ok(false) => Err(RepositoryError::AlreadyExists {
+                message: format!("Certificate already exists"),
+            }),
+            Err(error) => Err(RepositoryError::Database {
+                message: format!("Certificate save failed {:?}", error),
+            }),
         }
     }
 }

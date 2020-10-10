@@ -37,6 +37,7 @@ chrono = "0.4.15"
 [dev-dependencies]
 testcontainers = "0.11.0"
 mockall = "0.8.1"
+futures = "0.3"
 
 [profile.release]
 opt-level = 3

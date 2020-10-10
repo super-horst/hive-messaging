@@ -1,6 +1,6 @@
 use failure::Fail;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Clone, Fail)]
 pub enum RepositoryError {
     #[fail(display = "Conversion failed: {}", message)]
     Conversion {

@@ -32,9 +32,8 @@ EXPOSE 8080
 
 ARG PROJECT_NAME
 ENV RUST_BACKTRACE=full
-ENV CONFIG=config
-
-COPY --from=builder /usr/local/cargo/bin/$PROJECT_NAME ./service
 
 USER 1000
+COPY --from=builder /usr/local/cargo/bin/$PROJECT_NAME ./service
+
 CMD [ "./service" ]

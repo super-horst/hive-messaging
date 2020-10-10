@@ -3,9 +3,7 @@ use oxidizer::*;
 
 use crate::persistence::RepositoryError;
 
-pub use oxidizer::{entity::IEntity, migration::Migration};
-
-pub(crate) fn collect_migrations() -> Result<Vec<Migration>, RepositoryError> {
+pub(crate) fn collect_migrations() -> Result<Vec<migration::Migration>, RepositoryError> {
     let account_migration = Account::create_migration().map_err(|e| RepositoryError::Database {
         message: format!("{:?}", e),
     })?;
@@ -30,7 +28,7 @@ pub(crate) fn collect_migrations() -> Result<Vec<Migration>, RepositoryError> {
     ])
 }
 
-#[derive(Entity)]
+#[derive(Entity, PartialEq, Debug, Clone)]
 #[has_many(model = "Certificate", field = "account_id")]
 #[has_many(model = "PreKeyBundle", field = "account_id")]
 pub(crate) struct Account {
@@ -53,7 +51,7 @@ impl Account {
     }
 }
 
-#[derive(Entity)]
+#[derive(Entity, PartialEq, Debug)]
 pub struct Certificate {
     #[primary_key]
     pub id: i32,
@@ -80,7 +78,7 @@ impl Default for Certificate {
     }
 }
 
-#[derive(Entity)]
+#[derive(Entity, PartialEq, Debug)]
 #[has_many(model = "OneTimeKey", field = "pre_key_id")]
 pub struct PreKeyBundle {
     #[primary_key]
@@ -108,7 +106,7 @@ impl Default for PreKeyBundle {
     }
 }
 
-#[derive(Entity)]
+#[derive(Entity, PartialEq, Debug)]
 pub struct OneTimeKey {
     #[primary_key]
     pub id: i32,
