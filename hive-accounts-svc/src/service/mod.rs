@@ -26,10 +26,10 @@ fn match_to_status(error: RepositoryError) -> tonic::Status {
 
     match error {
         RepositoryError::AlreadyExists { message: _ } => {
-            tonic::Status::already_exists("Resource already exists")
+            tonic::Status::already_exists("resource already exists")
         }
-        RepositoryError::NotFound { message: _ } => tonic::Status::not_found("Resource not found"),
-        _ => tonic::Status::internal("Internal error"),
+        RepositoryError::NotFound { message: _ } => tonic::Status::not_found("resource not found"),
+        _ => tonic::Status::internal("internal error"),
     }
 }
 
@@ -128,10 +128,9 @@ impl Accounts for AccountService {
                 debug!("Account exists: {}", id.id_string());
                 Err(tonic::Status::already_exists("account exists"))?
             }
-            // TODO logging
             Err(e) => match e {
                 RepositoryError::NotFound { message: _ } => (),
-                _ => Err(tonic::Status::internal("internal error"))?,
+                error => Err(match_to_status(error))?,
             },
         }
 
