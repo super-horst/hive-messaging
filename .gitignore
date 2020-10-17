@@ -1,6 +1,5 @@
 # Default ignored files
 **/target/**
-**/app/
 **/*.lock
 
 .project

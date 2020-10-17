@@ -35,13 +35,11 @@ fn request(req: Request<Body>) -> Response<Body> {
                 builder.header("Content-Type", "text/html; charset=UTF-8");
             } else if path.ends_with(".js") {
                 builder.header("Content-Type", "application/javascript; charset=UTF-8");
-            }else if path.ends_with(".wasm") {
+            } else if path.ends_with(".wasm") {
                 builder.header("Content-Type", "application/wasm");
             }
 
-            builder.status(200)
-                   .body(body)
-                   .unwrap()
+            builder.status(200).body(body).unwrap()
         }
         None => Response::builder()
             .status(404)

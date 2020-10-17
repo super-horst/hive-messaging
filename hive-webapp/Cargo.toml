@@ -16,8 +16,7 @@ yew = { package = "yew-stdweb", version = "0.17.2" }
 
 hive-crypto = { version = "0.1.0", path = "../hive-crypto" }
 
-# incompatible due to missing wasm support
-# hive-grpc = { version = "0.1.0", path = "../hive-grpc" }
+hive-grpc = { version = "0.1.0", path = "../hive-grpc", default-features=false }
 
 [profile.release]
 opt-level = "s"
