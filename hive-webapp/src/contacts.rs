@@ -4,12 +4,14 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+use yew::format::Json;
 use yew::prelude::*;
 use yew::services::storage::{Area, StorageService};
-use yew::format::Json;
-use yew::{html, Component, Properties, ComponentLink, Href, Html, InputData, KeyPressEvent, ShouldRender};
+use yew::{
+    html, Component, ComponentLink, Href, Html, InputData, KeyPressEvent, Properties, ShouldRender,
+};
 
-use hive_crypto::*;
+use hive_commons::crypto::*;
 
 const KEY: &'static str = "hive.webapp.contacts";
 
@@ -62,7 +64,14 @@ impl Component for ContactList {
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
         let mut contacts = vec![];
 
-        let mut cto_store = vec![Arc::new(Contact { key: "firstC".to_string() }), Arc::new(Contact { key: "2ndC".to_string() })];
+        let mut cto_store = vec![
+            Arc::new(Contact {
+                key: "firstC".to_string(),
+            }),
+            Arc::new(Contact {
+                key: "2ndC".to_string(),
+            }),
+        ];
         contacts.append(&mut cto_store);
 
         /*let mut storage = StorageService::new(Area::Local).expect("storage was disabled by the user");

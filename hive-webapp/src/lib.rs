@@ -3,16 +3,16 @@
 mod contacts;
 mod messages;
 
-use crate::contacts::{ContactList, Contact};
+use crate::contacts::{Contact, ContactList};
 use crate::messages::Message;
 
 use serde::{Deserialize, Serialize};
 
-use yew::{html, Component, ComponentLink, Href, Html, InputData, KeyPressEvent, ShouldRender};
-use yew::format::Json;
-use std::sync::Arc;
+use hive_commons::crypto::{FromBytes, PublicKey};
 use std::collections::HashMap;
-use hive_crypto::{PublicKey, FromBytes};
+use std::sync::Arc;
+use yew::format::Json;
+use yew::{html, Component, ComponentLink, Href, Html, InputData, KeyPressEvent, ShouldRender};
 
 const STORAGE_KEY: &'static str = "hive.webapp.self";
 
@@ -56,9 +56,7 @@ impl Component for AppContainer {
                 true
             }
             StateChange::AddContact(key) => {
-                self.state.contacts.push(Arc::new(Contact {
-                    key,
-                }));
+                self.state.contacts.push(Arc::new(Contact { key }));
                 true
             }
         };
@@ -106,12 +104,6 @@ impl AppContainer {
         let key_bytes = base64::decode(&key).map_err(|e| e.to_string())?;
         let pk = PublicKey::from_bytes(&key_bytes[..]).map_err(|e| e.to_string())?;
 
-
-
-
-        Ok(Contact {
-            key,
-        })
-
+        Ok(Contact { key })
     }
 }

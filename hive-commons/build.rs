@@ -1,6 +1,7 @@
 extern crate cfg_if;
 extern crate tonic_build;
 
+#[allow(unused_mut)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut builder = tonic_build::configure().out_dir("./src/model");
 

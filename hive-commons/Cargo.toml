@@ -9,6 +9,7 @@ edition = "2018"
 [features]
 storage = ["tokio"]
 transport = ["tonic"]
+web = ["uuid/stdweb"]
 
 [dependencies]
 # structural
@@ -16,7 +17,7 @@ failure = "0.1.8"
 
 # tools
 hex = "0.4.2"
-uuid =  "0.8.1"
+uuid = { version = "0.8.1", features = ["v4"] }
 dashmap = "3.11.4"
 
 # serialisation

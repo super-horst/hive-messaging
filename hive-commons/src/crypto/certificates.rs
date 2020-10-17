@@ -217,7 +217,6 @@ impl CertificateFactory {
         signer_cert: Option<&Arc<Certificate>>,
     ) -> Result<Certificate, CryptoError> {
         use rand_core::OsRng;
-        use uuid::{Builder, Variant, Version};
 
         let certified = self.certified.ok_or(CryptoError::Message {
             message: "cannot create a certificate without a given identity".to_string(),
@@ -234,11 +233,7 @@ impl CertificateFactory {
         let mut bytes = [0; 16];
         OsRng::default().fill_bytes(&mut bytes);
 
-        let serial = Builder::from_bytes(bytes)
-            .set_variant(Variant::RFC4122)
-            .set_version(Version::Random)
-            .build()
-            .to_string();
+        let serial = Uuid::new_v4().to_string();
 
         let infos = CertificateInfoBundle {
             identity: certified,

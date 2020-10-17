@@ -14,7 +14,7 @@ base64 = "0.12.3"
 wasm-logger = "0.2.0"
 yew = { package = "yew-stdweb", version = "0.17.2" }
 
-hive-commons = { version = "0.1.0", path = "../hive-commons" }
+hive-commons = { version = "0.1.0", path = "../hive-commons" , features = ["web"]}
 
 [profile.release]
 opt-level = "s"

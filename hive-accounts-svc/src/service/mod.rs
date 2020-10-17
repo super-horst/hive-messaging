@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use bytes::BytesMut;
 use log::*;
 
 use crypto::FromBytes;
