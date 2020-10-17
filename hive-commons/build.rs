@@ -1,8 +1,8 @@
-extern crate tonic_build;
 extern crate cfg_if;
+extern crate tonic_build;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut builder = tonic_build::configure().out_dir("./src/");
+    let mut builder = tonic_build::configure().out_dir("./src/model");
 
     cfg_if::cfg_if! {
         if #[cfg(not(feature = "transport"))] {

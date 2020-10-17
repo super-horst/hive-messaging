@@ -1,5 +1,5 @@
 [package]
-name = "hive-crypto"
+name = "hive-commons"
 version = "0.1.0"
 authors = ["horst <horst>"]
 edition = "2018"
@@ -8,16 +8,20 @@ edition = "2018"
 
 [features]
 storage = ["tokio"]
+transport = ["tonic"]
 
 [dependencies]
 # structural
 failure = "0.1.8"
 
 # tools
-log = "0.4.8"
 hex = "0.4.2"
 uuid =  "0.8.1"
 dashmap = "3.11.4"
+
+# serialisation
+bytes = "0.5.4"
+prost = "0.6.1"
 serde = { version = "1.0", features = ["derive"] }
 
 # crypto
@@ -30,11 +34,13 @@ hkdf = { version = "0.8", features= ["std"] }
 digest = "0.8.1"
 sha2 = "0.8.2"
 
+tonic = { version = "0.3.1" , optional = true}
 tokio = { version = "0.2.22", features = ["full"] , optional= true}
 
 [dev-dependencies]
-bytes = "0.5.4"
-prost = "0.6.1"
 serde_json = "1.0"
-tokio = { version = "0.2", features = ["full"] }
-hive-grpc = { version = "0.1.0", path = "../hive-grpc" }
+tokio = { version = "0.2.22", features = ["full"]}
+
+[build-dependencies]
+cfg-if = "0.1.10"
+tonic-build = "0.3.1"

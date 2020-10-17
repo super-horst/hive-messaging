@@ -8,7 +8,7 @@ use x25519_dalek;
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::error::*;
+use crate::crypto::error::*;
 use std::marker::PhantomData;
 
 const COMBINED_PUBLIC_KEY_SIZE: usize = 64;
@@ -315,10 +315,10 @@ impl<'a> std::cmp::PartialEq<PrivateKey> for &'a PrivateKey {
 
 impl Eq for PrivateKey {}
 
+
 #[cfg(test)]
 mod key_tests {
     use super::*;
-    use serde_json::{Result, Value};
 
     #[test]
     fn test_public_serialise_deserialise() {

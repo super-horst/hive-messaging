@@ -1,10 +1,10 @@
 use std::hash::Hasher;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
-
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
-use crate::*;
+use crate::crypto::*;
+use crate::model::*;
 use rand_core::RngCore;
 
 /// A certificate representation.
@@ -49,6 +49,15 @@ impl Certificate {
     /// get the optional signer certificate
     pub fn expires(&self) -> &SystemTime {
         &self.infos.expires()
+    }
+}
+
+impl Encodable for Certificate {
+    fn encode(&self) -> Result<Vec<u8>, SerialisationError> {
+        common::Certificate {
+            certificate: self.encoded_certificate().to_vec(),
+            signature: self.signature().to_vec(),
+        }.encode()
     }
 }
 
@@ -112,25 +121,36 @@ impl CertificateInfoBundle {
     }
 }
 
-/// Certificate encoding trait
-pub trait CertificateEncoding {
-    type CertificateType;
+impl Encodable for CertificateInfoBundle {
+    fn encode(&self) -> Result<Vec<u8>, SerialisationError> {
+        let expires = self.expiration
+                          .duration_since(UNIX_EPOCH)
+                          .map(|d| d.as_secs())
+                          .map_err(|e| SerialisationError::Message {
+                              message: e.to_string(),
+                          })?;
 
-    /// encode the raw certicate data that is to be signed
-    fn serialise_tbs(infos: &CertificateInfoBundle) -> Result<Vec<u8>, failure::Error>;
+        let mut tbs_cert = common::certificate::TbsCertificate {
+            identity: self.identity.id_bytes(),
+            namespace: self.identity.namespace(),
+            expires,
+            uuid: self.serial.clone(),
+            signer: None,
+        };
 
-    /// encode certificate
-    fn serialise(data: &Certificate) -> Result<Vec<u8>, failure::Error>;
+        match &self.signer_certificate {
+            Some(c) => {
+                let gc = common::Certificate {
+                    certificate: c.encoded_certificate().to_vec(),
+                    signature: c.signature().to_vec(),
+                };
+                tbs_cert.signer = Some(gc);
+            }
+            None => (),
+        }
 
-    /// partially decode a certificate
-    /// returns the certificate itself and an optional (encoded) signer
-    fn decode_partial(
-        serialised: Self::CertificateType,
-    ) -> Result<(Certificate, Option<Self::CertificateType>), failure::Error>;
-
-    /// partially parse a certificate
-    /// returns the certificate itself and an optional (unparsed) signer
-    fn deserialise(bytes: Vec<u8>) -> Result<Self::CertificateType, failure::Error>;
+        tbs_cert.encode()
+    }
 }
 
 /// Build-a-certificate.
@@ -143,6 +163,32 @@ pub struct CertificateFactory {
 }
 
 impl CertificateFactory {
+    /// decode a certificate from DTO
+    pub fn decode(
+        serialised: common::Certificate,
+    ) -> Result<(Certificate, Option<common::Certificate>), CryptoError> {
+        let tbs_cert = common::certificate::TbsCertificate::decode(serialised.certificate.to_vec())
+            .map_err(|e| CryptoError::Unspecified {
+                message: "failed to decode certificate".to_string(),
+                cause: e.into(),
+            })?;
+
+        let signed_identity = PublicKey::from_bytes(&tbs_cert.identity[..])?;
+
+        let expiration = SystemTime::UNIX_EPOCH
+            .checked_add(Duration::from_secs(tbs_cert.expires))
+            .ok_or(CryptoError::Message {
+                message: format!("is invalid system time '{}'", tbs_cert.expires),
+            })?;
+
+        let cert_info =
+            CertificateInfoBundle::new(signed_identity, expiration, tbs_cert.uuid, None);
+
+        let cert = Certificate::new(serialised.certificate, serialised.signature, cert_info);
+
+        Ok((cert, tbs_cert.signer))
+    }
+
     /// Certify the given identity
     pub fn certified(mut self, certified: PublicKey) -> CertificateFactory {
         self.certified = Some(certified);
@@ -159,23 +205,17 @@ impl CertificateFactory {
 
     /// Self-sign the certificate information with the given private key.
     /// The resulting certificate will not carry a signer certificate.
-    pub fn self_sign<E>(self, signer: &PrivateKey) -> Result<Certificate, CryptoError>
-    where
-        E: CertificateEncoding,
-    {
-        self.sign::<E>(signer, None)
+    pub fn self_sign(self, signer: &PrivateKey) -> Result<Certificate, CryptoError> {
+        self.sign(signer, None)
     }
 
     /// Sign the certificate information with the given private key and an
     /// optional certificate
-    pub fn sign<E>(
+    pub fn sign(
         self,
         signer: &PrivateKey,
         signer_cert: Option<&Arc<Certificate>>,
-    ) -> Result<Certificate, CryptoError>
-    where
-        E: CertificateEncoding,
-    {
+    ) -> Result<Certificate, CryptoError> {
         use rand_core::OsRng;
         use uuid::{Builder, Variant, Version};
 
@@ -207,9 +247,9 @@ impl CertificateFactory {
             signer_certificate: signer_cert.map(Arc::clone),
         };
 
-        let tbs = E::serialise_tbs(&infos).map_err(|e| CryptoError::Unspecified {
+        let tbs = infos.encode().map_err(|e| CryptoError::Unspecified {
             message: "failed to serialise tbs certificate".to_string(),
-            cause: e,
+            cause: e.into(),
         })?;
 
         let signature = signer.sign(&tbs[..])?;
@@ -222,11 +262,11 @@ impl CertificateFactory {
     }
 }
 
+
 #[cfg(test)]
 pub mod certificate_tests {
     use super::*;
-    use crate::test_utils::GrpcCertificateEncoding;
-    use crate::PrivateKey;
+    use crate::crypto::PrivateKey;
 
     /// convenience method to create any signed certificate
     pub fn create_signed_cert() -> Certificate {
@@ -235,7 +275,7 @@ pub mod certificate_tests {
         let signer_cert = CertificateFactory::default()
             .certified(signer_key.id().copy())
             .expiration(Duration::from_secs(1000))
-            .self_sign::<GrpcCertificateEncoding>(&signer_key)
+            .self_sign(&signer_key)
             .map(Arc::new)
             .unwrap();
 
@@ -244,7 +284,7 @@ pub mod certificate_tests {
         let leaf_cert = CertificateFactory::default()
             .certified(leaf_key.id().copy())
             .expiration(Duration::from_secs(1000))
-            .sign::<GrpcCertificateEncoding>(&signer_key, Some(&signer_cert))
+            .sign(&signer_key, Some(&signer_cert))
             .unwrap();
 
         return leaf_cert;
@@ -257,7 +297,7 @@ pub mod certificate_tests {
         let signer_cert = CertificateFactory::default()
             .certified(signer_key.id().copy())
             .expiration(Duration::from_secs(1000))
-            .self_sign::<GrpcCertificateEncoding>(&signer_key)
+            .self_sign(&signer_key)
             .map(Arc::new)
             .unwrap();
 
@@ -266,7 +306,7 @@ pub mod certificate_tests {
         let leaf_cert_1 = CertificateFactory::default()
             .certified(leaf_key_1.id().copy())
             .expiration(Duration::from_secs(1000))
-            .sign::<GrpcCertificateEncoding>(&signer_key, Some(&signer_cert))
+            .sign(&signer_key, Some(&signer_cert))
             .unwrap();
 
         let leaf_key_2 = PrivateKey::generate().unwrap();
@@ -274,7 +314,7 @@ pub mod certificate_tests {
         let leaf_cert_2 = CertificateFactory::default()
             .certified(leaf_key_2.id().copy())
             .expiration(Duration::from_secs(1000))
-            .sign::<GrpcCertificateEncoding>(&signer_key, Some(&signer_cert))
+            .sign(&signer_key, Some(&signer_cert))
             .unwrap();
 
         return (leaf_cert_1, leaf_cert_2);
@@ -287,7 +327,7 @@ pub mod certificate_tests {
         let cert = CertificateFactory::default()
             .certified(private.id().copy())
             .expiration(Duration::from_secs(1000))
-            .self_sign::<GrpcCertificateEncoding>(&private)
+            .self_sign(&private)
             .unwrap();
 
         return cert;

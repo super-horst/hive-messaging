@@ -6,8 +6,8 @@ use sha2::Sha512;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::*;
-use crate::{PrivateKey, PublicKey};
+use crate::crypto::error::*;
+use crate::crypto::{PrivateKey, PublicKey};
 
 /// a single sending ratchet step
 #[derive(Debug)]
@@ -280,7 +280,7 @@ impl KdfChain {
 #[cfg(test)]
 pub mod ratchet_tests {
     use super::*;
-    use crate::PrivateKey;
+    use crate::crypto::PrivateKey;
     use rand_core::RngCore;
 
     fn entangled_ratchets() -> (DoubleRatchet, DoubleRatchet) {
