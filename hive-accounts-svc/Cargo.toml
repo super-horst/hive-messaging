@@ -5,8 +5,7 @@ authors = ["horst <horst>"]
 edition = "2018"
 
 [dependencies]
-hive-crypto = { version = "0.1.0", path = "../hive-crypto", features=["storage"] }
-hive-grpc = { version = "0.1.0", path = "../hive-grpc" }
+hive-commons = { version = "0.1.0", path = "../hive-commons", features=["transport", "storage"] }
 
 log = "0.4.8"
 env_logger = "0.7.1"

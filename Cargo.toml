@@ -1,13 +1,11 @@
 [workspace]
 members = [
-    "hive-crypto",
-    "hive-grpc",
-    "hive-server-embedded",
+    "hive-commons",
     "hive-webclient",
     "hive-accounts-svc",
 ]
 
 exclude = [
     "hive-webapp",
-# exclude client for now
+# exclude app for now
 ]
