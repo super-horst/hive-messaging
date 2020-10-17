@@ -1,0 +1,5 @@
+# Default ignored files
+**/generated/*.js
+**/dist
+**/node_modules
+**/*-lock.json
