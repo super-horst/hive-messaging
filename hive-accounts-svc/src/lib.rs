@@ -3,7 +3,7 @@ use std::fmt;
 use std::sync::Arc;
 
 mod errors;
-mod grpc;
+//mod grpc;
 
 //#[cfg(test)]
 pub mod config;
@@ -15,10 +15,9 @@ pub use errors::*;
 
 use tonic;
 
-use hive_crypto::PrivateKey;
+use hive_commons::crypto::PrivateKey;
 
 use env_logger;
-use hive_grpc::GrpcCertificateEncoding;
 use log::*;
 use tonic::transport::Server;
 
@@ -31,9 +30,9 @@ pub async fn run_service() {
     let addr = format!("0.0.0.0:{}", cfg.port).parse().unwrap();
     info!("Server listening on {}", addr);
 
-    let my_key = hive_crypto::load_private_key(&cfg.key).await;
+    let my_key = hive_commons::crypto::load_private_key(&cfg.key).await;
     let cert =
-        hive_crypto::load_certificate::<GrpcCertificateEncoding>(&my_key, &cfg.certificate).await;
+        hive_commons::crypto::load_certificate(&my_key, &cfg.certificate).await;
     let my_certificate = Arc::new(cert);
 
     let db_repo = persistence::DatabaseRepository::connect(&cfg.db_config)

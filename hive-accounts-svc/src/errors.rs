@@ -26,7 +26,7 @@ pub enum AccountsError {
     Cryptography {
         message: String,
         #[fail(cause)]
-        cause: hive_crypto::CryptoError,
+        cause: hive_commons::crypto::CryptoError,
     },
     #[fail(display = "Database operation failed: {}", message)]
     Database {

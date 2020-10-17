@@ -1,30 +1,25 @@
-use std::time::{SystemTime, Duration, UNIX_EPOCH};
 use std::fmt;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use std::sync::Arc;
 
 use bytes::{Bytes, BytesMut};
-use prost::Message;
 use dashmap::DashMap;
+use prost::Message;
 
 use log::*;
 
-use hive_crypto::{
-    PublicKey,
-    PrivateKey,
-    Identities,
-    CertificateFactory,
-};
+use hive_crypto::{CertificateFactory, Identities, PrivateKey, PublicKey};
 
 use crate::errors::*;
 
-use hive_grpc::*;
-use hive_grpc::common::*;
 pub use hive_grpc::accounts::accounts_client::AccountsClient;
 use hive_grpc::accounts::accounts_server;
+use hive_grpc::common::*;
+use hive_grpc::*;
 
 const CHALLENGE_GRACE_SECONDS: u64 = 11;
-const DEFAULT_CLIENT_CERT_VALIDITY: Duration = Duration::from_secs(2 * 24 * 60 * 60);//2 days
+const DEFAULT_CLIENT_CERT_VALIDITY: Duration = Duration::from_secs(2 * 24 * 60 * 60); //2 days
 
 pub struct InMemoryAccounts {
     ids: Arc<dyn Identities>,
@@ -48,7 +43,6 @@ impl fmt::Debug for InMemoryAccounts {
 
 #[async_trait::async_trait]
 impl accounts_server::Accounts for InMemoryAccounts {
-
     async fn create_account(
         &self,
         request: tonic::Request<SignedChallenge>,
@@ -63,35 +57,40 @@ impl accounts_server::Accounts for InMemoryAccounts {
         let inner_req = request.into_inner();
 
         let raw_challenge = BytesMut::from(inner_req.challenge.as_ref() as &[u8]);
-        let challenge = signed_challenge::Challenge::decode(raw_challenge)
-            .map_err(|e| {
-                debug!("Received malformed challenge {}", e);
-                tonic::Status::invalid_argument("malformed challenge")
-            })?;
+        let challenge = signed_challenge::Challenge::decode(raw_challenge).map_err(|e| {
+            debug!("Received malformed challenge {}", e);
+            tonic::Status::invalid_argument("malformed challenge")
+        })?;
 
         // check challenge timestamp
         // TODO handle error
-        let d = SystemTime::now().duration_since(UNIX_EPOCH)
-                                 .map(|d| d.as_secs()).map_err(|e| tonic::Status::internal("internal error"))?;
+        let d = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .map_err(|e| tonic::Status::internal("internal error"))?;
 
-        if d - CHALLENGE_GRACE_SECONDS >= challenge.timestamp ||
-            d + CHALLENGE_GRACE_SECONDS <= challenge.timestamp {
+        if d - CHALLENGE_GRACE_SECONDS >= challenge.timestamp
+            || d + CHALLENGE_GRACE_SECONDS <= challenge.timestamp
+        {
             return Err(tonic::Status::deadline_exceeded("challenge expired"));
         }
 
         // identity is verified inside Identities
-        let id = self.ids.resolve_id(&challenge.identity)
-                     .map_err(|e| {
-                         debug!("Received unknown identity '{}': {}", hex::encode(challenge.identity), e);
-                         tonic::Status::not_found("unable to verify identity")
-                     })?;
+        let id = self.ids.resolve_id(&challenge.identity).map_err(|e| {
+            debug!(
+                "Received unknown identity '{}': {}",
+                hex::encode(challenge.identity),
+                e
+            );
+            tonic::Status::not_found("unable to verify identity")
+        })?;
 
         // check signature
         id.verify(&inner_req.challenge, &inner_req.signature)
-          .map_err(|e| {
-              debug!("Failed to verify challenge: {}", e);
-              tonic::Status::unauthenticated("signature error")
-          })?;
+            .map_err(|e| {
+                debug!("Failed to verify challenge: {}", e);
+                tonic::Status::unauthenticated("signature error")
+            })?;
 
         // everything OK so far, let's generate certificates
         let my_id = self.ids.my_id();
@@ -99,7 +98,8 @@ impl accounts_server::Accounts for InMemoryAccounts {
 
         let their_cert = CertificateFactory::default()
             .expiration(DEFAULT_CLIENT_CERT_VALIDITY)
-            .certified(id).sign::<GrpcCertificateEncoding>(my_id, Some(my_cert))
+            .certified(id)
+            .sign::<GrpcCertificateEncoding>(my_id, Some(my_cert))
             .map_err(|e| {
                 debug!("Failed to sign certificate: {}", e);
                 tonic::Status::unknown("attestation error")
@@ -118,12 +118,18 @@ impl accounts_server::Accounts for InMemoryAccounts {
         let pre_key_update = request.into_inner();
 
         //TODO error handling
-        let public = self.ids.resolve_id(&pre_key_update.identity[..])
-                         .map_err(|e| tonic::Status::not_found("invalid identity"))?;
+        let public = self
+            .ids
+            .resolve_id(&pre_key_update.identity[..])
+            .map_err(|e| tonic::Status::not_found("invalid identity"))?;
 
         //TODO error handling
-        public.verify(&pre_key_update.pre_key[..], &pre_key_update.pre_key_signature[..])
-              .map_err(|e| tonic::Status::failed_precondition("signature error"))?;
+        public
+            .verify(
+                &pre_key_update.pre_key[..],
+                &pre_key_update.pre_key_signature[..],
+            )
+            .map_err(|e| tonic::Status::failed_precondition("signature error"))?;
 
         self.pre_keys.insert(public, pre_key_update);
 
@@ -137,12 +143,16 @@ impl accounts_server::Accounts for InMemoryAccounts {
         let peer = request.into_inner();
 
         //TODO error handling
-        let public = self.ids.resolve_id(&peer.identity[..])
-                         .map_err(|e| tonic::Status::not_found("invalid peer"))?;
+        let public = self
+            .ids
+            .resolve_id(&peer.identity[..])
+            .map_err(|e| tonic::Status::not_found("invalid peer"))?;
 
         //TODO error handling
-        let mut entry_ref = self.pre_keys.get_mut(&public)
-                                .ok_or(tonic::Status::not_found("invalid peer"))?;
+        let mut entry_ref = self
+            .pre_keys
+            .get_mut(&public)
+            .ok_or(tonic::Status::not_found("invalid peer"))?;
 
         let pre_key_ref = entry_ref.value_mut();
 
@@ -172,37 +182,43 @@ impl accounts_server::Accounts for InMemoryAccounts {
 #[cfg(test)]
 mod account_grpc_tests {
     use super::*;
+    use accounts_server::*;
+    use hive_crypto::Identities;
+    use hive_crypto::PrivateKey;
+    use hive_crypto::{CryptoStore, CryptoStoreBuilder};
+    use std::borrow::Borrow;
+    use std::io::Write;
     use tokio;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use hive_crypto::PrivateKey;
-    use hive_crypto::Identities;
-    use hive_crypto::{CryptoStore, CryptoStoreBuilder};
-    use accounts_server::*;
-    use std::borrow::Borrow;
     use tonic::{transport::Server, Request, Response, Status};
-    use std::io::Write;
 
     pub fn build_server() -> (impl accounts_server::Accounts, Arc<dyn Identities>) {
         let server_id = PrivateKey::generate()
             .map_err(|e| AccountsError::Cryptography {
                 message: "Unable to generate new key".to_string(),
                 cause: e,
-            }).unwrap();
+            })
+            .unwrap();
 
         let server_public = server_id.id().copy();
 
         let cert = CertificateFactory::default()
             .certified(server_public)
             .expiration(Duration::from_secs(1000))
-            .self_sign::<GrpcCertificateEncoding>(&server_id).unwrap();
+            .self_sign::<GrpcCertificateEncoding>(&server_id)
+            .unwrap();
 
-        let b = CryptoStoreBuilder::new().my_key(server_id)
-                                         .my_certificate(cert);
+        let b = CryptoStoreBuilder::new()
+            .my_key(server_id)
+            .my_certificate(cert);
 
         let store = b.build().unwrap();
 
         let ids = Arc::new(store) as Arc<dyn Identities>;
-        let inner_accs = InMemoryAccounts { ids: Arc::clone(&ids), pre_keys: DashMap::new() };
+        let inner_accs = InMemoryAccounts {
+            ids: Arc::clone(&ids),
+            pre_keys: DashMap::new(),
+        };
         return (inner_accs, ids);
     }
 
@@ -217,7 +233,8 @@ mod account_grpc_tests {
         Server::builder()
             .add_service(AccountsServer::new(accs))
             .serve(addr)
-            .await.unwrap();
+            .await
+            .unwrap();
     }
 
     fn prepare_identity(name: &str) {
@@ -234,17 +251,21 @@ mod account_grpc_tests {
         let otp_4 = PrivateKey::generate().unwrap();
         let otp_5 = PrivateKey::generate().unwrap();
 
-        let otp_privates = vec![otp_1.secret_bytes().to_vec(),
-                                otp_2.secret_bytes().to_vec(),
-                                otp_3.secret_bytes().to_vec(),
-                                otp_4.secret_bytes().to_vec(),
-                                otp_5.secret_bytes().to_vec()];
+        let otp_privates = vec![
+            otp_1.secret_bytes().to_vec(),
+            otp_2.secret_bytes().to_vec(),
+            otp_3.secret_bytes().to_vec(),
+            otp_4.secret_bytes().to_vec(),
+            otp_5.secret_bytes().to_vec(),
+        ];
 
-        let otp_publics = vec![otp_1.id().id_bytes(),
-                               otp_2.id().id_bytes(),
-                               otp_3.id().id_bytes(),
-                               otp_4.id().id_bytes(),
-                               otp_5.id().id_bytes()];
+        let otp_publics = vec![
+            otp_1.id().id_bytes(),
+            otp_2.id().id_bytes(),
+            otp_3.id().id_bytes(),
+            otp_4.id().id_bytes(),
+            otp_5.id().id_bytes(),
+        ];
 
         let private_bundle = common::PreKeyBundle {
             identity: my_key.secret_bytes().to_vec(),
@@ -264,16 +285,22 @@ mod account_grpc_tests {
 
         let _r = std::fs::create_dir("../target/server_tests");
 
-        let mut privates = std::fs::OpenOptions::new().create(true).write(true)
-                                                      .open(format!("../target/server_tests/{}_private_bundle", name)).unwrap();
+        let mut privates = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(format!("../target/server_tests/{}_private_bundle", name))
+            .unwrap();
 
         let mut privates_bytes = BytesMut::with_capacity(private_bundle.encoded_len());
         private_bundle.encode(&mut privates_bytes).unwrap();
 
         privates.write_all(&privates_bytes[..]).unwrap();
 
-        let mut publics = std::fs::OpenOptions::new().create(true).write(true)
-                                                     .open(format!("../target/server_tests/{}_public_bundle", name)).unwrap();
+        let mut publics = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(format!("../target/server_tests/{}_public_bundle", name))
+            .unwrap();
 
         let mut public_bytes = BytesMut::with_capacity(public_bundle.encoded_len());
         public_bundle.encode(&mut public_bytes).unwrap();
@@ -289,20 +316,27 @@ mod account_grpc_tests {
     //#[tokio::test]
     async fn publish_alice_to_server() {
         let mut client = AccountsClient::connect("http://[::1]:50051").await.unwrap();
-        let mut file = tokio::fs::File::open("../target/server_tests/alice_public_bundle").await.unwrap();
+        let mut file = tokio::fs::File::open("../target/server_tests/alice_public_bundle")
+            .await
+            .unwrap();
 
         let mut contents = vec![];
         file.read_to_end(&mut contents).await.unwrap();
 
         let pre_keys = common::PreKeyBundle::decode(Bytes::from(contents)).unwrap();
 
-        client.update_pre_keys(tonic::Request::new(pre_keys)).await.unwrap();
+        client
+            .update_pre_keys(tonic::Request::new(pre_keys))
+            .await
+            .unwrap();
     }
 
     //#[tokio::test]
     async fn get_alice_from_server() {
         let mut client = AccountsClient::connect("http://[::1]:50051").await.unwrap();
-        let mut file = tokio::fs::File::open("../target/server_tests/alice_public_bundle").await.unwrap();
+        let mut file = tokio::fs::File::open("../target/server_tests/alice_public_bundle")
+            .await
+            .unwrap();
 
         let mut contents = vec![];
         file.read_to_end(&mut contents).await.unwrap();
@@ -314,17 +348,23 @@ mod account_grpc_tests {
             namespace: pre_keys.namespace.clone(),
         };
 
-        let bundle = client.get_pre_keys(tonic::Request::new(peer.clone())).await.unwrap().into_inner();
+        let bundle = client
+            .get_pre_keys(tonic::Request::new(peer.clone()))
+            .await
+            .unwrap()
+            .into_inner();
         println!("{:?}", bundle);
     }
 
-   // #[tokio::test]
+    // #[tokio::test]
     async fn test_refresh_attestation() -> Result<(), failure::Error> {
         let (accs, ids) = build_server();
 
         // preparing client request
-        let now = SystemTime::now().duration_since(UNIX_EPOCH)
-                                   .map(|d| d.as_secs()).unwrap();
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap();
 
         let client_id = PrivateKey::generate()?;
         let challenge = signed_challenge::Challenge {
@@ -338,9 +378,15 @@ mod account_grpc_tests {
 
         let signature = client_id.sign(&buf).unwrap();
 
-        let signed = SignedChallenge { challenge: buf, signature };
+        let signed = SignedChallenge {
+            challenge: buf,
+            signature,
+        };
 
-        let response = accs.update_attestation(tonic::Request::new(signed)).await.unwrap();
+        let response = accs
+            .update_attestation(tonic::Request::new(signed))
+            .await
+            .unwrap();
 
         let cert_response = response.into_inner();
 
@@ -348,15 +394,20 @@ mod account_grpc_tests {
         let inner_sender_cert = certificate::TbsCertificate::decode(buf).unwrap();
 
         //TODO analyse signer
-        ids.my_id().id().verify(&cert_response.certificate, &cert_response.signature).unwrap();
+        ids.my_id()
+            .id()
+            .verify(&cert_response.certificate, &cert_response.signature)
+            .unwrap();
 
         Ok(())
     }
 
     pub fn build_client_challenge() -> SignedChallenge {
         // preparing client request
-        let now = SystemTime::now().duration_since(UNIX_EPOCH)
-                                   .map(|d| d.as_secs()).unwrap();
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap();
 
         let client_id = PrivateKey::generate().unwrap();
         let challenge = signed_challenge::Challenge {
@@ -370,6 +421,9 @@ mod account_grpc_tests {
 
         let signature = client_id.sign(&buf).unwrap();
 
-        return SignedChallenge { challenge: buf, signature };
+        return SignedChallenge {
+            challenge: buf,
+            signature,
+        };
     }
 }

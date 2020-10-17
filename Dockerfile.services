@@ -16,8 +16,7 @@ WORKDIR /build
 RUN USER=root cargo new --bin $PROJECT_NAME
 
 # Build dependencies & generated code for caching
-COPY hive-crypto ./hive-crypto
-COPY hive-grpc ./hive-grpc
+COPY hive-commons ./hive-commons
 COPY $PROJECT_NAME/Cargo.toml rust-toolchain ./$PROJECT_NAME/
 WORKDIR /build/$PROJECT_NAME
 RUN cargo build --target x86_64-unknown-linux-musl --release

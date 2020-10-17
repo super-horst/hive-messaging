@@ -3,7 +3,7 @@ mod entity_tests {
     use crate::config::DbConfig;
     use crate::persistence::connect_db;
     use crate::persistence::entities;
-    use hive_crypto as crypto;
+    use hive_commons::crypto;
 
     use oxidizer::{db::DB, entity::IEntity, migration::Migration};
 

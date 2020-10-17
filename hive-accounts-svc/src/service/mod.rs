@@ -3,15 +3,14 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use bytes::BytesMut;
 use log::*;
-use prost::Message;
 
 use crypto::FromBytes;
-use hive_crypto as crypto;
+use hive_commons::*;
 
-pub use hive_grpc::accounts::accounts_server::*;
-use hive_grpc::accounts::UpdateKeyResult;
-use hive_grpc::common;
-use hive_grpc::GrpcCertificateEncoding;
+pub use model::accounts::accounts_server::*;
+use model::accounts::UpdateKeyResult;
+use model::common;
+use model::Decodable;
 
 use crate::persistence::*;
 
@@ -61,7 +60,7 @@ impl AccountService {
         let their_cert = crypto::CertificateFactory::default()
             .expiration(DEFAULT_CLIENT_CERT_VALIDITY)
             .certified(tbc)
-            .sign::<GrpcCertificateEncoding>(&self.my_key, Some(&self.my_certificate))
+            .sign(&self.my_key, Some(&self.my_certificate))
             .map_err(|e| {
                 debug!("Failed to sign certificate: {}", e);
                 tonic::Status::unknown("attestation error")
@@ -78,7 +77,7 @@ impl AccountService {
     fn verify_challenge(
         signed_challenge: common::SignedChallenge,
     ) -> Result<crypto::PublicKey, tonic::Status> {
-        let raw_challenge = BytesMut::from(signed_challenge.challenge.as_ref() as &[u8]);
+        let raw_challenge = (signed_challenge.challenge.as_ref() as &[u8]).to_vec();
         let challenge =
             common::signed_challenge::Challenge::decode(raw_challenge).map_err(|e| {
                 debug!("Received malformed challenge {}", e);

@@ -6,13 +6,11 @@ mod service_tests {
     };
 
     use chrono::Utc;
-    use prost::Message;
 
     use mockall::predicate;
 
-    use hive_crypto as crypto;
-    use hive_grpc::common;
-    use hive_grpc::GrpcCertificateEncoding;
+    use hive_commons::crypto;
+    use hive_commons::model::{common, Encodable};
 
     use crate::persistence::*;
 
@@ -42,8 +40,7 @@ mod service_tests {
             timestamp: 0u64,
         };
 
-        let mut buf: Vec<u8> = Vec::with_capacity(challenge.encoded_len());
-        challenge.encode(&mut buf).unwrap();
+        let buf: Vec<u8> = challenge.encode().unwrap();
 
         let signature = client_private.sign(&buf).unwrap();
 
@@ -75,8 +72,7 @@ mod service_tests {
             timestamp: now,
         };
 
-        let mut buf: Vec<u8> = Vec::with_capacity(challenge.encoded_len());
-        challenge.encode(&mut buf).unwrap();
+        let buf: Vec<u8> = challenge.encode().unwrap();
 
         let signed = common::SignedChallenge {
             challenge: buf,
@@ -110,8 +106,8 @@ mod service_tests {
         let svc = AccountService::new(private, Arc::new(cert), Box::new(mock));
 
         svc.create_update_certificate(public_key, &account)
-            .await
-            .unwrap();
+           .await
+           .unwrap();
     }
 
     #[tokio::test]
@@ -184,14 +180,17 @@ mod service_tests {
     async fn update_attestation_test() {
         //TODO
     }
+
     #[tokio::test]
     async fn update_pre_keys_test() {
         //TODO
     }
+
     #[tokio::test]
     async fn update_pre_keys_with_invalid_signature_test() {
         //TODO
     }
+
     #[tokio::test]
     async fn get_pre_keys_test() {
         //TODO
@@ -205,7 +204,7 @@ mod service_tests {
         let cert = crypto::CertificateFactory::default()
             .certified(public_key)
             .expiration(Duration::from_secs(1000))
-            .self_sign::<GrpcCertificateEncoding>(&private_key)
+            .self_sign(&private_key)
             .unwrap();
 
         (private_key, cert)
@@ -225,8 +224,7 @@ mod service_tests {
             timestamp: now,
         };
 
-        let mut buf: Vec<u8> = Vec::with_capacity(challenge.encoded_len());
-        challenge.encode(&mut buf).unwrap();
+        let buf: Vec<u8> =challenge.encode().unwrap();
 
         let signature = client_private.sign(&buf).unwrap();
 
