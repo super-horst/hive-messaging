@@ -1,4 +1,1 @@
-**/generated/*.js
-**/dist
-**/node_modules
-**/*-lock.json
+**/src/*.js
