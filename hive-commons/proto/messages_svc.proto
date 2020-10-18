@@ -27,29 +27,15 @@ message MessageFilter {
 
 message MessageEnvelope {
   Payload payload = 1;
-  EncryptionParameters params = 2;
+  common.EncryptionParameters params = 2;
 
   common.Peer dst = 3;
-}
-
-message EncryptionParameters {
-
-  bytes ratchet_key = 1;
-  uint64 chain_idx = 2;
-  uint64 prev_chain_count = 3;
-
 }
 
 message Payload {
   bytes encrypted_content = 1;
 
-  KeyExchange key_ex = 2;
-}
-
-message KeyExchange {
-  common.Peer origin = 1 ;
-  bytes ephemeral_key = 2;
-  bytes one_time_key = 3;
+  common.KeyExchange key_ex = 2;
 }
 
 message MessageSendResult {

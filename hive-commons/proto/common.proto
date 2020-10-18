@@ -45,3 +45,15 @@ message Certificate {
   bytes certificate = 1;
   bytes signature = 2;
 }
+
+message KeyExchange {
+  Peer origin = 1 ;
+  bytes ephemeral_key = 2;
+  bytes one_time_key = 3;
+}
+
+message EncryptionParameters {
+  bytes ratchet_key = 1;
+  uint64 chain_idx = 2;
+  uint64 prev_chain_count = 3;
+}
