@@ -8,7 +8,4 @@ RUN wget https://github.com/grpc/grpc-web/releases/download/1.2.1/protoc-gen-grp
 
 RUN mkdir /.npm && chown 1000:0 /.npm
 
-COPY generate_interface.sh ./
-RUN chmod +x ./generate_interface.sh
-
 USER 1000
