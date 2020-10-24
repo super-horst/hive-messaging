@@ -2,17 +2,15 @@ syntax = "proto3";
 
 package messages;
 
-option java_multiple_files = true;
-option java_package = "hive.svc.messages";
-option java_outer_classname = "MessagesSvc";
-
 import "common.proto";
 
 // Messages service definition.
 service Messages {
+
   rpc GetMessages (MessageFilter) returns (MessageEnvelope);
 
   rpc SendMessage (MessageEnvelope) returns (MessageSendResult);
+
 }
 
 message MessageFilter {
