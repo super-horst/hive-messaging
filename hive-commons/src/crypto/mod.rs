@@ -18,6 +18,8 @@ pub use x3dh::*;
 mod ratchet;
 pub use ratchet::{ManagedRatchet, RecvStep, SendStep};
 
+pub mod signing;
+
 /// Identity provider
 /// TODO obsolete
 pub trait Identities: Send + Sync {
