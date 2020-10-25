@@ -95,15 +95,17 @@ impl AccountService {
             return Err(tonic::Status::deadline_exceeded("challenge expired"));
         }
 
-        let id = crypto::PublicKey::from_bytes(&challenge.identity[..])
+        let peer = challenge.identity.ok_or_else(|| tonic::Status::failed_precondition("missing peer"))?;
+
+        let id = crypto::PublicKey::from_bytes(&peer.identity[..])
             .map_err(|e| tonic::Status::invalid_argument("malformed identity"))?;
 
         // check signature
         id.verify(&signed_challenge.challenge, &signed_challenge.signature)
-            .map_err(|e| {
-                debug!("Failed to verify challenge: {}", e);
-                tonic::Status::permission_denied("signature error")
-            })?;
+          .map_err(|e| {
+              debug!("Failed to verify challenge: {}", e);
+              tonic::Status::permission_denied("signature error")
+          })?;
 
         Ok(id)
     }
@@ -183,7 +185,7 @@ impl Accounts for AccountService {
             &incoming_bundle.pre_key[..],
             &incoming_bundle.pre_key_signature[..],
         )
-        .map_err(|e| tonic::Status::failed_precondition("invalid signature"))?;
+          .map_err(|e| tonic::Status::failed_precondition("invalid signature"))?;
 
         let account = self
             .repository
