@@ -19,8 +19,7 @@ message PreKeyBundle {
 
 message SignedChallenge {
   message Challenge {
-    bytes identity = 1;
-    string namespace = 2;
+    Peer identity = 1;
 
     fixed64 timestamp = 3;
   }

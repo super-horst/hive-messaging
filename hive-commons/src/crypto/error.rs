@@ -40,4 +40,10 @@ pub enum CryptoError {
         #[fail(cause)]
         cause: crate::model::SerialisationError,
     },
+    #[fail(display = "Failure: {}", message)]
+    Common {
+        message: String,
+        #[fail(cause)]
+        cause: crate::error::CommonError,
+    },
 }

@@ -315,7 +315,6 @@ impl<'a> std::cmp::PartialEq<PrivateKey> for &'a PrivateKey {
 
 impl Eq for PrivateKey {}
 
-
 #[cfg(test)]
 mod key_tests {
     use super::*;

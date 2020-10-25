@@ -202,9 +202,9 @@ pub async fn load_private_key(path: &str) -> PrivateKey {
 //TODO cleanup
 #[cfg(feature = "storage")]
 pub async fn load_certificate(server_id: &PrivateKey, path: &str) -> Certificate {
+    use std::time::Duration;
     use tokio::fs;
     use tokio::prelude::*;
-    use std::time::Duration;
 
     let f = fs::File::open(path).await;
     if f.is_ok() {
@@ -233,7 +233,6 @@ pub async fn load_certificate(server_id: &PrivateKey, path: &str) -> Certificate
         return cert;
     }
 }
-
 
 #[cfg(test)]
 mod crypto_storage_tests {

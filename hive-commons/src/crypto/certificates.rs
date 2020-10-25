@@ -57,7 +57,8 @@ impl Encodable for Certificate {
         common::Certificate {
             certificate: self.encoded_certificate().to_vec(),
             signature: self.signature().to_vec(),
-        }.encode()
+        }
+        .encode()
     }
 }
 
@@ -123,12 +124,13 @@ impl CertificateInfoBundle {
 
 impl Encodable for CertificateInfoBundle {
     fn encode(&self) -> Result<Vec<u8>, SerialisationError> {
-        let expires = self.expiration
-                          .duration_since(UNIX_EPOCH)
-                          .map(|d| d.as_secs())
-                          .map_err(|e| SerialisationError::Message {
-                              message: e.to_string(),
-                          })?;
+        let expires = self
+            .expiration
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .map_err(|e| SerialisationError::Message {
+                message: e.to_string(),
+            })?;
 
         let mut tbs_cert = common::certificate::TbsCertificate {
             identity: self.identity.id_bytes(),
@@ -256,7 +258,6 @@ impl CertificateFactory {
         })
     }
 }
-
 
 #[cfg(test)]
 pub mod certificate_tests {
