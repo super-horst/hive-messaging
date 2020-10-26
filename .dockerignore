@@ -1,5 +1,10 @@
 **/target/**
+**/node_modules/**
+**/pkg/**
+
 **/*.lock
+**/*-lock.json
+
 .project
 *.iml
 .idea/**
