@@ -23,16 +23,16 @@ RUN cargo build --target x86_64-unknown-linux-musl --release
 
 # Copy the source and build the application.
 COPY $PROJECT_NAME/src ./src
-RUN cargo install --target x86_64-unknown-linux-musl --path .
+RUN cargo install --target x86_64-unknown-linux-musl --path . && \
+    mv /usr/local/cargo/bin/$PROJECT_NAME /usr/local/cargo/bin/service
 
 # Assemble final container
 FROM scratch
 EXPOSE 8080
 
-ARG PROJECT_NAME
 ENV RUST_BACKTRACE=full
 
 USER 1000
-COPY --from=builder /usr/local/cargo/bin/$PROJECT_NAME ./service
+COPY --from=builder /usr/local/cargo/bin/service ./service
 
 CMD [ "./service" ]

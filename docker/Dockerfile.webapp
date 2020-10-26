@@ -1,0 +1,33 @@
+FROM ubuntu:20.04 as builder
+EXPOSE 8080
+
+ENV PROJECT_NAME="app_sandbox"
+ENV RUST_BACKTRACE=full
+
+# compiler & npm
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl clang build-essential npm nodejs pkg-config && \
+    npm install npm@latest -g
+
+# rust init
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:$PATH"
+RUN cargo install wasm-bindgen-cli wasm-pack && \
+    rustup component add rustfmt && \
+    rustup target add wasm32-unknown-unknown
+
+# npm init
+WORKDIR /build/$PROJECT_NAME
+COPY $PROJECT_NAME/package.json ./
+RUN npm install
+
+# cargo init
+WORKDIR /build
+COPY hive-commons ./hive-commons
+COPY $PROJECT_NAME ./$PROJECT_NAME/
+
+WORKDIR /build/$PROJECT_NAME/crate
+RUN cargo build --lib --target wasm32-unknown-unknown
+
+WORKDIR /build/$PROJECT_NAME
+CMD [ "npm", "run", "serve" ]

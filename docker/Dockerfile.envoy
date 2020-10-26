@@ -1,0 +1,7 @@
+FROM envoyproxy/envoy:v1.15.0
+
+COPY docker/envoy_test.yaml /etc/envoy/envoy.yaml
+
+CMD /usr/local/bin/envoy -c /etc/envoy/envoy.yaml -l trace --log-path /tmp/envoy_info.log
+
+RUN apt update && apt install -y iputils-ping curl
