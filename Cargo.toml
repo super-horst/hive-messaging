@@ -3,9 +3,11 @@ members = [
     "hive-commons",
     "hive-webclient",
     "hive-accounts-svc",
+    "hive-messages-svc",
 ]
 
 exclude = [
     "hive-webapp",
+    "app_sandbox",
 # exclude app for now
 ]
