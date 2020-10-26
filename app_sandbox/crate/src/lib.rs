@@ -30,7 +30,7 @@ pub fn run() {
     bound_challenge.setChallenge(js_sys::Uint8Array::from(&challenge.challenge[..]));
     bound_challenge.setSignature(js_sys::Uint8Array::from(&challenge.signature[..]));
 
-    let client = accounts_svc_bindings::AccountsPromiseClient::new("http://localhost:8080/api".to_string());
+    let client = accounts_svc_bindings::AccountsPromiseClient::new("http://localhost:8080".to_string());
     log("Hello from DoingItAgain!");
 
     let promise = client.createAccount(bound_challenge);

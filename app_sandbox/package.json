@@ -1,7 +1,7 @@
 {
   "scripts": {
     "build": "webpack",
-    "serve": "webpack-dev-server --host 0.0.0.0"
+    "serve": "webpack-dev-server"
   },
   "dependencies": {
     "google-protobuf": "3.13.0",
