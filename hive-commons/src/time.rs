@@ -17,5 +17,6 @@ pub fn now() -> Result<u64, CommonError> {
 pub fn now() -> Result<u64, CommonError> {
     use js_sys::Date;
 
-    Ok(Date::new_0().get_time() as u64)
+    let utc_time = Date::new_0().get_time() / 1000.0_f64;
+    Ok(utc_time as u64)
 }

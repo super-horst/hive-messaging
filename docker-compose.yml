@@ -21,6 +21,13 @@ services:
         build:
             context: ./
             dockerfile: docker/Dockerfile.webapp
+        volumes:
+            - type: bind
+              source: ./hive-commons
+              target: /hive-commons
+            - type: bind
+              source: ./app_sandbox
+              target: /app
         restart: always
 
     accounts_svc:

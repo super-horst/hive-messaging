@@ -1,8 +1,11 @@
 use wasm_bindgen::prelude::*;
 use js_sys;
 use wasm_bindgen_futures::futures_0_3::JsFuture;
+use wasm_bindgen_futures::futures_0_3::spawn_local;
 
+use wasm_bindgen::JsCast;
 use hive_commons::crypto::*;
+use hive_commons::model::*;
 
 mod bindings;
 use bindings::common_bindings;
@@ -21,24 +24,41 @@ pub fn run() {
     set_panic_hook();
     log(&format!("Hello from {}!", "ItsaMeMario"));
 
-    let key = PrivateKey::generate().unwrap();
-
-    log("Hello from DoingItAgain!");
-    let challenge = signing::sign_challenge(&key).unwrap();
-
-    let bound_challenge = common_bindings::SignedChallenge::new();
-    bound_challenge.setChallenge(js_sys::Uint8Array::from(&challenge.challenge[..]));
-    bound_challenge.setSignature(js_sys::Uint8Array::from(&challenge.signature[..]));
-
     let client = accounts_svc_bindings::AccountsPromiseClient::new("http://localhost:8080".to_string());
-    log("Hello from DoingItAgain!");
 
-    let promise = client.createAccount(bound_challenge);
-    JsFuture::from(promise);
+    spawn_local(async move {
+        create_account(&client).await;
+    });
+
+    log("Hello from DoingItAgain!");
 }
 
 fn set_panic_hook() {
     // When the `console_error_panic_hook` feature is enabled, we can call the
     // `set_panic_hook` function to get better error messages if we ever panic.
     console_error_panic_hook::set_once();
+}
+
+async fn create_account(client: &accounts_svc_bindings::AccountsPromiseClient) {
+
+    log("create_account entry");
+    let key = PrivateKey::generate().unwrap();
+
+    let challenge = signing::sign_challenge(&key).unwrap();
+    let unsig_challenge = common::signed_challenge::Challenge::decode(challenge.challenge.clone()).unwrap();
+
+    log(&format!("Challenge timestamp {}", unsig_challenge.timestamp));
+
+    let bound_challenge = common_bindings::SignedChallenge::new();
+    bound_challenge.setChallenge(js_sys::Uint8Array::from(&challenge.challenge[..]));
+    bound_challenge.setSignature(js_sys::Uint8Array::from(&challenge.signature[..]));
+
+    let promise = client.createAccount(bound_challenge);
+    let value = JsFuture::from(promise).await.unwrap();
+
+    let resp: common_bindings::Certificate = value.dyn_into().expect("response not working...");
+
+    let tbs_cert = common::certificate::TbsCertificate::decode(resp.getCertificate_asU8().to_vec()).unwrap();
+
+    log(&format!("Certificate serial {}", tbs_cert.uuid));
 }
