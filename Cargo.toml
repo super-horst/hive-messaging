@@ -1,13 +1,12 @@
 [workspace]
 members = [
     "hive-commons",
-    "hive-webclient",
+    "hive-webapp/crate",
     "hive-accounts-svc",
     "hive-messages-svc",
 ]
 
 exclude = [
-    "hive-webapp",
-    "app_sandbox",
-# exclude app for now
+# exclude client for now
+    "hive-webclient",
 ]

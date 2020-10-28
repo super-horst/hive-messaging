@@ -1,2 +1,3 @@
-# Default ignored files
-app/
+**/node_modules/
+**/pkg
+*-lock.json
