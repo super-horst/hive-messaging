@@ -11,8 +11,18 @@ crate-type = ["cdylib"]
 wasm-bindgen = "0.2.66"
 js-sys = "0.3.45"
 
+log = "0.4.11"
+wasm-logger = "0.2.0"
+
+serde = { version = "1.0", features = ["derive"] }
+base64 = "0.12.3"
 wasm-bindgen-futures = { version = "0.3.21", features = ["futures_0_3"] }
 
+yew = "0.17.4"
 console_error_panic_hook = { version = "0.1.5" }
 
 hive-commons = { version = "0.1.0", path = "../../hive-commons" , features = ["web"]}
+
+[profile.release]
+lto = true
+opt-level = "s"

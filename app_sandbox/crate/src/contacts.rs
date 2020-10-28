@@ -1,39 +1,13 @@
-use std::hash::{Hash, Hasher};
-
 use std::sync::Arc;
-
-use serde::{Deserialize, Serialize};
 
 use yew::format::Json;
 use yew::prelude::*;
 use yew::services::storage::{Area, StorageService};
 use yew::{
-    html, Component, ComponentLink, Href, Html, InputData, KeyPressEvent, Properties, ShouldRender,
+    html, Component, ComponentLink, Href, Html, InputData, KeyboardEvent, Properties, ShouldRender,
 };
 
-use hive_commons::crypto::*;
-
-const KEY: &'static str = "hive.webapp.contacts";
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Contact {
-    pub key: String,
-    //ratchet: ManagedRatchet,
-}
-
-impl Hash for Contact {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.key.hash(state);
-    }
-}
-
-impl std::cmp::PartialEq<Contact> for Contact {
-    fn eq(&self, other: &Self) -> bool {
-        self.key == other.key
-    }
-}
-
-impl Eq for Contact {}
+use crate::storage::*;
 
 pub enum ContactMsg {
     Update(String),
@@ -54,6 +28,7 @@ pub struct ContactList {
     on_add: Callback<String>,
     on_select: Callback<Arc<Contact>>,
     value: String,
+    storage: StorageController,
     contacts: Vec<Arc<Contact>>,
 }
 
@@ -62,36 +37,12 @@ impl Component for ContactList {
     type Properties = Props;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let mut contacts = vec![];
-
-        let mut cto_store = vec![
-            Arc::new(Contact {
-                key: "firstC".to_string(),
-            }),
-            Arc::new(Contact {
-                key: "2ndC".to_string(),
-            }),
-        ];
-        contacts.append(&mut cto_store);
-
-        /*let mut storage = StorageService::new(Area::Local).expect("storage was disabled by the user");
-        storage.store(KEY, Json(&cto_store));
-
-        let mut entries = {
-            if let Json(Ok(restored_model)) = storage.restore(KEY) {
-                restored_model
-            } else {
-                Vec::new()
-            }
-        };
-
-        contacts.append(&mut entries);*/
-
         ContactList {
             link,
             on_add: props.on_add,
             on_select: props.on_select,
             value: "".to_string(),
+            storage: StorageController::new(),
             contacts: props.contacts,
         }
     }
@@ -127,7 +78,7 @@ impl Component for ContactList {
                 <input placeholder="Add new contact..." style="width: 100%;"
                     value=&self.value
                     oninput=self.link.callback(|e: InputData| ContactMsg::Update(e.value))
-                    onkeypress=self.link.callback(|e: KeyPressEvent| {
+                    onkeypress=self.link.callback(|e: KeyboardEvent| {
                        if e.key() == "Enter" { ContactMsg::Add } else { ContactMsg::Nope }
                    }) />
             </div>
