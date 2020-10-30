@@ -6,26 +6,31 @@ use yew::services::storage::{StorageService, Area};
 
 use serde::{Deserialize, Serialize};
 
-use hive_commons::crypto::*;
+use hive_commons::crypto;
+use hive_commons::model::common;
 
 const IDENTITY_KEY: &'static str = "hive.webapp.identity";
 const CONTACTS_KEY: &'static str = "hive.webapp.contacts";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Identity {
-    pub key: Vec<u8>,
+    pub key: crypto::PrivateKey,
+    pub certificate: Option<crypto::Certificate>,
 }
 
 impl Identity {
-    pub fn new() -> Self {
-        Identity { key: vec![] }
+    pub fn new(key: crypto::PrivateKey) -> Self {
+        Identity {
+            key,
+            certificate: None,
+        }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Contact {
     pub key: String,
-    pub ratchet: Option<ManagedRatchet>,
+    pub ratchet: Option<crypto::ManagedRatchet>,
 }
 
 impl Hash for Contact {
@@ -55,10 +60,10 @@ impl StorageController {
         StorageController { service }
     }
 
-    pub fn get_identity(&self) -> Identity {
+    pub fn get_identity(&self) -> Option<Identity> {
         //TODO error handling
         let Json(identity) = self.service.restore(IDENTITY_KEY);
-        identity.unwrap_or_else(|_| Identity::new())
+        identity.ok()
     }
 
     pub fn set_identity(&mut self, identity: &Identity) {

@@ -18,5 +18,4 @@ extern "C" {
 
     #[wasm_bindgen(method)]
     pub fn createAccount(this: &AccountsPromiseClient, request: common_bindings::SignedChallenge) -> js_sys::Promise;
-
 }

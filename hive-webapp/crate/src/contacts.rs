@@ -48,21 +48,27 @@ impl Component for ContactList {
     }
 
     fn update(&mut self, msg: Self::Message) -> bool {
-        match msg {
+        return match msg {
             ContactMsg::Update(val) => {
                 self.value = val;
+                true
             }
             ContactMsg::Add => {
+                let val = self.value.clone();
+                if val.is_empty() {
+                    return false;
+                }
+
                 self.on_add.emit(self.value.clone());
                 self.value = "".to_string();
+                return true;
             }
             ContactMsg::Select(key) => {
                 self.on_select.emit(key);
+                true
             }
-            _ => {}
+            _ => {true}
         }
-
-        true
     }
 
     fn change(&mut self, props: Self::Properties) -> bool {

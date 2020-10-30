@@ -6,6 +6,7 @@ mod app;
 mod contacts;
 mod bindings;
 mod storage;
+mod transport;
 
 
 #[wasm_bindgen(start)]

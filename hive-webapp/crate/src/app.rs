@@ -12,8 +12,9 @@ use wasm_bindgen::JsCast;
 
 use log::*;
 
-use hive_commons::crypto::*;
+use hive_commons::crypto;
 use hive_commons::model::*;
+use crypto::FromBytes;
 
 use crate::bindings::accounts_svc_bindings;
 use crate::bindings::common_bindings;
@@ -29,6 +30,7 @@ pub struct State {
 }
 
 pub enum StateChange {
+    UpdateCertificate(crypto::Certificate),
     SelectContact(Arc<Contact>),
     AddContact(String),
 }
@@ -38,6 +40,7 @@ pub struct AppContainer {
     selected_contact: Option<Arc<Contact>>,
     state: State,
     storage: StorageController,
+    identity: Identity,
 }
 
 
@@ -51,16 +54,43 @@ impl Component for AppContainer {
             messages: HashMap::new(),
         };
 
+        let mut storage = StorageController::new();
+
+        let id = match storage.get_identity() {
+            Some(id) => id,
+            None => {
+                let key = crypto::PrivateKey::generate().unwrap();
+
+                let created = Identity::new(key);
+                storage.set_identity(&created);
+
+                let certificate_link = link.clone();
+                spawn_local(async move {
+                    let client = accounts_svc_bindings::AccountsPromiseClient::new("http://localhost:8080".to_string());
+                    let certificate = create_account(&client).await;
+                    certificate_link.send_message(StateChange::UpdateCertificate(certificate));
+                });
+
+                created
+            }
+        };
+
         AppContainer {
             link,
             selected_contact: None,
             state,
-            storage: StorageController::new(),
+            storage,
+            identity: id,
         }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         return match msg {
+            StateChange::UpdateCertificate(c) => {
+                self.identity.certificate = Some(c);
+                self.storage.set_identity(&self.identity);
+                true
+            }
             StateChange::SelectContact(c) => {
                 self.selected_contact = Some(c);
                 true
@@ -112,25 +142,17 @@ impl Component for AppContainer {
 impl AppContainer {
     fn add_contact(&mut self, key: String) -> Result<Contact, String> {
         let key_bytes = base64::decode(&key).map_err(|e| e.to_string())?;
-        let pk = PublicKey::from_bytes(&key_bytes[..]).map_err(|e| e.to_string())?;
+        let pk = crypto::PublicKey::from_bytes(&key_bytes[..]).map_err(|e| e.to_string())?;
 
         Ok(Contact { key, ratchet: None })
     }
 }
 
-fn create_account_wrapper() {
-    let client = accounts_svc_bindings::AccountsPromiseClient::new("http://localhost:8080".to_string());
-
-    spawn_local(async move {
-        create_account(&client).await;
-    });
-}
-
-async fn create_account(client: &accounts_svc_bindings::AccountsPromiseClient) {
+async fn create_account(client: &accounts_svc_bindings::AccountsPromiseClient) -> crypto::Certificate {
     info!("create_account entry");
-    let key = PrivateKey::generate().unwrap();
+    let key = crypto::PrivateKey::generate().unwrap();
 
-    let challenge = signing::sign_challenge(&key).unwrap();
+    let challenge = crypto::signing::sign_challenge(&key).unwrap();
     let unsig_challenge = common::signed_challenge::Challenge::decode(challenge.challenge.clone()).unwrap();
 
     info!("Challenge timestamp {}", unsig_challenge.timestamp);
@@ -142,9 +164,11 @@ async fn create_account(client: &accounts_svc_bindings::AccountsPromiseClient) {
     let promise = client.createAccount(bound_challenge);
     let value = JsFuture::from(promise).await.unwrap();
 
-    let resp: common_bindings::Certificate = value.dyn_into().expect("response not working...");
+    let certificate_binding: common_bindings::Certificate = value.dyn_into().expect("response not working...");
 
-    let tbs_cert = common::certificate::TbsCertificate::decode(resp.getCertificate_asU8().to_vec()).unwrap();
+    let (certificate, ignore_for_now) = crypto::CertificateFactory::decode(certificate_binding.into()).unwrap();
 
-    info!("Certificate serial {}", tbs_cert.uuid);
+    info!("Certificate serial {}", certificate.infos().serial());
+
+    return certificate;
 }
