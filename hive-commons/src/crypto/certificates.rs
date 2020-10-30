@@ -3,15 +3,18 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use rand_core::RngCore;
+
 use crate::crypto::*;
 use crate::model::*;
-use rand_core::RngCore;
 
 /// A certificate representation.
 ///
 /// Carries an encoded certificate, signature and some decoded
 /// additional information.
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Certificate {
     pub(crate) cert: Vec<u8>,
     pub(crate) signature: Vec<u8>,
@@ -35,6 +38,11 @@ impl Certificate {
     /// get the certificate's signature
     pub fn signature(&self) -> &[u8] {
         self.signature.as_slice()
+    }
+
+    /// get the certificate's information
+    pub fn infos(&self) -> &CertificateInfoBundle {
+        &self.infos
     }
 
     /// get the public key represented by this certificate
@@ -81,7 +89,7 @@ impl std::hash::Hash for Certificate {
 /// An inner certificate.
 ///
 /// Contains parsed information about a certificate.
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CertificateInfoBundle {
     pub(crate) identity: PublicKey,
     pub(crate) expiration: SystemTime,
@@ -349,4 +357,29 @@ pub mod certificate_tests {
             .verify(sig_cert.encoded_certificate(), sig_cert.signature())
             .unwrap();
     }
+
+    #[test]
+    fn test_self_signed_serialise_deserialise() {
+        let cert = create_self_signed_cert();
+
+        // Serialize it to a JSON string.
+        let j = serde_json::to_string(&cert).unwrap();
+
+        let recycled: Certificate = serde_json::from_str(&j).unwrap();
+
+        assert_eq!(cert, recycled)
+    }
+
+    #[test]
+    fn test_signed_serialise_deserialise() {
+        let cert = create_signed_cert();
+
+        // Serialize it to a JSON string.
+        let j = serde_json::to_string(&cert).unwrap();
+
+        let recycled: Certificate = serde_json::from_str(&j).unwrap();
+
+        assert_eq!(cert, recycled)
+    }
+
 }
