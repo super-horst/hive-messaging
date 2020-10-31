@@ -1,13 +1,12 @@
 #![recursion_limit = "512"]
 use wasm_bindgen::prelude::*;
 
-
-mod app;
-mod contacts;
 mod bindings;
 mod storage;
 mod transport;
+mod views;
 
+mod app;
 
 #[wasm_bindgen(start)]
 pub fn main() {

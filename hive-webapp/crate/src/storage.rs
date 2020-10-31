@@ -2,7 +2,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex};
 
 use yew::format::Json;
-use yew::services::storage::{StorageService, Area};
+use yew::services::storage::{Area, StorageService};
 
 use serde::{Deserialize, Serialize};
 
@@ -14,15 +14,17 @@ const CONTACTS_KEY: &'static str = "hive.webapp.contacts";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Identity {
-    pub key: crypto::PrivateKey,
+    pub key: Arc<crypto::PrivateKey>,
     pub certificate: Option<crypto::Certificate>,
+    pub pre_keys: Option<crypto::utils::PrivatePreKeys>
 }
 
 impl Identity {
     pub fn new(key: crypto::PrivateKey) -> Self {
         Identity {
-            key,
+            key: Arc::new(key),
             certificate: None,
+            pre_keys: None,
         }
     }
 }
@@ -46,7 +48,6 @@ impl std::cmp::PartialEq<Contact> for Contact {
 }
 
 impl Eq for Contact {}
-
 
 pub struct StorageController {
     service: StorageService,

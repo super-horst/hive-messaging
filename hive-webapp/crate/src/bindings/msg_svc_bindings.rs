@@ -1,5 +1,5 @@
-use wasm_bindgen::prelude::*;
 use js_sys;
+use wasm_bindgen::prelude::*;
 
 use super::*;
 

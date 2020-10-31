@@ -8,6 +8,7 @@ use yew::{
 };
 
 use crate::storage::*;
+use log::*;
 
 pub enum ContactMsg {
     Update(String),
@@ -18,14 +19,11 @@ pub enum ContactMsg {
 
 #[derive(PartialEq, Clone, Properties)]
 pub struct Props {
-    pub contacts: Vec<Arc<Contact>>,
     pub on_select: Callback<Arc<Contact>>,
-    pub on_add: Callback<String>,
 }
 
 pub struct ContactList {
     link: ComponentLink<Self>,
-    on_add: Callback<String>,
     on_select: Callback<Arc<Contact>>,
     value: String,
     storage: StorageController,
@@ -37,13 +35,15 @@ impl Component for ContactList {
     type Properties = Props;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
+        let storage = StorageController::new();
+        let contacts = storage.get_contacts().drain(..).map(Arc::new).collect();
+
         ContactList {
             link,
-            on_add: props.on_add,
             on_select: props.on_select,
             value: "".to_string(),
-            storage: StorageController::new(),
-            contacts: props.contacts,
+            storage,
+            contacts,
         }
     }
 
@@ -59,7 +59,22 @@ impl Component for ContactList {
                     return false;
                 }
 
-                self.on_add.emit(self.value.clone());
+                info!("adding account {}", &val);
+                let contact = Arc::new(Contact {
+                    key: val,
+                    ratchet: None,
+                });
+
+                self.contacts.push(contact);
+                let contact_copy = self
+                    .contacts
+                    .iter()
+                    .map(Arc::as_ref)
+                    .map(Contact::clone)
+                    .collect();
+
+                self.storage.set_contacts(&contact_copy);
+
                 self.value = "".to_string();
                 return true;
             }
@@ -67,14 +82,12 @@ impl Component for ContactList {
                 self.on_select.emit(key);
                 true
             }
-            _ => {true}
-        }
+            _ => true,
+        };
     }
 
     fn change(&mut self, props: Self::Properties) -> bool {
-        self.contacts = props.contacts;
-
-        true
+        false
     }
 
     fn view(&self) -> Html {

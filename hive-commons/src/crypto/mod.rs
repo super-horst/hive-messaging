@@ -18,7 +18,7 @@ pub use x3dh::*;
 mod ratchet;
 pub use ratchet::{ManagedRatchet, RecvStep, SendStep};
 
-pub mod signing;
+pub mod utils;
 
 /// Identity provider
 /// TODO obsolete

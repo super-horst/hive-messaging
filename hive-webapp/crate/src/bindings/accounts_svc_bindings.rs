@@ -1,5 +1,5 @@
-use wasm_bindgen::prelude::*;
 use js_sys;
+use wasm_bindgen::prelude::*;
 
 use super::*;
 
@@ -7,7 +7,6 @@ use super::*;
 extern "C" {
     pub type UpdateKeyResult;
 }
-
 
 #[wasm_bindgen(module = "/generated/accounts_svc_grpc_web_pb.js")]
 extern "C" {
@@ -17,5 +16,14 @@ extern "C" {
     pub fn new(hostname: String) -> AccountsPromiseClient;
 
     #[wasm_bindgen(method)]
-    pub fn createAccount(this: &AccountsPromiseClient, request: common_bindings::SignedChallenge) -> js_sys::Promise;
+    pub fn createAccount(
+        this: &AccountsPromiseClient,
+        request: common_bindings::SignedChallenge,
+    ) -> js_sys::Promise;
+
+    #[wasm_bindgen(method)]
+    pub fn updatePreKeys(
+        this: &AccountsPromiseClient,
+        request: common_bindings::PreKeyBundle,
+    ) -> js_sys::Promise;
 }
