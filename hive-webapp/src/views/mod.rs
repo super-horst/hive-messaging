@@ -7,6 +7,7 @@ use yew::{
     html, Component, ComponentLink, Href, Html, InputData, KeyboardEvent, Properties, ShouldRender,
 };
 
+use crate::bindings;
 use crate::storage::*;
 
 mod contacts;
@@ -37,7 +38,9 @@ impl Component for MessagingView {
 
     fn update(&mut self, msg: Self::Message) -> bool {
         match msg {
-            MessagingViewMessage::Nope => {}
+            MessagingViewMessage::Nope => {
+                bindings::scan_qr();
+            }
             MessagingViewMessage::SelectContact(c) => {
                 self.selected_contact = Some(c);
             }
@@ -72,7 +75,7 @@ impl Component for MessagingView {
 
                 <div class="msg_input_view">
                     <input class="center" placeholder="Compose a message" style="width: 100%;"/>
-                    <button class="center">{"Send"}</button>
+                    <button class="center" onclick=self.link.callback(move |_| MessagingViewMessage::Nope)>{"Send"}</button>
                 </div>
             </div>
         </div>

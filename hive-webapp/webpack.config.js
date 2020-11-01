@@ -4,7 +4,7 @@ const webpack = require('webpack');
 const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin");
 
 module.exports = {
-    entry: './index.js',
+    entry: './build.js',
     output: {
         path: path.resolve(__dirname, 'dist'),
         filename: 'index.js',
@@ -14,7 +14,7 @@ module.exports = {
             template: 'index.html'
         }),
         new WasmPackPlugin({
-            crateDirectory: path.resolve(__dirname, "crate")
+            crateDirectory: path.resolve(__dirname)
         }),
         // Have this example work in Edge which doesn't ship `TextEncoder` or
         // `TextDecoder` at this time.

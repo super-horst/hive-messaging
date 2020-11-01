@@ -13,7 +13,7 @@ export PROTOS
 
 # shellcheck disable=SC2086
 docker run \
-  --mount type=bind,src="$(pwd)"/../../hive-commons/proto,dst=$PROTO_DIR \
+  --mount type=bind,src="$(pwd)"/../hive-commons/proto,dst=$PROTO_DIR \
   --mount type=bind,src="$(pwd)$GEN_DIR",dst=$GEN_DIR \
   protoc_container:latest \
   protoc -I="$PROTO_DIR" $PROTOS \

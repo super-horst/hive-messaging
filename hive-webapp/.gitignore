@@ -1,3 +1,5 @@
+**/generated/
 **/node_modules/
-**/pkg
-*-lock.json
+**/pkg/
+**/dist
+**/*-lock.json

@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 
 use super::*;
 
-#[wasm_bindgen(module = "/generated/messages_svc_pb.js")]
+#[wasm_bindgen(module = "/js/generated/messages_svc_pb.js")]
 extern "C" {
     pub type Payload;
 
@@ -23,7 +23,7 @@ extern "C" {
     pub fn setKeyEx(this: &Payload, exchange: common_bindings::KeyExchange);
 }
 
-#[wasm_bindgen(module = "/generated/messages_svc_pb.js")]
+#[wasm_bindgen(module = "/js/generated/messages_svc_pb.js")]
 extern "C" {
     pub type MessageEnvelope;
 
@@ -49,12 +49,12 @@ extern "C" {
     pub fn setDst(this: &MessageEnvelope, dst: common_bindings::Peer);
 }
 
-#[wasm_bindgen(module = "/generated/messages_svc_pb.js")]
+#[wasm_bindgen(module = "/js/generated/messages_svc_pb.js")]
 extern "C" {
     pub type MessageSendResult;
 }
 
-#[wasm_bindgen(module = "/generated/messages_svc_grpc_web_pb.js")]
+#[wasm_bindgen(module = "/js/generated/messages_svc_grpc_web_pb.js")]
 extern "C" {
     pub type MessagesPromiseClient;
 

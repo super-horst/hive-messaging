@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "hive-commons",
-    "hive-webapp/crate",
+    "hive-webapp",
     "hive-accounts-svc",
     "hive-messages-svc",
 ]
@@ -10,3 +10,8 @@ exclude = [
 # exclude client for now
     "hive-webclient",
 ]
+
+#TODO actual opt-level should be 3 -> optimised for wasm
+[profile.release]
+lto = true
+opt-level = "s"

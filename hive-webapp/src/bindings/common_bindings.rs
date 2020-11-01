@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 
 use hive_commons::model::common;
 
-#[wasm_bindgen(module = "/generated/common_pb.js")]
+#[wasm_bindgen(module = "/js/generated/common_pb.js")]
 extern "C" {
     pub type Peer;
 
@@ -44,7 +44,7 @@ impl Into<common::Peer> for Peer {
     }
 }
 
-#[wasm_bindgen(module = "/generated/common_pb.js")]
+#[wasm_bindgen(module = "/js/generated/common_pb.js")]
 extern "C" {
     pub type EncryptionParameters;
 
@@ -70,7 +70,7 @@ extern "C" {
     pub fn setPrevChainCount(this: &EncryptionParameters, idx: u64);
 }
 
-#[wasm_bindgen(module = "/generated/common_pb.js")]
+#[wasm_bindgen(module = "/js/generated/common_pb.js")]
 extern "C" {
     pub type KeyExchange;
 
@@ -124,7 +124,7 @@ impl Into<common::KeyExchange> for KeyExchange {
     }
 }
 
-#[wasm_bindgen(module = "/generated/common_pb.js")]
+#[wasm_bindgen(module = "/js/generated/common_pb.js")]
 extern "C" {
     pub type SignedChallenge;
 
@@ -166,7 +166,7 @@ impl Into<common::SignedChallenge> for SignedChallenge {
     }
 }
 
-#[wasm_bindgen(module = "/generated/common_pb.js")]
+#[wasm_bindgen(module = "/js/generated/common_pb.js")]
 extern "C" {
     pub type Certificate;
 
@@ -208,7 +208,7 @@ impl Into<common::Certificate> for Certificate {
     }
 }
 
-#[wasm_bindgen(module = "/generated/common_pb.js")]
+#[wasm_bindgen(module = "/js/generated/common_pb.js")]
 extern "C" {
     pub type PreKeyBundle;
 

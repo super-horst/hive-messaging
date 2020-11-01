@@ -3,12 +3,12 @@ use wasm_bindgen::prelude::*;
 
 use super::*;
 
-#[wasm_bindgen(module = "/generated/accounts_svc_pb.js")]
+#[wasm_bindgen(module = "/js/generated/accounts_svc_pb.js")]
 extern "C" {
     pub type UpdateKeyResult;
 }
 
-#[wasm_bindgen(module = "/generated/accounts_svc_grpc_web_pb.js")]
+#[wasm_bindgen(module = "/js/generated/accounts_svc_grpc_web_pb.js")]
 extern "C" {
     pub type AccountsPromiseClient;
 

@@ -22,8 +22,4 @@ wasm-bindgen-futures = { version = "0.3.21", features = ["futures_0_3"] }
 yew = "0.17.4"
 console_error_panic_hook = { version = "0.1.5" }
 
-hive-commons = { version = "0.1.0", path = "../../hive-commons" , features = ["web"]}
-
-[profile.release]
-lto = true
-opt-level = "s"
+hive-commons = { version = "0.1.0", path = "../hive-commons" , features = ["web"]}

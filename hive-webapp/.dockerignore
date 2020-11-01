@@ -1,4 +1,4 @@
-**/node_modules_remove_me/
+**/node_modules/
 **/pkg/
 **/target/
 **/*-lock.json
