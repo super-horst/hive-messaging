@@ -1,4 +1,4 @@
-import 'html5-qrcode/minified/html5-qrcode.min';
+import Html5QrcodeScanner from 'html5-qrcode/minified/html5-qrcode.min';
 
 export function scan_qr() {
     var html5QrcodeScanner = new Html5QrcodeScanner(

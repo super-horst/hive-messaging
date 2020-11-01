@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 
-cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-docker build -t protoc_container .
+cd "$DIR"/.. || exit 1
 
-export GEN_DIR=/generated
+docker build -t protoc_container -f "$DIR"/Dockerfile.protoc .
+
+export GEN_DIR=/js/generated
 mkdir -p .$GEN_DIR
 
 export PROTO_DIR=/proto
@@ -19,3 +21,5 @@ docker run \
   protoc -I="$PROTO_DIR" $PROTOS \
   --js_out=import_style=commonjs:"$GEN_DIR" \
   --grpc-web_out=import_style=commonjs,mode=grpcwebtext:"$GEN_DIR"
+
+cd "$DIR" || exit 1
