@@ -34,7 +34,7 @@ impl Component for MessagingView {
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
             MessagingViewMessage::Nope => {
-                bindings::scan_qr();
+                //NOOP
             }
             MessagingViewMessage::SelectContact(c) => {
                 self.selected_contact = Some(c);

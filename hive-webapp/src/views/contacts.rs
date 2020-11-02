@@ -162,7 +162,13 @@ impl Component for Contact {
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
-        false
+        return match msg {
+            ContactMsg::Select => {
+                self.on_select.emit(self.stored.clone());
+                true
+            }
+            _ => true,
+        };
     }
 
     fn change(&mut self, props: Self::Properties) -> ShouldRender {
