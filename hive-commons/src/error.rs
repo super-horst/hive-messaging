@@ -1,4 +1,4 @@
-use failure::{Error, Fail};
+use failure::Fail;
 
 #[derive(Debug, Fail)]
 pub enum CommonError {

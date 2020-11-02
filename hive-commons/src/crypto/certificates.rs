@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 use rand_core::RngCore;
 
@@ -66,7 +66,7 @@ impl Encodable for Certificate {
             certificate: self.encoded_certificate().to_vec(),
             signature: self.signature().to_vec(),
         }
-        .encode()
+            .encode()
     }
 }
 
@@ -381,5 +381,4 @@ pub mod certificate_tests {
 
         assert_eq!(cert, recycled)
     }
-
 }
