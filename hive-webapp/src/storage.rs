@@ -1,13 +1,13 @@
 use std::hash::{Hash, Hasher};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use yew::format::Json;
 use yew::services::storage::{Area, StorageService};
 
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use hive_commons::crypto;
-use hive_commons::model::common;
 
 const IDENTITY_KEY: &'static str = "hive.webapp.identity";
 const CONTACTS_KEY: &'static str = "hive.webapp.contacts";
@@ -31,6 +31,7 @@ impl Identity {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Contact {
+    pub id: Uuid,
     pub key: String,
     pub ratchet: Option<crypto::ManagedRatchet>,
 }

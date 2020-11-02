@@ -12,6 +12,7 @@ wasm-bindgen = "0.2.66"
 js-sys = "0.3.45"
 web-sys =  { version ="0.3.45" , features = ["Location", "Window"]}
 
+uuid = { version = "0.8.1", features = ["v4", "wasm-bindgen", "serde"] }
 log = "0.4.11"
 wasm-logger = "0.2.0"
 

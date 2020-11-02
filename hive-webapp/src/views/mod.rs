@@ -1,27 +1,23 @@
+use yew::prelude::*;
 use std::sync::Arc;
 
-use yew::format::Json;
-use yew::prelude::*;
-use yew::services::storage::{Area, StorageService};
 use yew::{
-    html, Component, ComponentLink, Href, Html, InputData, KeyboardEvent, Properties, ShouldRender,
+    html, Component, ComponentLink, Html, ShouldRender,
 };
 
 use crate::bindings;
-use crate::storage::*;
+use crate::storage;
 
 mod contacts;
-use contacts::*;
 
 pub enum MessagingViewMessage {
-    SelectContact(Arc<Contact>),
+    SelectContact(Arc<storage::Contact>),
     Nope,
 }
 
 pub struct MessagingView {
     link: ComponentLink<Self>,
-    storage: StorageController,
-    selected_contact: Option<Arc<Contact>>,
+    selected_contact: Option<Arc<storage::Contact>>,
 }
 
 impl Component for MessagingView {
@@ -31,12 +27,11 @@ impl Component for MessagingView {
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
         MessagingView {
             link,
-            storage: StorageController::new(),
             selected_contact: None,
         }
     }
 
-    fn update(&mut self, msg: Self::Message) -> bool {
+    fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
             MessagingViewMessage::Nope => {
                 bindings::scan_qr();
@@ -49,7 +44,7 @@ impl Component for MessagingView {
         return true;
     }
 
-    fn change(&mut self, props: Self::Properties) -> bool {
+    fn change(&mut self, props: Self::Properties) -> ShouldRender {
         // don't render
         false
     }
@@ -57,7 +52,7 @@ impl Component for MessagingView {
     fn view(&self) -> Html {
         html! {
         <div class="view_layout">
-            <ContactList
+            <contacts::ContactList
                 on_select=self.link.callback(move |c| MessagingViewMessage::SelectContact(c)) />
             <div class="box msg_view_layout">
                 <div class="msg_header">

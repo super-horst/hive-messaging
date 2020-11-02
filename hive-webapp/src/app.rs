@@ -1,7 +1,6 @@
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use yew::{html, Component, ComponentLink, Href, Html, InputData, KeyboardEvent, ShouldRender};
@@ -12,17 +11,16 @@ use wasm_bindgen_futures::futures_0_3::JsFuture;
 
 use log::*;
 
-use crypto::FromBytes;
 use hive_commons::crypto;
 use hive_commons::model::*;
+
+use crypto::FromBytes;
 
 use crate::bindings::accounts_svc_bindings;
 use crate::bindings::common_bindings;
 
 use crate::storage::*;
 use crate::views::*;
-
-struct Message {}
 
 pub enum StateChange {
     UpdateCertificate(crypto::Certificate),
