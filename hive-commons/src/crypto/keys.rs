@@ -1,5 +1,6 @@
 use std::fmt;
 use std::hash::Hasher;
+use std::marker::PhantomData;
 
 use ed25519_dalek;
 use sha2::Sha512;
@@ -9,7 +10,7 @@ use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::crypto::error::*;
-use std::marker::PhantomData;
+use crate::model::common;
 
 const COMBINED_PUBLIC_KEY_SIZE: usize = 64;
 
@@ -130,6 +131,10 @@ impl PublicKey {
 
         // expect no errors ... just recycling
         PublicKey::from_bytes(&bytes[..]).expect("Failed to copy DalekEd25519PublicId")
+    }
+
+    pub fn into_peer(&self) -> common::Peer {
+        common::Peer { identity: self.id_bytes(), namespace: self.namespace() }
     }
 }
 
