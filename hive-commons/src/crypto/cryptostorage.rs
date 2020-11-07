@@ -228,6 +228,7 @@ pub async fn load_certificate(server_id: &PrivateKey, path: &str) -> Certificate
             .unwrap();
 
         let mut f = fs::File::create(path).await.unwrap();
+        // TODO wrong target
         f.write_all(&cert.encode().unwrap()[..]).await.unwrap();
 
         return cert;
@@ -247,10 +248,10 @@ mod crypto_storage_tests {
         use tokio::prelude::*;
 
         let server_id = PrivateKey::generate().unwrap();
-
-        let mut f = fs::File::create("./private").await.unwrap();
-        f.write_all(server_id.secret_bytes()).await.unwrap();
         let server_public = server_id.id().copy();
+
+        let mut f = fs::File::create("./privates").await.unwrap();
+        f.write_all(server_id.secret_bytes()).await.unwrap();
 
         let cert = CertificateFactory::default()
             .certified(server_public)
@@ -258,10 +259,13 @@ mod crypto_storage_tests {
             .self_sign(&server_id)
             .unwrap();
 
-        let mut f = fs::File::create("./certificate").await.unwrap();
-        f.write_all(&cert.encode().unwrap()[..]).await.unwrap();
+        let common_cert = common::Certificate {
+            certificate: cert.encoded_certificate().to_vec(),
+            signature: cert.signature().to_vec(),
+        };
 
-
+        let mut f = fs::File::create("./certs").await.unwrap();
+        f.write_all(&common_cert.encode().unwrap()[..]).await.unwrap();
     }
 
 
