@@ -239,6 +239,32 @@ mod crypto_storage_tests {
     use super::*;
     use crate::crypto::certificates::certificate_tests;
 
+    #[ignore]
+    #[tokio::test]
+    async fn create_test_credentials() {
+        use std::time::Duration;
+        use tokio::fs;
+        use tokio::prelude::*;
+
+        let server_id = PrivateKey::generate().unwrap();
+
+        let mut f = fs::File::create("./private").await.unwrap();
+        f.write_all(server_id.secret_bytes()).await.unwrap();
+        let server_public = server_id.id().copy();
+
+        let cert = CertificateFactory::default()
+            .certified(server_public)
+            .expiration(Duration::from_secs(1000))
+            .self_sign(&server_id)
+            .unwrap();
+
+        let mut f = fs::File::create("./certificate").await.unwrap();
+        f.write_all(&cert.encode().unwrap()[..]).await.unwrap();
+
+
+    }
+
+
     #[tokio::test]
     async fn test_builder_with_signed_cert() {
         let my_key = PrivateKey::generate().unwrap();
