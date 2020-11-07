@@ -8,6 +8,13 @@ services:
             POSTGRES_PASSWORD: accounts_db
             POSTGRES_DB: common
 
+    messages_db:
+        image: postgres:latest
+        restart: always
+        environment:
+            POSTGRES_PASSWORD: messages_db
+            POSTGRES_DB: common
+
     envoy_client_gateway:
         build:
             context: ./
@@ -31,12 +38,12 @@ services:
         restart: always
 
     accounts_svc:
-        depends_on: 
+        depends_on:
             - accounts_db
         restart: always
         build:
             context: ./
-            args: 
+            args:
                 PROJECT_NAME: hive-accounts-svc
             dockerfile: docker/Dockerfile.services
         volumes:
@@ -59,4 +66,28 @@ services:
                 "ssl_mode":true},
             "certificate":"/certs",
             "key":"/privates"
+            }'
+
+    messages_svc:
+        depends_on:
+            - messages_db
+        restart: always
+        build:
+            context: ./
+            args:
+                PROJECT_NAME: hive-messages-svc
+            dockerfile: docker/Dockerfile.services
+        environment:
+            - 'CONFIG={
+            "port":8080,
+            "loglevel":"debug",
+            "db_config":{
+                "host":"messages_db",
+                "port":5432,
+                "user":"postgres",
+                "password":"messages_db",
+                "dbname":"common",
+                "ssl_mode":true},
+            "certificate":"ignore",
+            "key":"ignore"
             }'
