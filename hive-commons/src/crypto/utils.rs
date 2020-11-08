@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::error::*;
-use crate::crypto::{PrivateKey, PublicKey};
+use crate::crypto::{PrivateKey, PublicKey, ManagedRatchet, FromBytes};
 
 use crate::model::*;
 
@@ -81,3 +81,9 @@ pub fn create_pre_key_bundle(identity: &PrivateKey) -> Result<(common::PreKeyBun
 }
 
 
+pub fn initialise_ratchet_to_send(identity: &PrivateKey, bundle: common::PreKeyBundle) -> Result<ManagedRatchet, CryptoError> {
+    let other_identity = PublicKey::from_bytes(&bundle.identity[..])?;
+
+    let dh = identity.diffie_hellman(&other_identity);
+    ManagedRatchet::initialise_to_send(&dh, &other_identity)
+}
