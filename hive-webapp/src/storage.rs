@@ -16,7 +16,7 @@ const CONTACTS_KEY: &'static str = "hive.webapp.contacts";
 pub struct Identity {
     pub key: Arc<crypto::PrivateKey>,
     pub certificate: Option<crypto::Certificate>,
-    pub pre_keys: Option<crypto::utils::PrivatePreKeys>
+    pub pre_keys: Option<crypto::utils::PrivatePreKeys>,
 }
 
 impl Identity {

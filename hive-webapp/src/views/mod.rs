@@ -1,9 +1,7 @@
-use yew::prelude::*;
 use std::sync::Arc;
+use yew::prelude::*;
 
-use yew::{
-    html, Component, ComponentLink, Html, ShouldRender,
-};
+use yew::{html, Component, ComponentLink, Html, ShouldRender};
 
 use crate::bindings;
 use crate::storage;

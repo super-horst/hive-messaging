@@ -26,4 +26,10 @@ extern "C" {
         this: &AccountsPromiseClient,
         request: common_bindings::PreKeyBundle,
     ) -> js_sys::Promise;
+
+    #[wasm_bindgen(method)]
+    pub fn getPreKeys(
+        this: &AccountsPromiseClient,
+        request: common_bindings::Peer,
+    ) -> js_sys::Promise;
 }

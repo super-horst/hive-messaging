@@ -20,6 +20,7 @@ use crate::bindings::accounts_svc_bindings;
 use crate::bindings::common_bindings;
 
 use crate::storage::*;
+use crate::transport;
 use crate::views::*;
 
 pub enum StateChange {
@@ -63,7 +64,7 @@ impl Component for AppContainer {
             }
         };
 
-        if id.certificate.is_none() && !new_account{
+        if id.certificate.is_none() && !new_account {
             let private = id.key.clone();
             let certificate_link = link.clone();
             spawn_local(async move {
@@ -141,7 +142,7 @@ impl AppContainer {
         bound_challenge.setSignature(js_sys::Uint8Array::from(&challenge.signature[..]));
 
         let client =
-            accounts_svc_bindings::AccountsPromiseClient::new(create_service_url());
+            accounts_svc_bindings::AccountsPromiseClient::new(transport::create_service_url());
         let promise = client.createAccount(bound_challenge);
         let value = JsFuture::from(promise).await.unwrap();
 
@@ -159,11 +160,10 @@ impl AppContainer {
     async fn publish_pre_key_bundle(key: Arc<crypto::PrivateKey>) -> crypto::utils::PrivatePreKeys {
         info!("publish pre keys entry");
 
-        let (pre_keys, privates) =
-            crypto::utils::create_pre_key_bundle(&key).unwrap();
+        let (pre_keys, privates) = crypto::utils::create_pre_key_bundle(&key).unwrap();
 
         let client =
-            accounts_svc_bindings::AccountsPromiseClient::new(create_service_url());
+            accounts_svc_bindings::AccountsPromiseClient::new(transport::create_service_url());
 
         let bound_pre_keys: common_bindings::PreKeyBundle = pre_keys.into();
         let promise = client.updatePreKeys(bound_pre_keys);
@@ -174,16 +174,4 @@ impl AppContainer {
 
         privates
     }
-}
-
-fn create_service_url() -> String {
-    let location = web_sys::window().unwrap().location();
-
-    // TODO error handling
-    format!(
-        "{}//{}",
-        location.protocol().unwrap(),
-        location.host().unwrap()
-    )
-        .to_string()
 }

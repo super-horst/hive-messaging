@@ -1,13 +1,24 @@
 use std::sync::Arc;
 
+use log::*;
+
 use yew::format::Json;
 use yew::prelude::*;
 use yew::{
-    html, Component, ComponentLink, Href, Html, ChildrenWithProps, InputData, KeyboardEvent, Properties, ShouldRender,
+    html, ChildrenWithProps, Component, ComponentLink, Href, Html, InputData, KeyboardEvent,
+    Properties, ShouldRender,
 };
 
+use wasm_bindgen::JsCast;
+use wasm_bindgen_futures::futures_0_3::spawn_local;
+use wasm_bindgen_futures::futures_0_3::JsFuture;
+
+use hive_commons::crypto;
+use hive_commons::model;
+
+use crate::transport;
 use crate::storage;
-use log::*;
+use crate::bindings::*;
 
 pub enum ContactListMsg {
     Update(String),
@@ -107,19 +118,15 @@ impl Component for ContactList {
                    }) />
             </div>
 
-            {for self.stored_contacts.iter().map(|c| self.view_contact(c) )}
+            {for self.stored_contacts.iter().map(|c| {
+                let stored = Arc::clone(c);
+                html! {
+                <Contact
+                on_select = self.link.callback(move | c | ContactListMsg::Select(c))
+                stored = stored />
+                }
+            } )}
         </div>
-        }
-    }
-}
-
-impl ContactList {
-    fn view_contact(&self, contact: &Arc<storage::Contact>) -> Html {
-        let stored = Arc::clone(contact);
-        html! {
-        <Contact
-        on_select = self.link.callback(move | c | ContactListMsg::Select(c))
-        stored = stored />
         }
     }
 }
@@ -139,8 +146,7 @@ pub struct ContactProps {
 
 pub struct Contact {
     link: ComponentLink<Self>,
-    on_select: Callback<Arc<storage::Contact>>,
-    stored: Arc<storage::Contact>,
+    props: ContactProps,
 }
 
 impl Component for Contact {
@@ -148,41 +154,59 @@ impl Component for Contact {
     type Properties = ContactProps;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let stored = props.stored;
+        if props.stored.ratchet.is_none() {
 
-        if stored.ratchet.is_none() {
             // TODO get pre keys
         }
-
-        Contact {
-            link,
-            on_select: props.on_select,
-            stored,
-        }
+        Contact { link, props }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         return match msg {
             ContactMsg::Select => {
-                self.on_select.emit(self.stored.clone());
+                self.props.on_select.emit(self.props.stored.clone());
                 true
             }
+            ContactMsg::IncomingPreKey(pre_key) => false,
             _ => true,
         };
     }
 
     fn change(&mut self, props: Self::Properties) -> ShouldRender {
-        false
+        if self.props != props {
+            self.props = props;
+            true
+        } else {
+            false
+        }
     }
 
     fn view(&self) -> Html {
         html! {
         <div class = "box contact" onclick = self.link.callback( move | _ | ContactMsg::Select) >
-        { & self.stored.id }
+        { & self.props.stored.id }
         </div>
         }
     }
 }
 
+async fn retrieve_pre_key_bundle(other: &crypto::PublicKey)  {
+    info!("retrieve pre keys");
 
+    let peer = common_bindings::Peer::new();
+    peer.setIdentity(js_sys::Uint8Array::from(&other.id_bytes()[..]));
+    peer.setNamespace(other.namespace());
 
+    let client =
+        accounts_svc_bindings::AccountsPromiseClient::new(transport::create_service_url());
+
+    let promise = client.getPreKeys(peer);
+    let value = JsFuture::from(promise).await.unwrap();
+
+    let bound_bundle: common_bindings::PreKeyBundle =
+        value.dyn_into().expect("response not working...");
+
+    let bundle: model::common::PreKeyBundle = bound_bundle.into();
+
+    // TODO
+}
