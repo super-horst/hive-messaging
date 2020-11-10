@@ -2,7 +2,7 @@ use crate::CommonError;
 
 #[cfg(not(feature = "web"))]
 pub fn now() -> Result<u64, CommonError> {
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

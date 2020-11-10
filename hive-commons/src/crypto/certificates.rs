@@ -1,14 +1,14 @@
 use std::hash::Hasher;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime};
 use uuid::Uuid;
 
 use serde::{Deserialize, Serialize};
 
 use rand_core::RngCore;
 
-use crate::crypto::*;
-use crate::model::*;
+use crate::crypto::{CryptoError, FromBytes, PrivateKey, PublicKey};
+use crate::model::{common, Decodable, Encodable};
 
 /// A certificate representation.
 ///
@@ -57,16 +57,6 @@ impl Certificate {
     /// get the optional signer certificate
     pub fn expires(&self) -> &SystemTime {
         &self.infos.expires()
-    }
-}
-
-impl Encodable for Certificate {
-    fn encode(&self) -> Result<Vec<u8>, SerialisationError> {
-        common::Certificate {
-            certificate: self.encoded_certificate().to_vec(),
-            signature: self.signature().to_vec(),
-        }
-            .encode()
     }
 }
 
@@ -130,39 +120,6 @@ impl CertificateInfoBundle {
     }
 }
 
-impl Encodable for CertificateInfoBundle {
-    fn encode(&self) -> Result<Vec<u8>, SerialisationError> {
-        let expires = self
-            .expiration
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .map_err(|e| SerialisationError::Message {
-                message: e.to_string(),
-            })?;
-
-        let mut tbs_cert = common::certificate::TbsCertificate {
-            identity: self.identity.id_bytes(),
-            namespace: self.identity.namespace(),
-            expires,
-            uuid: self.serial.clone(),
-            signer: None,
-        };
-
-        match &self.signer_certificate {
-            Some(c) => {
-                let gc = common::Certificate {
-                    certificate: c.encoded_certificate().to_vec(),
-                    signature: c.signature().to_vec(),
-                };
-                tbs_cert.signer = Some(gc);
-            }
-            None => (),
-        }
-
-        tbs_cert.encode()
-    }
-}
-
 /// Build-a-certificate.
 ///
 /// Add all ingredients and decide how to sign it!
@@ -174,6 +131,7 @@ pub struct CertificateFactory {
 
 impl CertificateFactory {
     /// decode a certificate from DTO
+    /// TODO resolve dependency to model::common
     pub fn decode(
         serialised: common::Certificate,
     ) -> Result<(Certificate, Option<common::Certificate>), CryptoError> {

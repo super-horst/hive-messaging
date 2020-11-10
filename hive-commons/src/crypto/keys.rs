@@ -10,7 +10,6 @@ use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::crypto::error::*;
-use crate::model::common;
 
 const COMBINED_PUBLIC_KEY_SIZE: usize = 64;
 
@@ -24,16 +23,16 @@ struct FromBytesVisitor<K> {
 
 impl<K> FromBytesVisitor<K> {
     fn new() -> FromBytesVisitor<K>
-        where
-            K: FromBytes,
+    where
+        K: FromBytes,
     {
         FromBytesVisitor { _a: PhantomData }
     }
 }
 
 impl<'de, K> Visitor<'de> for FromBytesVisitor<K>
-    where
-        K: FromBytes,
+where
+    K: FromBytes,
 {
     type Value = K;
 
@@ -42,16 +41,16 @@ impl<'de, K> Visitor<'de> for FromBytesVisitor<K>
     }
 
     fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
+    where
+        E: serde::de::Error,
     {
         K::from_bytes(v).map_err(|_ce| E::invalid_length(v.len(), &self))
     }
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        where
-            A: SeqAccess<'de>,
-            A::Error: serde::de::Error,
+    where
+        A: SeqAccess<'de>,
+        A::Error: serde::de::Error,
     {
         let mut buff = seq
             .size_hint()
@@ -132,10 +131,6 @@ impl PublicKey {
         // expect no errors ... just recycling
         PublicKey::from_bytes(&bytes[..]).expect("Failed to copy DalekEd25519PublicId")
     }
-
-    pub fn into_peer(&self) -> common::Peer {
-        common::Peer { identity: self.id_bytes(), namespace: self.namespace() }
-    }
 }
 
 impl FromBytes for PublicKey {
@@ -170,8 +165,8 @@ impl FromBytes for PublicKey {
 
 impl Serialize for PublicKey {
     fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         serializer.serialize_bytes(&self.id_bytes()[..])
     }
@@ -179,8 +174,8 @@ impl Serialize for PublicKey {
 
 impl<'de> Deserialize<'de> for PublicKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         deserializer.deserialize_bytes(FromBytesVisitor::<PublicKey>::new())
     }
@@ -309,7 +304,7 @@ impl fmt::Debug for PrivateKey {
 
 impl Clone for PrivateKey {
     fn clone(&self) -> Self {
-        let ed_bytes =  self.ed_secret.to_bytes();
+        let ed_bytes = self.ed_secret.to_bytes();
 
         PrivateKey {
             ed_secret: ed25519_dalek::SecretKey::from_bytes(&ed_bytes[..]).unwrap(),

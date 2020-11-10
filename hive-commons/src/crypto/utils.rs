@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::error::*;
-use crate::crypto::{PrivateKey, PublicKey, ManagedRatchet, FromBytes};
+use crate::crypto::{FromBytes, ManagedRatchet, PrivateKey, PublicKey};
 
 use crate::model::*;
 
@@ -46,7 +46,9 @@ pub fn sign_challenge(identity: &PrivateKey) -> Result<common::SignedChallenge, 
     })
 }
 
-pub fn create_pre_key_bundle(identity: &PrivateKey) -> Result<(common::PreKeyBundle, PrivatePreKeys), CryptoError> {
+pub fn create_pre_key_bundle(
+    identity: &PrivateKey,
+) -> Result<(common::PreKeyBundle, PrivatePreKeys), CryptoError> {
     let pre_private_key = PrivateKey::generate()?;
     let pre_public_key = pre_private_key.id().clone();
 
@@ -60,9 +62,14 @@ pub fn create_pre_key_bundle(identity: &PrivateKey) -> Result<(common::PreKeyBun
             return PrivateKey::generate().ok();
         }
         return None;
-    }).collect::<Vec<PrivateKey>>();
+    })
+    .collect::<Vec<PrivateKey>>();
 
-    let publics = otps.iter().map(PrivateKey::id.clone()).map(PublicKey::id_bytes).collect();
+    let publics = otps
+        .iter()
+        .map(PrivateKey::id.clone())
+        .map(PublicKey::id_bytes)
+        .collect();
 
     let pre_key_bundle = common::PreKeyBundle {
         identity: identity.id().id_bytes(),
@@ -80,8 +87,10 @@ pub fn create_pre_key_bundle(identity: &PrivateKey) -> Result<(common::PreKeyBun
     Ok((pre_key_bundle, privates))
 }
 
-
-pub fn initialise_ratchet_to_send(identity: &PrivateKey, bundle: common::PreKeyBundle) -> Result<ManagedRatchet, CryptoError> {
+pub fn initialise_ratchet_to_send(
+    identity: &PrivateKey,
+    bundle: common::PreKeyBundle,
+) -> Result<ManagedRatchet, CryptoError> {
     let other_identity = PublicKey::from_bytes(&bundle.identity[..])?;
 
     let dh = identity.diffie_hellman(&other_identity);
