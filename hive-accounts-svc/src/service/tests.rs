@@ -35,8 +35,7 @@ mod service_tests {
 
         let public = client_private.id();
         let challenge = common::signed_challenge::Challenge {
-            identity: public.id_bytes(),
-            namespace: public.namespace(),
+            identity: Some(public.into_peer()),
             timestamp: 0u64,
         };
 
@@ -67,8 +66,7 @@ mod service_tests {
 
         let public = client_private.id();
         let challenge = common::signed_challenge::Challenge {
-            identity: public.id_bytes(),
-            namespace: public.namespace(),
+            identity: Some(public.into_peer()),
             timestamp: now,
         };
 
@@ -219,8 +217,7 @@ mod service_tests {
 
         let public = client_private.id();
         let challenge = common::signed_challenge::Challenge {
-            identity: public.id_bytes(),
-            namespace: public.namespace(),
+            identity: Some(public.into_peer()),
             timestamp: now,
         };
 

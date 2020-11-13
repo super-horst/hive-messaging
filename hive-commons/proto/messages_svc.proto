@@ -23,20 +23,37 @@ message MessageFilter {
   common.Peer dst = 2;
 }
 
-message MessageEnvelope {
-  Payload payload = 1;
-  common.EncryptionParameters params = 2;
+message EncryptionParameters {
+  bytes ratchet_key = 1;
+  uint64 chain_idx = 2;
+  uint64 prev_chain_count = 3;
+}
 
-  common.Peer dst = 3;
+message KeyExchange {
+  common.Peer origin = 1 ;
+  bytes ephemeral_key = 2;
+  bytes one_time_key = 3;
+}
+
+message PayloadHeader {
+  string identifier = 1;
 }
 
 message Payload {
-  bytes encrypted_content = 1;
-
-  common.KeyExchange key_ex = 2;
+  PayloadHeader header = 1;
+  bytes payload = 2;
 }
+
+message MessageEnvelope {
+  common.Peer dst = 1;
+
+  EncryptionParameters params = 2;
+  KeyExchange key_exchange = 3;
+
+  Payload payload = 10;
+}
+
 
 message MessageSendResult {
   //TODO
 }
-

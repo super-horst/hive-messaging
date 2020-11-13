@@ -125,9 +125,9 @@ impl Encodable for CertificateInfoBundle {
     }
 }
 
-impl Into<common::EncryptionParameters> for SendStep {
-    fn into(self) -> common::EncryptionParameters {
-        return common::EncryptionParameters {
+impl Into<messages::EncryptionParameters> for SendStep {
+    fn into(self) -> messages::EncryptionParameters {
+        return messages::EncryptionParameters {
             ratchet_key: self.ratchet_key.id_bytes(),
             chain_idx: self.counter,
             prev_chain_count: self.prev_ratchet_counter,
