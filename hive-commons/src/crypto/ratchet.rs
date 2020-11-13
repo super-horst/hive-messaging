@@ -429,6 +429,61 @@ pub mod ratchet_tests {
     }
 
     #[test]
+    fn test_ratchet_manager_chaotic_order_messages() {
+        let (alice, bob) = entangled_ratchets();
+
+        let mut alice_mgmt = ManagedRatchet {
+            ratchet: alice,
+            unused_keys: HashSet::new(),
+        };
+        let mut bob_mgmt = ManagedRatchet {
+            ratchet: bob,
+            unused_keys: HashSet::new(),
+        };
+
+        let a1 = alice_mgmt.send_step();
+        let b1 = bob_mgmt
+            .recv_step_for(a1.ratchet_key.copy(), a1.counter, a1.prev_ratchet_counter)
+            .unwrap();
+        assert_send_recv(a1, b1);
+
+        let a2 = alice_mgmt.send_step();
+        let a3 = alice_mgmt.send_step();
+        let a4 = alice_mgmt.send_step();
+        let a5 = alice_mgmt.send_step();
+        let a6 = alice_mgmt.send_step();
+
+        let b2 = bob_mgmt.send_step();
+        let b3 = bob_mgmt.send_step();
+        let b4 = bob_mgmt.send_step();
+        let b5 = bob_mgmt.send_step();
+        let b6 = bob_mgmt.send_step();
+
+        // do it random
+        let ab3 = receive(&mut bob_mgmt, &a3);
+        let ba5 = receive(&mut bob_mgmt, &b5);
+        let ba3 = receive(&mut bob_mgmt, &b3);
+        let ab2 = receive(&mut bob_mgmt, &a2);
+        let ab5 = receive(&mut bob_mgmt, &a5);
+        let ba4 = receive(&mut bob_mgmt, &b4);
+        let ba6 = receive(&mut bob_mgmt, &b6);
+        let ba2 = receive(&mut bob_mgmt, &b2);
+        let ab6 = receive(&mut bob_mgmt, &a6);
+        let ab4 = receive(&mut bob_mgmt, &a4);
+
+        assert_send_recv(a2, ab2);
+        assert_send_recv(a3, ab3);
+        assert_send_recv(a4, ab4);
+        assert_send_recv(a5, ab5);
+        assert_send_recv(a6, ab6);
+        assert_send_recv(b2, ba2);
+        assert_send_recv(b3, ba3);
+        assert_send_recv(b4, ba4);
+        assert_send_recv(b5, ba5);
+        assert_send_recv(b6, ba6);
+    }
+
+    #[test]
     fn test_ratchet_manager_linear_operation() {
         let (alice, bob) = entangled_ratchets();
 
@@ -513,5 +568,10 @@ pub mod ratchet_tests {
         assert_eq!(chain1.update(&dummy_info), chain2.update(&dummy_info));
         assert_eq!(chain1.update(&dummy_info), chain2.update(&dummy_info));
         assert_eq!(chain1.update(&dummy_info), chain2.update(&dummy_info));
+    }
+
+    fn receive(ratchet: &mut ManagedRatchet, step: &SendStep) -> RecvStep {
+        ratchet.recv_step_for(step.ratchet_key.copy(), step.counter, step.prev_ratchet_counter)
+            .unwrap()
     }
 }
