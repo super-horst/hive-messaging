@@ -50,9 +50,12 @@ message MessageEnvelope {
   EncryptionParameters params = 2;
   KeyExchange key_exchange = 3;
 
-  Payload payload = 10;
+  bytes encrypted_payload = 10;
 }
 
+message MessagePayload {
+  string message = 1;
+}
 
 message MessageSendResult {
   //TODO

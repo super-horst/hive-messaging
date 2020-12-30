@@ -8,8 +8,7 @@ message Peer {
 }
 
 message PreKeyBundle {
-  bytes identity = 1;
-  string namespace = 2;
+  Peer identity = 1;
 
   bytes pre_key = 5;
   bytes pre_key_signature = 6;

@@ -13,6 +13,7 @@ pub use errors::*;
 
 #[cfg(test)]
 use mockall::automock;
+
 #[cfg(test)]
 mod tests;
 
@@ -183,10 +184,10 @@ impl AccountsRepository for DatabaseRepository {
                 })?;
 
             key.delete(&self.db)
-                .await
-                .map_err(|e| RepositoryError::Database {
-                    message: format!("DB request failed: {:?}", e),
-                })?;
+               .await
+               .map_err(|e| RepositoryError::Database {
+                   message: format!("DB request failed: {:?}", e),
+               })?;
 
             vec![decoded]
         } else {
@@ -205,9 +206,13 @@ impl AccountsRepository for DatabaseRepository {
                 cause: e,
             })?;
 
-        Ok(common::PreKeyBundle {
+        let peer_dto = common::Peer {
             identity: peer.id_bytes().clone(),
             namespace: "namespace".to_string(),
+        };
+
+        Ok(common::PreKeyBundle {
+            identity: Some(peer_dto),
             pre_key: decoded_pre_key,
             pre_key_signature: decoded_pre_key_signature,
             one_time_pre_keys: bundled_otk,
@@ -259,10 +264,10 @@ async fn connect_db(cfg: &DbConfig) -> Result<DB, RepositoryError> {
     let migrations = entities::collect_migrations()?;
 
     db.migrate_tables(&migrations[..])
-        .await
-        .map_err(|e| RepositoryError::Database {
-            message: format!("{:?}", e),
-        })?;
+      .await
+      .map_err(|e| RepositoryError::Database {
+          message: format!("{:?}", e),
+      })?;
 
     Ok(db)
 }

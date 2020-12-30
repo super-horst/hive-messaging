@@ -178,8 +178,14 @@ impl Accounts for AccountService {
     ) -> Result<tonic::Response<UpdateKeyResult>, tonic::Status> {
         let incoming_bundle = request.into_inner();
 
-        let id = crypto::PublicKey::from_bytes(&incoming_bundle.identity[..])
-            .map_err(|e| tonic::Status::invalid_argument("malformed identity"))?;
+        let id;
+
+        if let Some(peer) = &incoming_bundle.identity {
+            id = crypto::PublicKey::from_bytes(&peer.identity[..])
+                .map_err(|e| tonic::Status::invalid_argument("malformed identity"))?;
+        } else {
+            return Err(tonic::Status::invalid_argument("no identity given"));
+        }
 
         id.verify(
             &incoming_bundle.pre_key[..],

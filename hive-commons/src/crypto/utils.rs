@@ -72,8 +72,7 @@ pub fn create_pre_key_bundle(
         .collect();
 
     let pre_key_bundle = common::PreKeyBundle {
-        identity: identity.id().id_bytes(),
-        namespace: identity.id().namespace(),
+        identity: Some(identity.id().into_peer()),
         pre_key: pre_public_key.id_bytes(),
         pre_key_signature: signed_pre_key,
         one_time_pre_keys: publics,
@@ -91,7 +90,17 @@ pub fn initialise_ratchet_to_send(
     identity: &PrivateKey,
     bundle: common::PreKeyBundle,
 ) -> Result<ManagedRatchet, CryptoError> {
-    let other_identity = PublicKey::from_bytes(&bundle.identity[..])?;
+
+    let other_identity;
+    if let Some(id) = bundle.identity {
+
+        other_identity = PublicKey::from_bytes(&id.identity[..])?;
+    }else {
+        return Err(CryptoError::Message {
+            message: "found no identity in bundle".to_string(),
+        })
+    }
+
 
     let dh = identity.diffie_hellman(&other_identity);
     ManagedRatchet::initialise_to_send(&dh, &other_identity)

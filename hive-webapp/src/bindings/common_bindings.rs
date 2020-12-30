@@ -136,16 +136,10 @@ extern "C" {
     pub fn new() -> PreKeyBundle;
 
     #[wasm_bindgen(method)]
-    pub fn getIdentity_asU8(this: &PreKeyBundle) -> js_sys::Uint8Array;
+    pub fn getIdentity(this: &PreKeyBundle) -> Peer;
 
     #[wasm_bindgen(method)]
-    pub fn setIdentity(this: &PreKeyBundle, identity: js_sys::Uint8Array);
-
-    #[wasm_bindgen(method)]
-    pub fn getNamespace(this: &PreKeyBundle) -> String;
-
-    #[wasm_bindgen(method)]
-    pub fn setNamespace(this: &PreKeyBundle, namespace: String);
+    pub fn setIdentity(this: &PreKeyBundle, identity: Peer);
 
     #[wasm_bindgen(method)]
     pub fn getPreKey_asU8(this: &PreKeyBundle) -> js_sys::Uint8Array;
@@ -170,7 +164,9 @@ impl From<common::PreKeyBundle> for PreKeyBundle {
     fn from(key_bundle: common::PreKeyBundle) -> Self {
         let mut key_bundle = key_bundle;
 
-        let identity = js_sys::Uint8Array::from(&key_bundle.identity[..]);
+        // TODO error handling
+        let peer = key_bundle.identity.unwrap();
+
         let pre_key = js_sys::Uint8Array::from(&key_bundle.pre_key[..]);
         let pre_key_signature = js_sys::Uint8Array::from(&key_bundle.pre_key_signature[..]);
 
@@ -181,8 +177,7 @@ impl From<common::PreKeyBundle> for PreKeyBundle {
             .collect();
 
         let binding = Self::new();
-        binding.setIdentity(identity);
-        binding.setNamespace(key_bundle.namespace);
+        binding.setIdentity(peer.into());
         binding.setPreKey(pre_key);
         binding.setPreKeySignature(pre_key_signature);
         binding.setOneTimePreKeysList(one_time_pre_keys);
@@ -203,8 +198,7 @@ impl Into<common::PreKeyBundle> for PreKeyBundle {
             .collect();
 
         return common::PreKeyBundle {
-            identity: self.getIdentity_asU8().to_vec(),
-            namespace: self.getNamespace(),
+            identity: Some(self.getIdentity().into()),
             pre_key: self.getPreKey_asU8().to_vec(),
             pre_key_signature: self.getPreKeySignature_asU8().to_vec(),
             one_time_pre_keys: keys.iter().map(js_sys::Uint8Array::to_vec).collect(),
