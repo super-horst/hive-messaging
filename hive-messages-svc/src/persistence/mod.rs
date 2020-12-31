@@ -91,7 +91,9 @@ impl MessagesRepository for DatabaseRepository {
         .map_err(|error| RepositoryError::Database {
             message: format!("Failed to retrieve peer {:?}", error),
         })?
-        .ok_or_else(|| RepositoryError::NotFound { message: "Peer not found".to_string() })?;
+        .ok_or_else(|| RepositoryError::NotFound {
+            message: "Peer not found".to_string(),
+        })?;
 
         let message_entities: Vec<entities::Message> = entities::Message::find(
             &self.db,
@@ -171,13 +173,17 @@ async fn connect_db(cfg: &DbConfig) -> Result<DB, RepositoryError> {
 
     let db = DB::connect(db_string.as_str(), 50, None)
         .await
-        .map_err(|e| RepositoryError::Database { message: format!("{:?}", e) })?;
+        .map_err(|e| RepositoryError::Database {
+            message: format!("{:?}", e),
+        })?;
 
     let migrations = entities::collect_migrations()?;
 
     db.migrate_tables(&migrations[..])
         .await
-        .map_err(|e| RepositoryError::Database { message: format!("{:?}", e) })?;
+        .map_err(|e| RepositoryError::Database {
+            message: format!("{:?}", e),
+        })?;
 
     Ok(db)
 }

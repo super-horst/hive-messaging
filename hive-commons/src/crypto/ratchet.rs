@@ -571,7 +571,12 @@ pub mod ratchet_tests {
     }
 
     fn receive(ratchet: &mut ManagedRatchet, step: &SendStep) -> RecvStep {
-        ratchet.recv_step_for(step.ratchet_key.copy(), step.counter, step.prev_ratchet_counter)
+        ratchet
+            .recv_step_for(
+                step.ratchet_key.copy(),
+                step.counter,
+                step.prev_ratchet_counter,
+            )
             .unwrap()
     }
 }

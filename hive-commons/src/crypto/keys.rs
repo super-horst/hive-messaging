@@ -136,7 +136,7 @@ impl PublicKey {
 impl FromBytes for PublicKey {
     /// parse an identity from raw bytes
     fn from_bytes(bytes: &[u8]) -> Result<PublicKey, CryptoError> {
-        if bytes.len() < COMBINED_PUBLIC_KEY_SIZE {
+        if bytes.len() != COMBINED_PUBLIC_KEY_SIZE {
             return Err(CryptoError::Message {
                 message: "Invalid public key format".to_string(),
             });

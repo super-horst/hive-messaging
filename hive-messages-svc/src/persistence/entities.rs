@@ -4,10 +4,12 @@ use oxidizer::*;
 use crate::persistence::RepositoryError;
 
 pub(crate) fn collect_migrations() -> Result<Vec<migration::Migration>, RepositoryError> {
-    let peer_migration = Peer::create_migration()
-        .map_err(|e| RepositoryError::Database { message: format!("{:?}", e) })?;
-    let message_migration = Message::create_migration()
-        .map_err(|e| RepositoryError::Database { message: format!("{:?}", e) })?;
+    let peer_migration = Peer::create_migration().map_err(|e| RepositoryError::Database {
+        message: format!("{:?}", e),
+    })?;
+    let message_migration = Message::create_migration().map_err(|e| RepositoryError::Database {
+        message: format!("{:?}", e),
+    })?;
 
     Ok(vec![peer_migration, message_migration])
 }
@@ -55,6 +57,10 @@ pub struct Peer {
 
 impl Default for Peer {
     fn default() -> Self {
-        Peer { id: i32::default(), identity: String::default(), namespace: String::default() }
+        Peer {
+            id: i32::default(),
+            identity: String::default(),
+            namespace: String::default(),
+        }
     }
 }

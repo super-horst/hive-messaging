@@ -184,10 +184,10 @@ impl AccountsRepository for DatabaseRepository {
                 })?;
 
             key.delete(&self.db)
-               .await
-               .map_err(|e| RepositoryError::Database {
-                   message: format!("DB request failed: {:?}", e),
-               })?;
+                .await
+                .map_err(|e| RepositoryError::Database {
+                    message: format!("DB request failed: {:?}", e),
+                })?;
 
             vec![decoded]
         } else {
@@ -264,10 +264,10 @@ async fn connect_db(cfg: &DbConfig) -> Result<DB, RepositoryError> {
     let migrations = entities::collect_migrations()?;
 
     db.migrate_tables(&migrations[..])
-      .await
-      .map_err(|e| RepositoryError::Database {
-          message: format!("{:?}", e),
-      })?;
+        .await
+        .map_err(|e| RepositoryError::Database {
+            message: format!("{:?}", e),
+        })?;
 
     Ok(db)
 }

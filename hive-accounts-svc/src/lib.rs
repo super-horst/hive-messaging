@@ -31,8 +31,7 @@ pub async fn run_service() {
     info!("Server listening on {}", addr);
 
     let my_key = hive_commons::crypto::load_private_key(&cfg.key).await;
-    let cert =
-        hive_commons::crypto::load_certificate(&my_key, &cfg.certificate).await;
+    let cert = hive_commons::crypto::load_certificate(&my_key, &cfg.certificate).await;
     let my_certificate = Arc::new(cert);
 
     let db_repo = persistence::DatabaseRepository::connect(&cfg.db_config)

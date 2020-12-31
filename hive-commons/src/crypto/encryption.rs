@@ -1,7 +1,7 @@
 use chacha20poly1305;
 
-use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 use chacha20poly1305::aead::{Aead, NewAead};
+use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 
 fn encrypt(key: &[u8], payload: &[u8]) -> Vec<u8> {
     let key = Key::from_slice(key);

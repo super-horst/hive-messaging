@@ -53,8 +53,9 @@ impl Messages for MessageService {
             _ => Err(tonic::Status::failed_precondition("unknown state")),
         }?;
 
-        let dst_peer =
-            filter.dst.ok_or_else(|| tonic::Status::failed_precondition("missing peer"))?;
+        let dst_peer = filter
+            .dst
+            .ok_or_else(|| tonic::Status::failed_precondition("missing peer"))?;
 
         let mut messages = self
             .repository
@@ -77,17 +78,22 @@ impl Messages for MessageService {
         request: Request<MessageEnvelope>,
     ) -> Result<Response<MessageSendResult>, Status> {
         let envelope = request.into_inner();
-        let x: Vec<u8> = envelope.encode().map_err(|e| tonic::Status::internal("internal error"))?;
+        let x: Vec<u8> = envelope
+            .encode()
+            .map_err(|e| tonic::Status::internal("internal error"))?;
 
-        let dst = envelope.dst.ok_or_else(|| tonic::Status::failed_precondition("no destination found"))?;
+        let dst = envelope
+            .dst
+            .ok_or_else(|| tonic::Status::failed_precondition("no destination found"))?;
 
-        self.repository.save_message(dst, x)
-            .await.map_err(|e| tonic::Status::internal("failed to save message"))?;
+        self.repository
+            .save_message(dst, x)
+            .await
+            .map_err(|e| tonic::Status::internal("failed to save message"))?;
 
         Ok(Response::new(MessageSendResult {}))
     }
 }
-
 
 /*fn prepare_identity(name: &str) {
     let my_key = PrivateKey::generate().unwrap();

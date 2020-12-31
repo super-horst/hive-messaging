@@ -29,11 +29,17 @@ pub async fn run_service() {
     let addr = format!("0.0.0.0:{}", cfg.port).parse().unwrap();
     info!("Server listening on {}", addr);
 
-    let db_repo = persistence::DatabaseRepository::connect(&cfg.db_config).await.unwrap();
+    let db_repo = persistence::DatabaseRepository::connect(&cfg.db_config)
+        .await
+        .unwrap();
 
     let inner = service::MessageService::new(Box::new(db_repo));
 
     let service = service::MessagesServer::new(inner);
 
-    Server::builder().add_service(service).serve(addr).await.unwrap();
+    Server::builder()
+        .add_service(service)
+        .serve(addr)
+        .await
+        .unwrap();
 }

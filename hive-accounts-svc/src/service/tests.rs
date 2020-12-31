@@ -104,8 +104,8 @@ mod service_tests {
         let svc = AccountService::new(private, Arc::new(cert), Box::new(mock));
 
         svc.create_update_certificate(public_key, &account)
-           .await
-           .unwrap();
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -221,7 +221,7 @@ mod service_tests {
             timestamp: now,
         };
 
-        let buf: Vec<u8> =challenge.encode().unwrap();
+        let buf: Vec<u8> = challenge.encode().unwrap();
 
         let signature = client_private.sign(&buf).unwrap();
 

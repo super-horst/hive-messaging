@@ -90,17 +90,14 @@ pub fn initialise_ratchet_to_send(
     identity: &PrivateKey,
     bundle: common::PreKeyBundle,
 ) -> Result<ManagedRatchet, CryptoError> {
-
     let other_identity;
     if let Some(id) = bundle.identity {
-
         other_identity = PublicKey::from_bytes(&id.identity[..])?;
-    }else {
+    } else {
         return Err(CryptoError::Message {
             message: "found no identity in bundle".to_string(),
-        })
+        });
     }
-
 
     let dh = identity.diffie_hellman(&other_identity);
     ManagedRatchet::initialise_to_send(&dh, &other_identity)
