@@ -4,27 +4,36 @@ use yew::prelude::*;
 use yew::{html, Component, ComponentLink, Html, ShouldRender};
 
 use crate::bindings;
+use crate::identity::LocalIdentity;
 use crate::storage;
+use crate::storage::IdentityModel;
 
 mod contacts;
 
 pub enum MessagingViewMessage {
-    SelectContact(Arc<storage::Contact>),
+    SelectContact(Arc<storage::ContactModel>),
     Nope,
 }
 
 pub struct MessagingView {
     link: ComponentLink<Self>,
-    selected_contact: Option<Arc<storage::Contact>>,
+    identity: LocalIdentity,
+    selected_contact: Option<Arc<storage::ContactModel>>,
+}
+
+#[derive(Clone, Properties)]
+pub struct MessagingProperties {
+    pub identity: LocalIdentity,
 }
 
 impl Component for MessagingView {
     type Message = MessagingViewMessage;
-    type Properties = ();
+    type Properties = MessagingProperties;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
         MessagingView {
             link,
+            identity: props.identity,
             selected_contact: None,
         }
     }
@@ -51,12 +60,13 @@ impl Component for MessagingView {
         html! {
         <div class="view_layout">
             <contacts::ContactList
-                on_select=self.link.callback(move |c| MessagingViewMessage::SelectContact(c)) />
+                on_select=self.link.callback(move |c| MessagingViewMessage::SelectContact(c))
+                identity=self.identity.clone() />
             <div class="box msg_view_layout">
                 <div class="msg_header">
                     <div class="center">
                         {match &self.selected_contact {
-                            Some(c) => c.key.clone(),
+                            Some(c) => c.key.id_string(),
                             None => "".to_string(),
                          }}
                     </div>

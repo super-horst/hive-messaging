@@ -2,8 +2,7 @@ use js_sys;
 use wasm_bindgen::prelude::*;
 
 use super::*;
-use hive_commons::model::{messages, common};
-
+use hive_commons::model::{common, messages};
 
 #[wasm_bindgen(module = "/js/generated/messages_svc_pb.js")]
 extern "C" {
@@ -87,40 +86,6 @@ impl Into<messages::KeyExchange> for KeyExchange {
 
 #[wasm_bindgen(module = "/js/generated/messages_svc_pb.js")]
 extern "C" {
-    pub type PayloadHeader;
-
-    #[wasm_bindgen(constructor)]
-    pub fn new() -> PayloadHeader;
-
-    #[wasm_bindgen(method)]
-    pub fn getIdentifier(this: &PayloadHeader) -> String;
-
-    #[wasm_bindgen(method)]
-    pub fn setIdentifier(this: &PayloadHeader, identifier: String);
-}
-
-#[wasm_bindgen(module = "/js/generated/messages_svc_pb.js")]
-extern "C" {
-    pub type Payload;
-
-    #[wasm_bindgen(constructor)]
-    pub fn new() -> Payload;
-
-    #[wasm_bindgen(method)]
-    pub fn getPayload(this: &Payload) -> js_sys::Uint8Array;
-
-    #[wasm_bindgen(method)]
-    pub fn setPayload(this: &Payload, content: js_sys::Uint8Array);
-
-    #[wasm_bindgen(method)]
-    pub fn getPayloadHeader(this: &Payload) -> PayloadHeader;
-
-    #[wasm_bindgen(method)]
-    pub fn setPayloadHeader(this: &Payload, content: PayloadHeader);
-}
-
-#[wasm_bindgen(module = "/js/generated/messages_svc_pb.js")]
-extern "C" {
     pub type MessageEnvelope;
 
     #[wasm_bindgen(constructor)]
@@ -145,10 +110,10 @@ extern "C" {
     pub fn setKeyExchange(this: &MessageEnvelope, params: KeyExchange);
 
     #[wasm_bindgen(method)]
-    pub fn getPayload(this: &MessageEnvelope) -> Payload;
+    pub fn getEncryptedPayload_asU8(this: &MessageEnvelope) -> js_sys::Uint8Array;
 
     #[wasm_bindgen(method)]
-    pub fn setPayload(this: &MessageEnvelope, payload: Payload);
+    pub fn setEncryptedPayload(this: &MessageEnvelope, payload: js_sys::Uint8Array);
 }
 
 #[wasm_bindgen(module = "/js/generated/messages_svc_pb.js")]

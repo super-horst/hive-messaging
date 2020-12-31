@@ -14,22 +14,26 @@ use wasm_bindgen_futures::futures_0_3::spawn_local;
 use wasm_bindgen_futures::futures_0_3::JsFuture;
 
 use hive_commons::crypto;
+use hive_commons::crypto::{FromBytes, ManagedRatchet};
 use hive_commons::model;
 
-use crate::transport;
-use crate::storage;
 use crate::bindings::*;
+use crate::storage;
+use crate::transport;
+use crate::identity::LocalIdentity;
 
 pub enum ContactListMsg {
     Update(String),
     Add,
-    Select(Arc<storage::Contact>),
+    Select(Arc<storage::ContactModel>),
+    ContactUpdate(Arc<storage::ContactModel>),
     Nope,
 }
 
-#[derive(PartialEq, Clone, Properties)]
+#[derive(Clone, Properties)]
 pub struct ListProps {
-    pub on_select: Callback<Arc<storage::Contact>>,
+    pub on_select: Callback<Arc<storage::ContactModel>>,
+    pub identity: LocalIdentity,
 }
 
 pub struct ContactList {
@@ -37,7 +41,7 @@ pub struct ContactList {
     props: ListProps,
     value: String,
     storage: storage::StorageController,
-    stored_contacts: Vec<Arc<storage::Contact>>,
+    stored_contacts: Vec<Arc<storage::ContactModel>>,
 }
 
 impl Component for ContactList {
@@ -70,9 +74,13 @@ impl Component for ContactList {
                 }
 
                 info!("adding account {}", &val);
-                let contact = Arc::new(storage::Contact {
+
+                let bytes = hex::decode(&val).unwrap();
+                let public = crypto::PublicKey::from_bytes(&bytes[..]).unwrap();
+
+                let contact = Arc::new(storage::ContactModel {
                     id: uuid::Uuid::new_v4(),
-                    key: val,
+                    key: public,
                     ratchet: None,
                 });
 
@@ -81,7 +89,7 @@ impl Component for ContactList {
                     .stored_contacts
                     .iter()
                     .map(Arc::as_ref)
-                    .map(storage::Contact::clone)
+                    .map(storage::ContactModel::clone)
                     .collect();
 
                 self.storage.set_contacts(&contact_copy);
@@ -93,17 +101,13 @@ impl Component for ContactList {
                 self.props.on_select.emit(key);
                 true
             }
+            ContactListMsg::ContactUpdate(contact) => true,
             _ => true,
         };
     }
 
     fn change(&mut self, props: Self::Properties) -> ShouldRender {
-        if self.props != props {
-            self.props = props;
-            true
-        } else {
-            false
-        }
+        false
     }
 
     fn view(&self) -> Html {
@@ -123,6 +127,8 @@ impl Component for ContactList {
                 html! {
                 <Contact
                 on_select = self.link.callback(move | c | ContactListMsg::Select(c))
+                on_update = self.link.callback(move | c | ContactListMsg::ContactUpdate(c))
+                identity = self.props.identity.clone()
                 stored = stored />
                 }
             } )}
@@ -132,16 +138,18 @@ impl Component for ContactList {
 }
 
 pub enum ContactMsg {
-    IncomingPreKey(String),
+    IncomingPreKey(model::common::PreKeyBundle),
     // TODO
     Select,
     Nope,
 }
 
-#[derive(PartialEq, Clone, Properties)]
+#[derive(Clone, Properties)]
 pub struct ContactProps {
-    pub on_select: Callback<Arc<storage::Contact>>,
-    pub stored: Arc<storage::Contact>,
+    pub on_select: Callback<Arc<storage::ContactModel>>,
+    pub on_update: Callback<Arc<storage::ContactModel>>,
+    pub stored: Arc<storage::ContactModel>,
+    pub identity: LocalIdentity,
 }
 
 pub struct Contact {
@@ -155,8 +163,12 @@ impl Component for Contact {
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
         if props.stored.ratchet.is_none() {
-
-            // TODO get pre keys
+            let contact_link = link.clone();
+            let other_key = props.stored.key.clone();
+            spawn_local(async move {
+                let bundle = retrieve_pre_key_bundle(&other_key).await;
+                contact_link.send_message(ContactMsg::IncomingPreKey(bundle));
+            });
         }
         Contact { link, props }
     }
@@ -167,18 +179,24 @@ impl Component for Contact {
                 self.props.on_select.emit(self.props.stored.clone());
                 true
             }
-            ContactMsg::IncomingPreKey(pre_key) => false,
+            ContactMsg::IncomingPreKey(pre_key) => {
+                // TODO error handling
+                let ratchet = self.props.identity.prepare_ratchet(pre_key);
+
+                let mut contact = self.props.stored.as_ref().clone();
+                contact.ratchet = Some(ratchet);
+
+                let arced = Arc::new(contact);
+                self.props.on_update.emit(arced);
+
+                true
+            }
             _ => true,
         };
     }
 
     fn change(&mut self, props: Self::Properties) -> ShouldRender {
-        if self.props != props {
-            self.props = props;
-            true
-        } else {
-            false
-        }
+        false
     }
 
     fn view(&self) -> Html {
@@ -190,15 +208,15 @@ impl Component for Contact {
     }
 }
 
-async fn retrieve_pre_key_bundle(other: &crypto::PublicKey)  {
+async fn retrieve_pre_key_bundle(other: &crypto::PublicKey) -> model::common::PreKeyBundle {
+    // TODO error handling
     info!("retrieve pre keys");
 
     let peer = common_bindings::Peer::new();
     peer.setIdentity(js_sys::Uint8Array::from(&other.id_bytes()[..]));
     peer.setNamespace(other.namespace());
 
-    let client =
-        accounts_svc_bindings::AccountsPromiseClient::new(transport::create_service_url());
+    let client = accounts_svc_bindings::AccountsPromiseClient::new(transport::create_service_url());
 
     let promise = client.getPreKeys(peer);
     let value = JsFuture::from(promise).await.unwrap();
@@ -206,7 +224,5 @@ async fn retrieve_pre_key_bundle(other: &crypto::PublicKey)  {
     let bound_bundle: common_bindings::PreKeyBundle =
         value.dyn_into().expect("response not working...");
 
-    let bundle: model::common::PreKeyBundle = bound_bundle.into();
-
-    // TODO
+    bound_bundle.into()
 }
