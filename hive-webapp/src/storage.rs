@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use hive_commons::crypto;
+use wasm_bindgen::__rt::std::sync::{Arc, RwLock};
 
 const IDENTITY_KEY: &'static str = "hive.webapp.identity";
 const CONTACTS_KEY: &'static str = "hive.webapp.contacts";
@@ -49,8 +50,9 @@ impl std::cmp::PartialEq<ContactModel> for ContactModel {
 
 impl Eq for ContactModel {}
 
+#[derive(Clone)]
 pub struct StorageController {
-    service: StorageService,
+    service: Arc<RwLock<StorageService>>,
 }
 
 impl StorageController {
@@ -58,28 +60,34 @@ impl StorageController {
         //TODO error handling
         let service = StorageService::new(Area::Local).expect("storage was disabled by the user");
 
-        StorageController { service }
+        StorageController {
+            service: Arc::new(RwLock::new(service)),
+        }
     }
 
     pub fn get_identity(&self) -> Option<IdentityModel> {
         //TODO error handling
-        let Json(identity) = self.service.restore(IDENTITY_KEY);
+        let storage = self.service.read().unwrap();
+        let Json(identity) = storage.restore(IDENTITY_KEY);
         identity.ok()
     }
 
-    pub fn set_identity(&mut self, identity: &IdentityModel) {
+    pub fn set_identity(&self, identity: &IdentityModel) {
         //TODO error handling
-        self.service.store(IDENTITY_KEY, Json(&identity));
+        let mut storage = self.service.write().unwrap();
+        storage.store(IDENTITY_KEY, Json(&identity));
     }
 
     pub fn get_contacts(&self) -> Vec<ContactModel> {
         //TODO error handling
-        let Json(contacts) = self.service.restore(CONTACTS_KEY);
+        let storage = self.service.read().unwrap();
+        let Json(contacts) = storage.restore(CONTACTS_KEY);
         contacts.unwrap_or_else(|_| vec![])
     }
 
-    pub fn set_contacts(&mut self, contacts: &Vec<ContactModel>) {
+    pub fn set_contacts(&self, contacts: &Vec<ContactModel>) {
         //TODO error handling
-        self.service.store(CONTACTS_KEY, Json(&contacts));
+        let mut storage = self.service.write().unwrap();
+        storage.store(CONTACTS_KEY, Json(&contacts));
     }
 }

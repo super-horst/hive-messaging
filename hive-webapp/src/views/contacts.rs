@@ -18,9 +18,11 @@ use hive_commons::crypto::{FromBytes, ManagedRatchet};
 use hive_commons::model;
 
 use crate::bindings::*;
-use crate::storage;
-use crate::transport;
 use crate::identity::LocalIdentity;
+use crate::storage;
+use crate::storage::StorageController;
+use crate::transport;
+use crate::transport::ConnectionManager;
 
 pub enum ContactListMsg {
     Update(String),
@@ -34,13 +36,14 @@ pub enum ContactListMsg {
 pub struct ListProps {
     pub on_select: Callback<Arc<storage::ContactModel>>,
     pub identity: LocalIdentity,
+    pub storage: StorageController,
+    pub connections: ConnectionManager,
 }
 
 pub struct ContactList {
     link: ComponentLink<Self>,
     props: ListProps,
     value: String,
-    storage: storage::StorageController,
     stored_contacts: Vec<Arc<storage::ContactModel>>,
 }
 
@@ -49,14 +52,17 @@ impl Component for ContactList {
     type Properties = ListProps;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let storage = storage::StorageController::new();
-        let stored_contacts = storage.get_contacts().drain(..).map(Arc::new).collect();
+        let stored_contacts = props
+            .storage
+            .get_contacts()
+            .drain(..)
+            .map(Arc::new)
+            .collect();
 
         ContactList {
             link,
             props,
             value: "".to_string(),
-            storage,
             stored_contacts,
         }
     }
@@ -92,7 +98,7 @@ impl Component for ContactList {
                     .map(storage::ContactModel::clone)
                     .collect();
 
-                self.storage.set_contacts(&contact_copy);
+                self.props.storage.set_contacts(&contact_copy);
 
                 self.value = "".to_string();
                 return true;
@@ -111,6 +117,7 @@ impl Component for ContactList {
     }
 
     fn view(&self) -> Html {
+        let id_string = self.props.identity.public_key().id_string();
         html! {
         <div class="box contacts">
             <div class="box contact_add_field">
@@ -129,9 +136,13 @@ impl Component for ContactList {
                 on_select = self.link.callback(move | c | ContactListMsg::Select(c))
                 on_update = self.link.callback(move | c | ContactListMsg::ContactUpdate(c))
                 identity = self.props.identity.clone()
+                connections = self.props.connections.clone()
                 stored = stored />
                 }
             } )}
+            <div style="width:100%;resize:none;overflow:always;">
+                <input style="width: 100%;" value=&id_string/>
+            </div>
         </div>
         }
     }
@@ -150,8 +161,10 @@ pub struct ContactProps {
     pub on_update: Callback<Arc<storage::ContactModel>>,
     pub stored: Arc<storage::ContactModel>,
     pub identity: LocalIdentity,
+    pub connections: ConnectionManager,
 }
 
+#[derive(Clone)]
 pub struct Contact {
     link: ComponentLink<Self>,
     props: ContactProps,
@@ -162,15 +175,22 @@ impl Component for Contact {
     type Properties = ContactProps;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        if props.stored.ratchet.is_none() {
-            let contact_link = link.clone();
-            let other_key = props.stored.key.clone();
+        let contact = Contact {
+            link: link.clone(),
+            props,
+        };
+
+        if contact.props.stored.ratchet.is_none() {
+            let other_key = contact.props.stored.key.clone();
+            let cloned = contact.clone();
+
             spawn_local(async move {
-                let bundle = retrieve_pre_key_bundle(&other_key).await;
-                contact_link.send_message(ContactMsg::IncomingPreKey(bundle));
+                let bundle = cloned.retrieve_pre_key_bundle(&other_key).await;
+                link.send_message(ContactMsg::IncomingPreKey(bundle));
             });
         }
-        Contact { link, props }
+
+        return contact;
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
@@ -208,21 +228,24 @@ impl Component for Contact {
     }
 }
 
-async fn retrieve_pre_key_bundle(other: &crypto::PublicKey) -> model::common::PreKeyBundle {
-    // TODO error handling
-    info!("retrieve pre keys");
+impl Contact {
+    async fn retrieve_pre_key_bundle(
+        &self,
+        other: &crypto::PublicKey,
+    ) -> model::common::PreKeyBundle {
+        // TODO error handling
+        info!("retrieve pre keys");
 
-    let peer = common_bindings::Peer::new();
-    peer.setIdentity(js_sys::Uint8Array::from(&other.id_bytes()[..]));
-    peer.setNamespace(other.namespace());
+        let peer = common_bindings::Peer::new();
+        peer.setIdentity(js_sys::Uint8Array::from(&other.id_bytes()[..]));
+        peer.setNamespace(other.namespace());
 
-    let client = accounts_svc_bindings::AccountsPromiseClient::new(transport::create_service_url());
+        let promise = self.props.connections.accounts().getPreKeys(peer);
+        let value = JsFuture::from(promise).await.unwrap();
 
-    let promise = client.getPreKeys(peer);
-    let value = JsFuture::from(promise).await.unwrap();
+        let bound_bundle: common_bindings::PreKeyBundle =
+            value.dyn_into().expect("response not working...");
 
-    let bound_bundle: common_bindings::PreKeyBundle =
-        value.dyn_into().expect("response not working...");
-
-    bound_bundle.into()
+        bound_bundle.into()
+    }
 }

@@ -1,7 +1,10 @@
-use std::cell::Cell;
-use std::sync::{Arc, Mutex};
+use wasm_bindgen::__rt::core::borrow::Borrow;
+use wasm_bindgen::__rt::std::sync::Arc;
 
-pub fn create_service_url() -> String {
+use crate::bindings::accounts_svc_bindings::AccountsPromiseClient;
+use crate::bindings::msg_svc_bindings::MessagesPromiseClient;
+
+fn create_service_url() -> String {
     let location = web_sys::window().unwrap().location();
 
     // TODO error handling
@@ -13,20 +16,30 @@ pub fn create_service_url() -> String {
     .to_string()
 }
 
-pub trait ConnectionProvider {
-    type Connection;
-
-    fn new_connection(&self) -> Result<Self::Connection, String>;
+#[derive(Clone)]
+pub struct ConnectionManager {
+    accounts: Arc<AccountsPromiseClient>,
+    messages: Arc<MessagesPromiseClient>,
 }
 
-pub struct ConnectionPool<T> {
-    provider: Box<dyn ConnectionProvider<Connection = T>>,
-    connection: Option<T>,
-}
+impl ConnectionManager {
+    pub fn new() -> ConnectionManager {
+        let service_url = create_service_url();
 
-impl<T> ConnectionPool<T>
-where
-    T: Send + Sync,
-{
-    pub fn do_stuff(&self) {}
+        let accounts = AccountsPromiseClient::new(service_url.clone());
+        let messages = MessagesPromiseClient::new(service_url.clone());
+
+        ConnectionManager {
+            accounts: Arc::new(accounts),
+            messages: Arc::new(messages),
+        }
+    }
+
+    pub fn accounts(&self) -> &AccountsPromiseClient {
+        self.accounts.borrow()
+    }
+
+    pub fn messages(&self) -> &MessagesPromiseClient {
+        self.messages.borrow()
+    }
 }

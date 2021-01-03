@@ -2,11 +2,17 @@ use yew::{html, Component, ComponentLink, Html, ShouldRender};
 
 use log::*;
 
+use wasm_bindgen::__rt::std::sync::{Arc, RwLock};
+
 use crate::identity::LocalIdentity;
+use crate::storage::StorageController;
+use crate::transport::ConnectionManager;
 use crate::views::*;
 
 pub struct AppContainer {
     link: ComponentLink<Self>,
+    connections: ConnectionManager,
+    storage: StorageController,
     identity: LocalIdentity,
 }
 
@@ -17,9 +23,14 @@ impl Component for AppContainer {
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
         info!("Initialising app");
 
+        let connections = ConnectionManager::new();
+        let storage = StorageController::new();
+
         AppContainer {
             link,
-            identity: LocalIdentity::initialise(),
+            connections: connections.clone(),
+            storage: storage.clone(),
+            identity: LocalIdentity::initialise(storage, connections),
         }
     }
 
@@ -34,10 +45,12 @@ impl Component for AppContainer {
     }
 
     fn view(&self) -> Html {
-        let id = self.identity.clone();
         html! {
         <div>
-            <MessagingView identity = id/>
+            <messaging::MessagingView
+             identity=self.identity.clone()
+             storage=self.storage.clone()
+             connections=self.connections.clone() />
         </div>
         }
     }
