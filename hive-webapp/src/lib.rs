@@ -1,6 +1,5 @@
 #![recursion_limit = "512"]
 use wasm_bindgen::prelude::*;
-use yew::prelude::*;
 
 mod bindings;
 mod identity;

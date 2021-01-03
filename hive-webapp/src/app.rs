@@ -2,8 +2,6 @@ use yew::{html, Component, ComponentLink, Html, ShouldRender};
 
 use log::*;
 
-use wasm_bindgen::__rt::std::sync::{Arc, RwLock};
-
 use crate::identity::LocalIdentity;
 use crate::storage::StorageController;
 use crate::transport::ConnectionManager;
@@ -21,7 +19,7 @@ impl Component for AppContainer {
     type Properties = ();
 
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
-        info!("Initialising app");
+        info!("Initialising app...");
 
         let connections = ConnectionManager::new();
         let storage = StorageController::new();

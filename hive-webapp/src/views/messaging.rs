@@ -1,25 +1,23 @@
 use yew::prelude::*;
-use yew::{html, Component, ComponentLink, Html, ShouldRender};
+use yew::{html, Component, ComponentLink, Html, Properties, ShouldRender};
 
 use wasm_bindgen::__rt::std::sync::Arc;
 
-use crate::bindings;
 use crate::identity::LocalIdentity;
-use crate::storage;
-use crate::storage::{IdentityModel, StorageController};
+use crate::storage::{ContactModel, StorageController};
 
 use crate::transport::ConnectionManager;
 use crate::views::contacts;
 
 pub enum MessagingViewMessage {
-    SelectContact(Arc<storage::ContactModel>),
+    SelectContact(Arc<ContactModel>),
     Nope,
 }
 
 pub struct MessagingView {
     link: ComponentLink<Self>,
     props: MessagingProperties,
-    selected_contact: Option<Arc<storage::ContactModel>>,
+    selected_contact: Option<Arc<ContactModel>>,
 }
 
 #[derive(Clone, Properties)]

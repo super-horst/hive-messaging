@@ -1,40 +1,35 @@
-use std::sync::Arc;
+use yew::prelude::*;
+use yew::{
+    html, Component, ComponentLink, Html, InputData, KeyboardEvent, Properties, ShouldRender,
+};
 
 use log::*;
 
-use yew::format::Json;
-use yew::prelude::*;
-use yew::{
-    html, ChildrenWithProps, Component, ComponentLink, Href, Html, InputData, KeyboardEvent,
-    Properties, ShouldRender,
-};
-
 use wasm_bindgen::JsCast;
+use wasm_bindgen::__rt::std::sync::Arc;
 use wasm_bindgen_futures::futures_0_3::spawn_local;
 use wasm_bindgen_futures::futures_0_3::JsFuture;
 
 use hive_commons::crypto;
-use hive_commons::crypto::{FromBytes, ManagedRatchet};
+use hive_commons::crypto::FromBytes;
 use hive_commons::model;
 
 use crate::bindings::*;
 use crate::identity::LocalIdentity;
-use crate::storage;
-use crate::storage::StorageController;
-use crate::transport;
+use crate::storage::{ContactModel, StorageController};
 use crate::transport::ConnectionManager;
 
 pub enum ContactListMsg {
     Update(String),
     Add,
-    Select(Arc<storage::ContactModel>),
-    ContactUpdate(Arc<storage::ContactModel>),
+    Select(Arc<ContactModel>),
+    ContactUpdate(Arc<ContactModel>),
     Nope,
 }
 
 #[derive(Clone, Properties)]
 pub struct ListProps {
-    pub on_select: Callback<Arc<storage::ContactModel>>,
+    pub on_select: Callback<Arc<ContactModel>>,
     pub identity: LocalIdentity,
     pub storage: StorageController,
     pub connections: ConnectionManager,
@@ -44,7 +39,7 @@ pub struct ContactList {
     link: ComponentLink<Self>,
     props: ListProps,
     value: String,
-    stored_contacts: Vec<Arc<storage::ContactModel>>,
+    stored_contacts: Vec<Arc<ContactModel>>,
 }
 
 impl Component for ContactList {
@@ -84,7 +79,7 @@ impl Component for ContactList {
                 let bytes = hex::decode(&val).unwrap();
                 let public = crypto::PublicKey::from_bytes(&bytes[..]).unwrap();
 
-                let contact = Arc::new(storage::ContactModel {
+                let contact = Arc::new(ContactModel {
                     id: uuid::Uuid::new_v4(),
                     key: public,
                     ratchet: None,
@@ -95,7 +90,7 @@ impl Component for ContactList {
                     .stored_contacts
                     .iter()
                     .map(Arc::as_ref)
-                    .map(storage::ContactModel::clone)
+                    .map(ContactModel::clone)
                     .collect();
 
                 self.props.storage.set_contacts(&contact_copy);
@@ -112,7 +107,7 @@ impl Component for ContactList {
         };
     }
 
-    fn change(&mut self, props: Self::Properties) -> ShouldRender {
+    fn change(&mut self, _: Self::Properties) -> ShouldRender {
         false
     }
 
@@ -157,9 +152,9 @@ pub enum ContactMsg {
 
 #[derive(Clone, Properties)]
 pub struct ContactProps {
-    pub on_select: Callback<Arc<storage::ContactModel>>,
-    pub on_update: Callback<Arc<storage::ContactModel>>,
-    pub stored: Arc<storage::ContactModel>,
+    pub on_select: Callback<Arc<ContactModel>>,
+    pub on_update: Callback<Arc<ContactModel>>,
+    pub stored: Arc<ContactModel>,
     pub identity: LocalIdentity,
     pub connections: ConnectionManager,
 }
@@ -215,7 +210,7 @@ impl Component for Contact {
         };
     }
 
-    fn change(&mut self, props: Self::Properties) -> ShouldRender {
+    fn change(&mut self, _: Self::Properties) -> ShouldRender {
         false
     }
 

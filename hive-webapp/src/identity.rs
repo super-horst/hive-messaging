@@ -11,7 +11,6 @@ use hive_commons::model::*;
 
 use crate::bindings::*;
 use crate::storage::*;
-use crate::transport;
 use crate::transport::ConnectionManager;
 
 #[derive(Clone)]
