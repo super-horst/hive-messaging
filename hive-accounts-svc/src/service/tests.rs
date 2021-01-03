@@ -18,7 +18,7 @@ mod service_tests {
     use crate::service::Accounts;
 
     #[test]
-    fn verfy_challenge_test() {
+    fn verify_challenge_test() {
         let (client_private, _) = generate_credentials();
 
         let signed = prepare_signed_challenge(&client_private);
@@ -30,7 +30,7 @@ mod service_tests {
     }
 
     #[test]
-    fn verfy_challenge_with_exceeded_timestamp_test() {
+    fn verify_challenge_with_exceeded_timestamp_test() {
         let (client_private, _) = generate_credentials();
 
         let public = client_private.id();
@@ -56,7 +56,7 @@ mod service_tests {
     }
 
     #[test]
-    fn verfy_challenge_with_invalid_signature_test() {
+    fn verify_challenge_with_invalid_signature_test() {
         let (client_private, _) = generate_credentials();
 
         let now = SystemTime::now()
