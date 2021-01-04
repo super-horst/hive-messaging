@@ -17,7 +17,7 @@ pub fn sign_challenge(identity: &PrivateKey) -> Result<common::SignedChallenge, 
         cause: e,
     })?;
 
-    let public_key = identity.id();
+    let public_key = identity.public_key();
 
     let peer_dto = common::Peer {
         identity: public_key.id_bytes(),
@@ -50,7 +50,7 @@ pub fn create_pre_key_bundle(
     identity: &PrivateKey,
 ) -> Result<(common::PreKeyBundle, PrivatePreKeys), CryptoError> {
     let pre_private_key = PrivateKey::generate()?;
-    let pre_public_key = pre_private_key.id().clone();
+    let pre_public_key = pre_private_key.public_key().clone();
 
     let signed_pre_key = identity.sign(&pre_public_key.id_bytes()[..]).unwrap();
 
@@ -67,12 +67,12 @@ pub fn create_pre_key_bundle(
 
     let publics = otps
         .iter()
-        .map(PrivateKey::id.clone())
+        .map(PrivateKey::public_key.clone())
         .map(PublicKey::id_bytes)
         .collect();
 
     let pre_key_bundle = common::PreKeyBundle {
-        identity: Some(identity.id().into_peer()),
+        identity: Some(identity.public_key().into_peer()),
         pre_key: pre_public_key.id_bytes(),
         pre_key_signature: signed_pre_key,
         one_time_pre_keys: publics,

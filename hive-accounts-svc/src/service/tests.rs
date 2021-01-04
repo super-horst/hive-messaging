@@ -25,7 +25,7 @@ mod service_tests {
 
         let recycled_id = AccountService::verify_challenge(signed).unwrap();
 
-        let public = client_private.id();
+        let public = client_private.public_key();
         assert_eq!(public, recycled_id);
     }
 
@@ -33,7 +33,7 @@ mod service_tests {
     fn verify_challenge_with_exceeded_timestamp_test() {
         let (client_private, _) = generate_credentials();
 
-        let public = client_private.id();
+        let public = client_private.public_key();
         let challenge = common::signed_challenge::Challenge {
             identity: Some(public.into_peer()),
             timestamp: 0u64,
@@ -64,7 +64,7 @@ mod service_tests {
             .map(|d| d.as_secs())
             .unwrap();
 
-        let public = client_private.id();
+        let public = client_private.public_key();
         let challenge = common::signed_challenge::Challenge {
             identity: Some(public.into_peer()),
             timestamp: now,
@@ -99,7 +99,7 @@ mod service_tests {
             .return_const(Ok(()));
 
         let (private, cert) = generate_credentials();
-        let public_key = private.id().copy();
+        let public_key = private.public_key().clone();
 
         let svc = AccountService::new(private, Arc::new(cert), Box::new(mock));
 
@@ -197,7 +197,7 @@ mod service_tests {
     fn generate_credentials() -> (crypto::PrivateKey, crypto::Certificate) {
         let private_key = crypto::PrivateKey::generate().unwrap();
 
-        let public_key = private_key.id().copy();
+        let public_key = private_key.public_key().clone();
 
         let cert = crypto::CertificateFactory::default()
             .certified(public_key)
@@ -215,7 +215,7 @@ mod service_tests {
             .map(|d| d.as_secs())
             .unwrap();
 
-        let public = client_private.id();
+        let public = client_private.public_key();
         let challenge = common::signed_challenge::Challenge {
             identity: Some(public.into_peer()),
             timestamp: now,

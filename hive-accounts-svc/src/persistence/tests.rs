@@ -51,7 +51,7 @@ mod entity_tests {
     async fn test_inserts(db: &DB) {
         let key = crypto::PrivateKey::generate().unwrap();
 
-        let mut account = entities::Account::for_public_key(key.id().id_string());
+        let mut account = entities::Account::for_public_key(key.public_key().id_string());
         let saved = account.save(db).await.unwrap();
         assert!(saved);
 

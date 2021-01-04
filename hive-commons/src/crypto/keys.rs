@@ -2,16 +2,20 @@ use std::fmt;
 use std::hash::Hasher;
 use std::marker::PhantomData;
 
-use ed25519_dalek;
-use sha2::Sha512;
-use x25519_dalek;
+use sha2::{Digest, Sha512};
+
+use curve25519_dalek::constants::ED25519_BASEPOINT_TABLE;
+use curve25519_dalek::edwards::{EdwardsPoint, CompressedEdwardsY};
+use curve25519_dalek::montgomery::MontgomeryPoint;
+use curve25519_dalek::scalar::Scalar;
 
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::crypto::error::*;
 
-const COMBINED_PUBLIC_KEY_SIZE: usize = 64;
+const KEY_LENGTH: usize = 32;
+const SIGNATURE_LENGTH: usize = 64;
 
 pub trait FromBytes: Sized {
     fn from_bytes(bytes: &[u8]) -> Result<Self, CryptoError>;
@@ -23,16 +27,16 @@ struct FromBytesVisitor<K> {
 
 impl<K> FromBytesVisitor<K> {
     fn new() -> FromBytesVisitor<K>
-    where
-        K: FromBytes,
+        where
+            K: FromBytes,
     {
         FromBytesVisitor { _a: PhantomData }
     }
 }
 
 impl<'de, K> Visitor<'de> for FromBytesVisitor<K>
-where
-    K: FromBytes,
+    where
+        K: FromBytes,
 {
     type Value = K;
 
@@ -41,16 +45,16 @@ where
     }
 
     fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
+        where
+            E: serde::de::Error,
     {
         K::from_bytes(v).map_err(|_ce| E::invalid_length(v.len(), &self))
     }
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: SeqAccess<'de>,
-        A::Error: serde::de::Error,
+        where
+            A: SeqAccess<'de>,
+            A::Error: serde::de::Error,
     {
         let mut buff = seq
             .size_hint()
@@ -68,18 +72,17 @@ where
 /// Dalek public key
 #[derive(Copy, Clone)]
 pub struct PublicKey {
-    ed_public: ed25519_dalek::PublicKey,
-    x_public: x25519_dalek::PublicKey,
+    x_public: MontgomeryPoint,
+    ed_public: EdwardsPoint,
 }
 
 impl PublicKey {
     fn new(
-        ed_public: ed25519_dalek::PublicKey,
-        x_public: x25519_dalek::PublicKey,
+        ed_public: EdwardsPoint,
     ) -> Result<PublicKey, CryptoError> {
         Ok(PublicKey {
+            x_public: ed_public.to_montgomery(),
             ed_public,
-            x_public,
         })
     }
 
@@ -90,13 +93,7 @@ impl PublicKey {
 
     /// encode public identity as bytes
     pub fn id_bytes(&self) -> Vec<u8> {
-        let ed_bytes = self.ed_public.as_bytes();
-        let x_bytes = self.x_public.as_bytes();
-
-        let mut buffer = ed_bytes.to_vec();
-        buffer.append(&mut x_bytes.to_vec());
-
-        buffer
+        self.ed_public.compress().as_bytes().to_vec()
     }
 
     /// this identity's namespace
@@ -107,66 +104,73 @@ impl PublicKey {
 
     ///Verify a raw byte signature
     pub fn verify(&self, data: &[u8], signature: &[u8]) -> Result<(), CryptoError> {
-        let signature = ed25519_dalek::Signature::from_bytes(signature).map_err(|e| {
-            CryptoError::Signature {
-                message: "Failed to convert signature".to_string(),
-                cause: e,
-            }
-        })?;
+        if signature.len() != SIGNATURE_LENGTH {
+            return Err(CryptoError::Message {
+                message: "Invalid signature format".to_string(),
+            });
+        }
 
-        self.ed_public
-            .verify::<Sha512>(&data[..], &signature)
-            .map_err(|e| CryptoError::Signature {
+        // decode signature
+        let mut lower: [u8; 32] = [0u8; 32];
+        let mut upper: [u8; 32] = [0u8; 32];
+
+        lower.copy_from_slice(&signature[..32]);
+        upper.copy_from_slice(&signature[32..]);
+
+        if upper[31] & 0b1110_0000_u8 != 0 {
+            return Err(CryptoError::Message {
+                message: "Invalid scalar format".to_string(),
+            });
+        }
+
+        let signature_r = CompressedEdwardsY(lower);
+        let signature_s = Scalar::from_bits(upper);
+
+        let mut hash = Sha512::new();
+        hash.update(signature_r.as_bytes());
+        hash.update(self.ed_public.compress().as_bytes());
+        hash.update(&data);
+        let h = Scalar::from_hash(hash);
+
+        let r = EdwardsPoint::vartime_double_scalar_mul_basepoint(
+            &h,
+            &(-self.ed_public),
+            &signature_s,
+        );
+
+        if r.compress() != signature_r {
+            return Err(CryptoError::Message {
                 message: "Failed to verify signature".to_string(),
-                cause: e,
-            })?;
+            });
+        }
 
         Ok(())
-    }
-
-    /// make a copy of myself
-    pub fn copy(&self) -> PublicKey {
-        let bytes = self.id_bytes();
-
-        // expect no errors ... just recycling
-        PublicKey::from_bytes(&bytes[..]).expect("Failed to copy DalekEd25519PublicId")
     }
 }
 
 impl FromBytes for PublicKey {
     /// parse an identity from raw bytes
     fn from_bytes(bytes: &[u8]) -> Result<PublicKey, CryptoError> {
-        if bytes.len() != COMBINED_PUBLIC_KEY_SIZE {
+        if bytes.len() != KEY_LENGTH {
             return Err(CryptoError::Message {
-                message: "Invalid public key format".to_string(),
+                message: "Invalid public key length".to_string(),
             });
         }
 
-        let mut ed_bytes = [0u8; 32];
-        let mut x_bytes = [0u8; 32];
-
-        ed_bytes.clone_from_slice(&bytes[..32]);
-        x_bytes.clone_from_slice(&bytes[32..]);
-
-        let ed_public =
-            ed25519_dalek::PublicKey::from_bytes(&ed_bytes[..]).map_err(|e| CryptoError::Key {
-                message: "ed25519 decode failed".to_string(),
-                cause: e,
+        let ed_public = CompressedEdwardsY::from_slice(bytes)
+            .decompress()
+            .ok_or_else(|| CryptoError::Message {
+                message: "Invalid public key format".to_string(),
             })?;
 
-        let x_public = x25519_dalek::PublicKey::from(x_bytes);
-
-        Ok(PublicKey {
-            ed_public,
-            x_public,
-        })
+        PublicKey::new(ed_public)
     }
 }
 
 impl Serialize for PublicKey {
     fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-    where
-        S: Serializer,
+        where
+            S: Serializer,
     {
         serializer.serialize_bytes(&self.id_bytes()[..])
     }
@@ -174,8 +178,8 @@ impl Serialize for PublicKey {
 
 impl<'de> Deserialize<'de> for PublicKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
-    where
-        D: Deserializer<'de>,
+        where
+            D: Deserializer<'de>,
     {
         deserializer.deserialize_bytes(FromBytesVisitor::<PublicKey>::new())
     }
@@ -183,7 +187,7 @@ impl<'de> Deserialize<'de> for PublicKey {
 
 impl fmt::Debug for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Ed25519 dalek public key: {}", self.id_string())
+        write!(f, "Curve25519 public key: {}", self.id_string())
     }
 }
 
@@ -208,80 +212,96 @@ impl std::hash::Hash for PublicKey {
 }
 
 /// Dalek private key
+#[derive(Copy, Clone, Hash)]
 pub struct PrivateKey {
-    ed_secret: ed25519_dalek::SecretKey,
-    x_secret: x25519_dalek::StaticSecret,
+    ed_private: Scalar,
     public: PublicKey,
 }
 
 impl PrivateKey {
     pub fn generate() -> Result<PrivateKey, CryptoError> {
-        // just use x25519 for key generation
-        use rand_core::OsRng;
-        let raw_privates = x25519_dalek::StaticSecret::new(&mut OsRng).to_bytes();
+        use rand_core::{OsRng, RngCore};
 
-        PrivateKey::from_bytes(&raw_privates[..])
+        let mut bytes = [0u8; 32];
+        OsRng::default().fill_bytes(&mut bytes);
+
+        bytes[0] &= 248;
+        bytes[31] &= 127;
+        bytes[31] |= 64;
+
+        PrivateKey::new(bytes)
     }
 
-    pub fn new(ed_private: ed25519_dalek::SecretKey) -> Result<PrivateKey, CryptoError> {
-        let x_private = x25519_dalek::StaticSecret::from(ed_private.to_bytes());
-
-        let ed_public = ed25519_dalek::PublicKey::from_secret::<Sha512>(&ed_private);
-        let x_public = x25519_dalek::PublicKey::from(&x_private);
-
-        let public = PublicKey::new(ed_public, x_public)?;
+    fn new(secret_bytes: [u8; 32]) -> Result<PrivateKey, CryptoError> {
+        let a = Scalar::from_bits(secret_bytes);
+        let public = PublicKey::new(&a * &ED25519_BASEPOINT_TABLE)?;
 
         Ok(PrivateKey {
-            ed_secret: ed_private,
-            x_secret: x_private,
+            ed_private: a,
             public,
         })
     }
 
     /// corresponding public key
-    pub fn id(&self) -> &PublicKey {
+    pub fn public_key(&self) -> &PublicKey {
         &self.public
     }
 
-    pub fn secret_bytes(&self) -> &[u8] {
-        self.ed_secret.as_bytes()
+    pub (crate) fn secret_bytes(&self) -> &[u8; 32] {
+        self.ed_private.as_bytes()
     }
 
-    pub fn diffie_hellman(&self, public: &PublicKey) -> [u8; 32] {
-        self.x_secret
-            .diffie_hellman(&public.x_public)
-            .as_bytes()
-            .clone()
+    pub fn diffie_hellman(&self, their_public: &PublicKey) -> [u8; 32] {
+        (self.ed_private * their_public.x_public).to_bytes()
     }
 
     /// Sign some data using the underlying private key.
     /// Since the digest used is SHA512, output will be 64 bytes
     pub fn sign(&self, data: &[u8]) -> Result<Vec<u8>, CryptoError> {
-        let signature = self
-            .ed_secret
-            .expand::<Sha512>()
-            .sign::<Sha512>(data, &self.public.ed_public);
+        use rand_core::{OsRng, RngCore};
 
-        Ok(Vec::from(&signature.to_bytes()[..]))
+        let mut random_bytes = [0u8; 64];
+        OsRng::default().fill_bytes(&mut random_bytes);
+
+        let mut hash1 = Sha512::new();
+        hash1.update(&self.ed_private.to_bytes());
+        hash1.update(&data);
+        hash1.update(&random_bytes[..]);
+
+        let r = Scalar::from_hash(hash1);
+        let cap_r = (&r * &ED25519_BASEPOINT_TABLE).compress();
+
+        let ed_public_point = self.public.ed_public.compress().to_bytes();
+
+        let mut hash = Sha512::new();
+        hash.update(cap_r.as_bytes());
+        hash.update(&ed_public_point);
+        hash.update(&data);
+
+        let h = Scalar::from_hash(hash);
+        let s = (h * self.ed_private) + r;
+
+        let mut result = [0u8; SIGNATURE_LENGTH];
+        result[..32].copy_from_slice(cap_r.as_bytes());
+        result[32..].copy_from_slice(s.as_bytes());
+
+        Ok(Vec::from(&result[..]))
     }
 }
 
 impl FromBytes for PrivateKey {
     fn from_bytes(private: &[u8]) -> Result<PrivateKey, CryptoError> {
-        let ed_private =
-            ed25519_dalek::SecretKey::from_bytes(private).map_err(|e| CryptoError::Key {
-                message: "Failed to process secret key bytes".to_string(),
-                cause: e,
-            })?;
+        let mut bytes = [0u8; 32];
+        bytes.copy_from_slice(private);
 
-        PrivateKey::new(ed_private)
+        PrivateKey::new(bytes)
     }
 }
 
 impl Serialize for PrivateKey {
     fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-    where
-        S: Serializer,
+        where
+            S: Serializer,
     {
         serializer.serialize_bytes(&self.secret_bytes()[..])
     }
@@ -289,8 +309,8 @@ impl Serialize for PrivateKey {
 
 impl<'de> Deserialize<'de> for PrivateKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
-    where
-        D: Deserializer<'de>,
+        where
+            D: Deserializer<'de>,
     {
         deserializer.deserialize_bytes(FromBytesVisitor::<PrivateKey>::new())
     }
@@ -298,19 +318,7 @@ impl<'de> Deserialize<'de> for PrivateKey {
 
 impl fmt::Debug for PrivateKey {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Ed25519 dalek private key: {}", self.public.id_string())
-    }
-}
-
-impl Clone for PrivateKey {
-    fn clone(&self) -> Self {
-        let ed_bytes = self.ed_secret.to_bytes();
-
-        PrivateKey {
-            ed_secret: ed25519_dalek::SecretKey::from_bytes(&ed_bytes[..]).unwrap(),
-            x_secret: self.x_secret.clone(),
-            public: self.public.copy(),
-        }
+        write!(f, "Curve25519 private key: {}", self.public.id_string())
     }
 }
 
@@ -364,7 +372,7 @@ mod key_tests {
 
         let signed = wrapped_privates.sign(data).unwrap();
 
-        wrapped_privates.id().verify(data, &signed).unwrap();
+        wrapped_privates.public_key().verify(data, &signed).unwrap();
     }
 
     #[test]
@@ -378,62 +386,31 @@ mod key_tests {
         let recycled_public = PublicKey::from_bytes(&buffer[..]).unwrap();
 
         assert_eq!(
-            original_public.ed_public.to_bytes(),
-            recycled_public.ed_public.to_bytes()
-        );
-        assert_eq!(
-            original_public.x_public.as_bytes(),
-            recycled_public.x_public.as_bytes()
+            original_public.id_bytes(),
+            recycled_public.id_bytes()
         );
     }
 
     #[test]
     fn test_private_key_encoding_decoding() {
-        let wrapped_privates = PrivateKey::generate().unwrap();
+        let original_privates = PrivateKey::generate().unwrap();
 
-        let original_public = wrapped_privates.public;
-
-        let buffer = original_public.id_bytes();
-
-        let recycled_public = PublicKey::from_bytes(&buffer[..]).unwrap();
+        let recycled_privates = PrivateKey::from_bytes(&original_privates.secret_bytes()[..]).unwrap();
 
         assert_eq!(
-            original_public.ed_public.to_bytes(),
-            recycled_public.ed_public.to_bytes()
-        );
-        assert_eq!(
-            original_public.x_public.as_bytes(),
-            recycled_public.x_public.as_bytes()
+            original_privates.secret_bytes(),
+            recycled_privates.secret_bytes()
         );
     }
 
     #[test]
     fn test_dalek_dh() {
-        use rand_core::OsRng;
-        use x25519_dalek;
-        let a_x_privates = x25519_dalek::StaticSecret::new(&mut OsRng);
-        let a_my_privates = PrivateKey::from_bytes(&a_x_privates.to_bytes()[..]).unwrap();
+        let a_privates = PrivateKey::generate().unwrap();
+        let b_privates = PrivateKey::generate().unwrap();
 
-        let b_x_privates = x25519_dalek::StaticSecret::new(&mut OsRng);
-        let b_my_privates = PrivateKey::from_bytes(&b_x_privates.to_bytes()[..]).unwrap();
-
-        let dh1 = a_my_privates.diffie_hellman(&b_my_privates.public);
-        let dh2 = b_my_privates.diffie_hellman(&a_my_privates.public);
-
-        let dh3 = a_x_privates
-            .diffie_hellman(&x25519_dalek::PublicKey::from(&b_x_privates))
-            .as_bytes()
-            .clone();
-        let dh4 = b_x_privates
-            .diffie_hellman(&x25519_dalek::PublicKey::from(&a_x_privates))
-            .as_bytes()
-            .clone();
+        let dh1 = a_privates.diffie_hellman(&b_privates.public);
+        let dh2 = b_privates.diffie_hellman(&a_privates.public);
 
         assert_eq!(dh1, dh2);
-        assert_eq!(dh1, dh3);
-        assert_eq!(dh1, dh4);
-        assert_eq!(dh2, dh3);
-        assert_eq!(dh2, dh4);
-        assert_eq!(dh3, dh4);
     }
 }

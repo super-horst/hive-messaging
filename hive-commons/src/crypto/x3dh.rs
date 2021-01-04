@@ -36,7 +36,7 @@ pub fn x3dh_agree_initial(
     let mut okm = [0u8; 32];
     h.expand(&[0u8; 0], &mut okm).unwrap();
 
-    return (ek_a.id().copy(), okm);
+    return (ek_a.public_key().clone(), okm);
 }
 
 pub fn x3dh_agree_respond(
@@ -81,8 +81,8 @@ mod x3dh_tests {
         let ik_b = PrivateKey::generate().unwrap();
         let pre_key = PrivateKey::generate().unwrap();
 
-        let (eph_pub, dh1) = x3dh_agree_initial(&ik_a, ik_b.id(), pre_key.id(), None);
-        let dh2 = x3dh_agree_respond(&ik_a.id(), &ik_b, &eph_pub, &pre_key, None);
+        let (eph_pub, dh1) = x3dh_agree_initial(&ik_a, ik_b.public_key(), pre_key.public_key(), None);
+        let dh2 = x3dh_agree_respond(&ik_a.public_key(), &ik_b, &eph_pub, &pre_key, None);
 
         assert_eq!(dh1, dh2);
     }
@@ -95,8 +95,8 @@ mod x3dh_tests {
         let opk = PrivateKey::generate().unwrap();
 
         let (eph_pub, dh1) =
-            x3dh_agree_initial(&ik_a, ik_b.id(), pre_key.id(), Some(opk.id().copy()));
-        let dh2 = x3dh_agree_respond(&ik_a.id(), &ik_b, &eph_pub, &pre_key, Some(opk));
+            x3dh_agree_initial(&ik_a, ik_b.public_key(), pre_key.public_key(), Some(opk.public_key().clone()));
+        let dh2 = x3dh_agree_respond(&ik_a.public_key(), &ik_b, &eph_pub, &pre_key, Some(opk));
 
         assert_eq!(dh1, dh2);
     }

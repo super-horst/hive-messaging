@@ -65,7 +65,7 @@ pub async fn load_certificate(server_id: &PrivateKey, path: &str) -> Certificate
 
         return cert;
     } else {
-        let server_public = server_id.id().copy();
+        let server_public = server_id.public_key().clone();
 
         let cert = CertificateFactory::default()
             .certified(server_public)

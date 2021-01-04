@@ -99,7 +99,7 @@ impl ManagedRatchet {
         // is it already saved?
         let step_dummy = RecvStep {
             counter,
-            ratchet_key: ratchet_key.copy(),
+            ratchet_key: ratchet_key.clone(),
             secret: [0u8; 32],
         };
         match self.unused_keys.take(&step_dummy) {
@@ -140,7 +140,7 @@ impl DoubleRatchet {
         other_public: &PublicKey,
     ) -> Result<DoubleRatchet, CryptoError> {
         let init_private = PrivateKey::generate()?;
-        let init_public = init_private.id().copy();
+        let init_public = init_private.public_key().clone();
 
         let root_chain = KdfChain(root_key.clone());
         let send_chain = CountingChain::new(init_private.diffie_hellman(other_public));
@@ -154,7 +154,7 @@ impl DoubleRatchet {
             root_chain,
             current_private: init_private,
             current_public: init_public,
-            current_other: other_public.copy(),
+            current_other: other_public.clone(),
         })
     }
 
@@ -167,7 +167,7 @@ impl DoubleRatchet {
         let recv_chain = CountingChain::new(my_private.diffie_hellman(&other_public));
 
         let init_private = PrivateKey::generate()?;
-        let init_public = init_private.id().copy();
+        let init_public = init_private.public_key().clone();
 
         let init_dh = init_private.diffie_hellman(&other_public);
         let send_chain = CountingChain::new(root_chain.update(&init_dh));
@@ -200,7 +200,7 @@ impl DoubleRatchet {
         self.prev_send_counter = self.send_chain.1;
         self.send_chain.reset(self.root_chain.update(&dh_new));
 
-        self.current_public = new_private.id().copy();
+        self.current_public = new_private.public_key().clone();
         self.current_private = new_private;
         self.current_other = other_public;
 
@@ -214,7 +214,7 @@ impl DoubleRatchet {
         SendStep {
             counter,
             prev_ratchet_counter: self.prev_send_counter,
-            ratchet_key: self.current_public.copy(),
+            ratchet_key: self.current_public.clone(),
             secret,
         }
     }
@@ -225,7 +225,7 @@ impl DoubleRatchet {
 
         RecvStep {
             counter,
-            ratchet_key: self.current_other.copy(),
+            ratchet_key: self.current_other.clone(),
             secret,
         }
     }
@@ -287,12 +287,12 @@ pub mod ratchet_tests {
         let a = PrivateKey::generate().unwrap();
         let b = PrivateKey::generate().unwrap();
 
-        let root = a.diffie_hellman(b.id());
+        let root = a.diffie_hellman(b.public_key());
 
         // alice starts the conversation & sends bob her current ratchet key
-        let alice = DoubleRatchet::initialise_to_send(&root, b.id()).unwrap();
+        let alice = DoubleRatchet::initialise_to_send(&root, b.public_key()).unwrap();
         let bob =
-            DoubleRatchet::initialise_received(&root, &b, alice.current_public.copy()).unwrap();
+            DoubleRatchet::initialise_received(&root, &b, alice.current_public.clone()).unwrap();
 
         (alice, bob)
     }
@@ -319,7 +319,7 @@ pub mod ratchet_tests {
         let a1 = alice_mgmt.send_step();
         let b1 = bob_mgmt
             .recv_step_for(
-                a1.ratchet_key.copy(),
+                a1.ratchet_key.clone(),
                 a1.counter,
                 alice_mgmt.ratchet.prev_send_counter,
             )
@@ -329,7 +329,7 @@ pub mod ratchet_tests {
         let b1 = bob_mgmt.send_step();
         let a1 = alice_mgmt
             .recv_step_for(
-                b1.ratchet_key.copy(),
+                b1.ratchet_key.clone(),
                 b1.counter,
                 bob_mgmt.ratchet.prev_send_counter,
             )
@@ -343,7 +343,7 @@ pub mod ratchet_tests {
         // "loose" a2 & a3
         let b4 = bob_mgmt
             .recv_step_for(
-                a4.ratchet_key.copy(),
+                a4.ratchet_key.clone(),
                 a4.counter,
                 alice_mgmt.ratchet.prev_send_counter,
             )
@@ -357,24 +357,24 @@ pub mod ratchet_tests {
 
         // "loose" b5 & b6
         let a7 = alice_mgmt
-            .recv_step_for(b7.ratchet_key.copy(), b7.counter, b7.prev_ratchet_counter)
+            .recv_step_for(b7.ratchet_key.clone(), b7.counter, b7.prev_ratchet_counter)
             .unwrap();
 
         assert_send_recv(b7, a7);
 
         // recover "lost" keys
         let b2 = bob_mgmt
-            .recv_step_for(a2.ratchet_key.copy(), a2.counter, a2.prev_ratchet_counter)
+            .recv_step_for(a2.ratchet_key.clone(), a2.counter, a2.prev_ratchet_counter)
             .unwrap();
         let b3 = bob_mgmt
-            .recv_step_for(a3.ratchet_key.copy(), a3.counter, a3.prev_ratchet_counter)
+            .recv_step_for(a3.ratchet_key.clone(), a3.counter, a3.prev_ratchet_counter)
             .unwrap();
 
         let a5 = alice_mgmt
-            .recv_step_for(b5.ratchet_key.copy(), b5.counter, b5.prev_ratchet_counter)
+            .recv_step_for(b5.ratchet_key.clone(), b5.counter, b5.prev_ratchet_counter)
             .unwrap();
         let a6 = alice_mgmt
-            .recv_step_for(b6.ratchet_key.copy(), b6.counter, b6.prev_ratchet_counter)
+            .recv_step_for(b6.ratchet_key.clone(), b6.counter, b6.prev_ratchet_counter)
             .unwrap();
 
         assert_send_recv(a2, b2);
@@ -402,7 +402,7 @@ pub mod ratchet_tests {
 
         let a1 = alice_mgmt.send_step();
         let b1 = bob_mgmt
-            .recv_step_for(a1.ratchet_key.copy(), a1.counter, a1.prev_ratchet_counter)
+            .recv_step_for(a1.ratchet_key.clone(), a1.counter, a1.prev_ratchet_counter)
             .unwrap();
         assert_send_recv(a1, b1);
 
@@ -412,16 +412,16 @@ pub mod ratchet_tests {
 
         // "loose" a2 & a3
         let b4 = bob_mgmt
-            .recv_step_for(a4.ratchet_key.copy(), a4.counter, a4.prev_ratchet_counter)
+            .recv_step_for(a4.ratchet_key.clone(), a4.counter, a4.prev_ratchet_counter)
             .unwrap();
 
         assert_send_recv(a4, b4);
 
         let b2 = bob_mgmt
-            .recv_step_for(a2.ratchet_key.copy(), a2.counter, a2.prev_ratchet_counter)
+            .recv_step_for(a2.ratchet_key.clone(), a2.counter, a2.prev_ratchet_counter)
             .unwrap();
         let b3 = bob_mgmt
-            .recv_step_for(a3.ratchet_key.copy(), a3.counter, a3.prev_ratchet_counter)
+            .recv_step_for(a3.ratchet_key.clone(), a3.counter, a3.prev_ratchet_counter)
             .unwrap();
 
         assert_send_recv(a2, b2);
@@ -443,7 +443,7 @@ pub mod ratchet_tests {
 
         let a1 = alice_mgmt.send_step();
         let b1 = bob_mgmt
-            .recv_step_for(a1.ratchet_key.copy(), a1.counter, a1.prev_ratchet_counter)
+            .recv_step_for(a1.ratchet_key.clone(), a1.counter, a1.prev_ratchet_counter)
             .unwrap();
         assert_send_recv(a1, b1);
 
@@ -498,14 +498,14 @@ pub mod ratchet_tests {
 
         let a1 = alice_mgmt.send_step();
         let b1 = bob_mgmt
-            .recv_step_for(a1.ratchet_key.copy(), a1.counter, a1.prev_ratchet_counter)
+            .recv_step_for(a1.ratchet_key.clone(), a1.counter, a1.prev_ratchet_counter)
             .unwrap();
 
         assert_send_recv(a1, b1);
 
         let b2 = bob_mgmt.send_step();
         let a2 = alice_mgmt
-            .recv_step_for(b2.ratchet_key.copy(), b2.counter, b2.prev_ratchet_counter)
+            .recv_step_for(b2.ratchet_key.clone(), b2.counter, b2.prev_ratchet_counter)
             .unwrap();
 
         assert_send_recv(b2, a2);
@@ -515,13 +515,13 @@ pub mod ratchet_tests {
         let a5 = alice_mgmt.send_step();
 
         let b3 = bob_mgmt
-            .recv_step_for(a3.ratchet_key.copy(), a3.counter, a3.prev_ratchet_counter)
+            .recv_step_for(a3.ratchet_key.clone(), a3.counter, a3.prev_ratchet_counter)
             .unwrap();
         let b4 = bob_mgmt
-            .recv_step_for(a4.ratchet_key.copy(), a4.counter, a4.prev_ratchet_counter)
+            .recv_step_for(a4.ratchet_key.clone(), a4.counter, a4.prev_ratchet_counter)
             .unwrap();
         let b5 = bob_mgmt
-            .recv_step_for(a5.ratchet_key.copy(), a5.counter, a5.prev_ratchet_counter)
+            .recv_step_for(a5.ratchet_key.clone(), a5.counter, a5.prev_ratchet_counter)
             .unwrap();
 
         assert_send_recv(a3, b3);
@@ -538,18 +538,18 @@ pub mod ratchet_tests {
         assert_send_recv(alice.send_step(), bob.recv_step());
 
         // bob answers with his new ratchet key, which alice needs to include before processing the step
-        alice.asymmetric_step(bob.current_public.copy()).unwrap();
+        alice.asymmetric_step(bob.current_public.clone()).unwrap();
         assert_send_recv(bob.send_step(), alice.recv_step());
         assert_send_recv(bob.send_step(), alice.recv_step());
         assert_send_recv(bob.send_step(), alice.recv_step());
 
-        bob.asymmetric_step(alice.current_public.copy()).unwrap();
+        bob.asymmetric_step(alice.current_public.clone()).unwrap();
         assert_send_recv(alice.send_step(), bob.recv_step());
 
-        alice.asymmetric_step(bob.current_public.copy()).unwrap();
+        alice.asymmetric_step(bob.current_public.clone()).unwrap();
 
-        alice.asymmetric_step(bob.current_public.copy()).unwrap();
-        bob.asymmetric_step(alice.current_public.copy()).unwrap();
+        alice.asymmetric_step(bob.current_public.clone()).unwrap();
+        bob.asymmetric_step(alice.current_public.clone()).unwrap();
         assert_send_recv(alice.send_step(), bob.recv_step());
     }
 
@@ -573,7 +573,7 @@ pub mod ratchet_tests {
     fn receive(ratchet: &mut ManagedRatchet, step: &SendStep) -> RecvStep {
         ratchet
             .recv_step_for(
-                step.ratchet_key.copy(),
+                step.ratchet_key.clone(),
                 step.counter,
                 step.prev_ratchet_counter,
             )

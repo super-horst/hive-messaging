@@ -28,12 +28,11 @@ serde = { version = "1.0", features = ["derive", "rc"] }
 # crypto
 rand = "0.6"
 rand_core = "0.5"
-x25519-dalek = "0.6"
-ed25519-dalek = "0.9.1"
+curve25519-dalek = "3.0.0"
 chacha20poly1305 = "0.5.1"
-hkdf = { version = "0.8", features= ["std"] }
-digest = "0.8.1"
-sha2 = "0.8.2"
+hkdf = { version = "0.10.0", features= ["std"] }
+digest = "0.9.0"
+sha2 = "0.9"
 
 js-sys =  { version = "0.3.45" , optional = true}
 

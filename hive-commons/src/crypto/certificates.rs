@@ -235,7 +235,7 @@ pub mod certificate_tests {
         let signer_key = PrivateKey::generate().unwrap();
 
         let signer_cert = CertificateFactory::default()
-            .certified(signer_key.id().copy())
+            .certified(signer_key.public_key().clone())
             .expiration(Duration::from_secs(1000))
             .self_sign(&signer_key)
             .map(Arc::new)
@@ -244,7 +244,7 @@ pub mod certificate_tests {
         let leaf_key = PrivateKey::generate().unwrap();
 
         let leaf_cert = CertificateFactory::default()
-            .certified(leaf_key.id().copy())
+            .certified(leaf_key.public_key().clone())
             .expiration(Duration::from_secs(1000))
             .sign(&signer_key, Some(&signer_cert))
             .unwrap();
@@ -257,7 +257,7 @@ pub mod certificate_tests {
         let signer_key = PrivateKey::generate().unwrap();
 
         let signer_cert = CertificateFactory::default()
-            .certified(signer_key.id().copy())
+            .certified(signer_key.public_key().clone())
             .expiration(Duration::from_secs(1000))
             .self_sign(&signer_key)
             .map(Arc::new)
@@ -266,7 +266,7 @@ pub mod certificate_tests {
         let leaf_key_1 = PrivateKey::generate().unwrap();
 
         let leaf_cert_1 = CertificateFactory::default()
-            .certified(leaf_key_1.id().copy())
+            .certified(leaf_key_1.public_key().clone())
             .expiration(Duration::from_secs(1000))
             .sign(&signer_key, Some(&signer_cert))
             .unwrap();
@@ -274,7 +274,7 @@ pub mod certificate_tests {
         let leaf_key_2 = PrivateKey::generate().unwrap();
 
         let leaf_cert_2 = CertificateFactory::default()
-            .certified(leaf_key_2.id().copy())
+            .certified(leaf_key_2.public_key().clone())
             .expiration(Duration::from_secs(1000))
             .sign(&signer_key, Some(&signer_cert))
             .unwrap();
@@ -287,7 +287,7 @@ pub mod certificate_tests {
         let private = PrivateKey::generate().unwrap();
 
         let cert = CertificateFactory::default()
-            .certified(private.id().copy())
+            .certified(private.public_key().clone())
             .expiration(Duration::from_secs(1000))
             .self_sign(&private)
             .unwrap();

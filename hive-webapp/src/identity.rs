@@ -79,7 +79,7 @@ impl LocalIdentity {
     /// provide my public key
     pub fn public_key(&self) -> PublicKey {
         let read_model = self.model.read().unwrap();
-        read_model.key.id().clone()
+        read_model.key.public_key().clone()
     }
 
     /// prepare a ratchet with this identity and another party's pre keys
