@@ -212,7 +212,7 @@ impl std::hash::Hash for PublicKey {
 }
 
 /// Dalek private key
-#[derive(Copy, Clone, Hash)]
+#[derive(Copy, Clone)]
 pub struct PrivateKey {
     ed_private: Scalar,
     public: PublicKey,
@@ -225,9 +225,9 @@ impl PrivateKey {
         let mut bytes = [0u8; 32];
         OsRng::default().fill_bytes(&mut bytes);
 
-        bytes[0] &= 248;
-        bytes[31] &= 127;
-        bytes[31] |= 64;
+        bytes[0] &= 0b1111_1000_u8;
+        bytes[31] &= 0b0111_1111_u8;
+        bytes[31] |= 0b0100_0000_u8;
 
         PrivateKey::new(bytes)
     }
@@ -292,7 +292,7 @@ impl PrivateKey {
 
 impl FromBytes for PrivateKey {
     fn from_bytes(private: &[u8]) -> Result<PrivateKey, CryptoError> {
-        let mut bytes = [0u8; 32];
+        let mut bytes = [0u8; KEY_LENGTH];
         bytes.copy_from_slice(private);
 
         PrivateKey::new(bytes)
@@ -336,6 +336,12 @@ impl<'a> std::cmp::PartialEq<PrivateKey> for &'a PrivateKey {
 }
 
 impl Eq for PrivateKey {}
+
+impl std::hash::Hash for PrivateKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.ed_private.hash(state);
+    }
+}
 
 #[cfg(test)]
 mod key_tests {
