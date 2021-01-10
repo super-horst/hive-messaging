@@ -256,7 +256,8 @@ impl PrivateKey {
     }
 
     /// Sign some data using the underlying private key.
-    /// Since the digest used is SHA512, output will be 64 bytes
+    /// Signature output will be 64 bytes
+    /// XEdDSA derived from https://signal.org/docs/specifications/xeddsa
     pub fn sign(&self, data: &[u8]) -> Result<Vec<u8>, CryptoError> {
         use rand_core::{OsRng, RngCore};
 
