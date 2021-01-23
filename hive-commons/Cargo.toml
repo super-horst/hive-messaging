@@ -23,7 +23,8 @@ dashmap = "3.11.4"
 # serialisation
 bytes = "0.5.4"
 prost = "0.6.1"
-serde = { version = "1.0", features = ["derive", "rc"] }
+# keep serde version fixed until update of oxidizer&refinery
+serde = { version = "=1.0.118", features = ["derive", "rc"] }
 
 # crypto
 rand = "0.6"

@@ -12,8 +12,9 @@ env_logger = "0.7.1"
 bytes = "0.5.4"
 dashmap = "3.11.4"
 hex = "0.4.2"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.57"
+# keep serde version fixed until update of oxidizer&refinery
+serde = { version = "=1.0.118", features = ["derive"] }
+serde_json = "1.0"
 
 percent-encoding = "2.0"
 
