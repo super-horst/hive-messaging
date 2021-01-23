@@ -48,10 +48,10 @@ services:
             dockerfile: docker/debug/Dockerfile.services
         volumes:
             - type: bind
-              source: ./hive-accounts-svc/certs
+              source: ./hive-accounts-svc/certificate.json
               target: /certs
             - type: bind
-              source: ./hive-accounts-svc/privates
+              source: ./hive-accounts-svc/privates.json
               target: /privates
         environment:
             - 'CONFIG={
@@ -64,8 +64,8 @@ services:
                 "password":"accounts_db",
                 "dbname":"common",
                 "ssl_mode":true},
-            "certificate":"/certs",
-            "key":"/privates"
+            "certificate":"/certificate.json",
+            "key":"/privates.json"
             }'
 
     messages_svc:

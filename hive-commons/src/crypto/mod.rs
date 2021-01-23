@@ -21,66 +21,6 @@ mod encryption;
 
 pub mod utils;
 
-//TODO cleanup
-#[cfg(feature = "storage")]
-pub async fn load_private_key(path: &str) -> PrivateKey {
-    use tokio::fs;
-    use tokio::prelude::*;
-
-    let f = fs::File::open(path).await;
-    if f.is_ok() {
-        let mut file = f.unwrap();
-
-        let mut contents = vec![];
-        file.read_to_end(&mut contents).await.unwrap();
-
-        return PrivateKey::from_bytes(&contents[..]).unwrap();
-    } else {
-        let server_id = PrivateKey::generate().unwrap();
-
-        let mut f = fs::File::create(path).await.unwrap();
-        f.write_all(server_id.secret_bytes()).await.unwrap();
-
-        return server_id;
-    }
-}
-
-//TODO cleanup
-#[cfg(feature = "storage")]
-pub async fn load_certificate(server_id: &PrivateKey, path: &str) -> Certificate {
-    use std::time::Duration;
-    use tokio::fs;
-    use tokio::prelude::*;
-
-    let f = fs::File::open(path).await;
-    if f.is_ok() {
-        let mut file = f.unwrap();
-
-        let mut contents = vec![];
-        file.read_to_end(&mut contents).await.unwrap();
-
-        let raw_cert = common::Certificate::decode(contents).unwrap();
-
-        let (cert, _) = CertificateFactory::decode(raw_cert).unwrap();
-
-        return cert;
-    } else {
-        let server_public = server_id.public_key().clone();
-
-        let cert = CertificateFactory::default()
-            .certified(server_public)
-            .expiration(Duration::from_secs(1000))
-            .self_sign(server_id)
-            .unwrap();
-
-        let mut f = fs::File::create(path).await.unwrap();
-        // TODO wrong target
-        f.write_all(&cert.encode().unwrap()[..]).await.unwrap();
-
-        return cert;
-    }
-}
-
 impl Encodable for Certificate {
     fn encode(&self) -> Result<Vec<u8>, SerialisationError> {
         common::Certificate {

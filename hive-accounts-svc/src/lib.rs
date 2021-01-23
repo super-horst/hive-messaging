@@ -3,22 +3,22 @@ use std::fmt;
 use std::sync::Arc;
 
 mod errors;
-//mod grpc;
 
-//#[cfg(test)]
 pub mod config;
 pub mod persistence;
 mod service;
 
 pub use errors::*;
-//pub use grpc::*;
 
 use tonic;
 
-use hive_commons::crypto::PrivateKey;
+use hive_commons::crypto::{Certificate, PrivateKey};
 
 use env_logger;
 use log::*;
+use serde::de::DeserializeOwned;
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use tonic::transport::Server;
 
 pub async fn run_service() {
@@ -30,8 +30,8 @@ pub async fn run_service() {
     let addr = format!("0.0.0.0:{}", cfg.port).parse().unwrap();
     info!("Server listening on {}", addr);
 
-    let my_key = hive_commons::crypto::load_private_key(&cfg.key).await;
-    let cert = hive_commons::crypto::load_certificate(&my_key, &cfg.certificate).await;
+    let my_key: PrivateKey = load_json(&cfg.key).await;
+    let cert: Certificate = load_json(&cfg.certificate).await;
     let my_certificate = Arc::new(cert);
 
     let db_repo = persistence::DatabaseRepository::connect(&cfg.db_config)
@@ -47,6 +47,15 @@ pub async fn run_service() {
         .serve(addr)
         .await
         .unwrap();
+}
+
+async fn load_json<T: DeserializeOwned>(path: &str) -> T {
+    let mut buffer = Vec::new();
+
+    let mut file = File::open(path).await.unwrap();
+    file.read_to_end(&mut buffer).await.unwrap();
+
+    serde_json::from_slice(&buffer).unwrap()
 }
 
 pub struct Accounts<T> {

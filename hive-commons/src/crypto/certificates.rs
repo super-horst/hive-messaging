@@ -283,7 +283,7 @@ pub mod certificate_tests {
     }
 
     /// convenience method to create any self signed certificate
-    pub fn create_self_signed_cert() -> Certificate {
+    pub fn create_self_signed_cert() -> (PrivateKey, Certificate) {
         let private = PrivateKey::generate().unwrap();
 
         let cert = CertificateFactory::default()
@@ -292,14 +292,15 @@ pub mod certificate_tests {
             .self_sign(&private)
             .unwrap();
 
-        return cert;
+        return (private, cert);
     }
 
     #[test]
     fn test_create_self_signed() {
-        let cert = create_self_signed_cert();
+        let (private, cert) = create_self_signed_cert();
 
-        cert.public_key()
+        private
+            .public_key()
             .verify(cert.encoded_certificate(), cert.signature())
             .unwrap();
     }
@@ -318,7 +319,7 @@ pub mod certificate_tests {
 
     #[test]
     fn test_self_signed_serialise_deserialise() {
-        let cert = create_self_signed_cert();
+        let (_private, cert) = create_self_signed_cert();
 
         // Serialize it to a JSON string.
         let j = serde_json::to_string(&cert).unwrap();
@@ -338,5 +339,24 @@ pub mod certificate_tests {
         let recycled: Certificate = serde_json::from_str(&j).unwrap();
 
         assert_eq!(cert, recycled)
+    }
+
+    #[test]
+    #[ignore = "only invoke to manually create server key / certificate pair"]
+    fn create_key_certificate_files() {
+        use std::fs::File;
+        use std::io::Write;
+
+        let (private, cert) = create_self_signed_cert();
+
+        // Serialize it to a JSON string.
+        let private_json = serde_json::to_vec(&private).unwrap();
+        let cert_json = serde_json::to_vec(&cert).unwrap();
+
+        let mut output = File::create("privates.json").unwrap();
+        output.write_all(&private_json[..]).unwrap();
+
+        let mut output = File::create("certificate.json").unwrap();
+        output.write_all(&cert_json[..]).unwrap();
     }
 }
