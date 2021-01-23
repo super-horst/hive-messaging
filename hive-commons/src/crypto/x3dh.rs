@@ -81,7 +81,8 @@ mod x3dh_tests {
         let ik_b = PrivateKey::generate().unwrap();
         let pre_key = PrivateKey::generate().unwrap();
 
-        let (eph_pub, dh1) = x3dh_agree_initial(&ik_a, ik_b.public_key(), pre_key.public_key(), None);
+        let (eph_pub, dh1) =
+            x3dh_agree_initial(&ik_a, ik_b.public_key(), pre_key.public_key(), None);
         let dh2 = x3dh_agree_respond(&ik_a.public_key(), &ik_b, &eph_pub, &pre_key, None);
 
         assert_eq!(dh1, dh2);
@@ -94,8 +95,12 @@ mod x3dh_tests {
         let pre_key = PrivateKey::generate().unwrap();
         let opk = PrivateKey::generate().unwrap();
 
-        let (eph_pub, dh1) =
-            x3dh_agree_initial(&ik_a, ik_b.public_key(), pre_key.public_key(), Some(opk.public_key().clone()));
+        let (eph_pub, dh1) = x3dh_agree_initial(
+            &ik_a,
+            ik_b.public_key(),
+            pre_key.public_key(),
+            Some(opk.public_key().clone()),
+        );
         let dh2 = x3dh_agree_respond(&ik_a.public_key(), &ik_b, &eph_pub, &pre_key, Some(opk));
 
         assert_eq!(dh1, dh2);

@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use sha2::{Digest, Sha512};
 
 use curve25519_dalek::constants::ED25519_BASEPOINT_TABLE;
-use curve25519_dalek::edwards::{EdwardsPoint, CompressedEdwardsY};
+use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::montgomery::MontgomeryPoint;
 use curve25519_dalek::scalar::Scalar;
 
@@ -27,16 +27,16 @@ struct FromBytesVisitor<K> {
 
 impl<K> FromBytesVisitor<K> {
     fn new() -> FromBytesVisitor<K>
-        where
-            K: FromBytes,
+    where
+        K: FromBytes,
     {
         FromBytesVisitor { _a: PhantomData }
     }
 }
 
 impl<'de, K> Visitor<'de> for FromBytesVisitor<K>
-    where
-        K: FromBytes,
+where
+    K: FromBytes,
 {
     type Value = K;
 
@@ -45,16 +45,16 @@ impl<'de, K> Visitor<'de> for FromBytesVisitor<K>
     }
 
     fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
+    where
+        E: serde::de::Error,
     {
         K::from_bytes(v).map_err(|_ce| E::invalid_length(v.len(), &self))
     }
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        where
-            A: SeqAccess<'de>,
-            A::Error: serde::de::Error,
+    where
+        A: SeqAccess<'de>,
+        A::Error: serde::de::Error,
     {
         let mut buff = seq
             .size_hint()
@@ -77,9 +77,7 @@ pub struct PublicKey {
 }
 
 impl PublicKey {
-    fn new(
-        ed_public: EdwardsPoint,
-    ) -> Result<PublicKey, CryptoError> {
+    fn new(ed_public: EdwardsPoint) -> Result<PublicKey, CryptoError> {
         Ok(PublicKey {
             x_public: ed_public.to_montgomery(),
             ed_public,
@@ -132,11 +130,8 @@ impl PublicKey {
         hash.update(&data);
         let h = Scalar::from_hash(hash);
 
-        let r = EdwardsPoint::vartime_double_scalar_mul_basepoint(
-            &h,
-            &(-self.ed_public),
-            &signature_s,
-        );
+        let r =
+            EdwardsPoint::vartime_double_scalar_mul_basepoint(&h, &(-self.ed_public), &signature_s);
 
         if r.compress() != signature_r {
             return Err(CryptoError::Message {
@@ -169,8 +164,8 @@ impl FromBytes for PublicKey {
 
 impl Serialize for PublicKey {
     fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         serializer.serialize_bytes(&self.id_bytes()[..])
     }
@@ -178,8 +173,8 @@ impl Serialize for PublicKey {
 
 impl<'de> Deserialize<'de> for PublicKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         deserializer.deserialize_bytes(FromBytesVisitor::<PublicKey>::new())
     }
@@ -247,7 +242,7 @@ impl PrivateKey {
         &self.public
     }
 
-    pub (crate) fn secret_bytes(&self) -> &[u8; 32] {
+    pub(crate) fn secret_bytes(&self) -> &[u8; 32] {
         self.ed_private.as_bytes()
     }
 
@@ -301,8 +296,8 @@ impl FromBytes for PrivateKey {
 
 impl Serialize for PrivateKey {
     fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         serializer.serialize_bytes(&self.secret_bytes()[..])
     }
@@ -310,8 +305,8 @@ impl Serialize for PrivateKey {
 
 impl<'de> Deserialize<'de> for PrivateKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         deserializer.deserialize_bytes(FromBytesVisitor::<PrivateKey>::new())
     }
@@ -392,17 +387,15 @@ mod key_tests {
 
         let recycled_public = PublicKey::from_bytes(&buffer[..]).unwrap();
 
-        assert_eq!(
-            original_public.id_bytes(),
-            recycled_public.id_bytes()
-        );
+        assert_eq!(original_public.id_bytes(), recycled_public.id_bytes());
     }
 
     #[test]
     fn test_private_key_encoding_decoding() {
         let original_privates = PrivateKey::generate().unwrap();
 
-        let recycled_privates = PrivateKey::from_bytes(&original_privates.secret_bytes()[..]).unwrap();
+        let recycled_privates =
+            PrivateKey::from_bytes(&original_privates.secret_bytes()[..]).unwrap();
 
         assert_eq!(
             original_privates.secret_bytes(),

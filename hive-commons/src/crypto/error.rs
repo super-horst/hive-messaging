@@ -17,13 +17,9 @@ pub enum CryptoError {
         cause: std::io::Error,
     },
     #[fail(display = "Failed to process key: {}", message)]
-    Key {
-        message: String,
-    },
+    Key { message: String },
     #[fail(display = "Failed to process signature: {}", message)]
-    Signature {
-        message: String,
-    },
+    Signature { message: String },
     #[fail(display = "KDF encountered an invalid length: {}", message)]
     InvalidLength {
         message: String,
