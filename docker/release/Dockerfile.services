@@ -1,6 +1,5 @@
 FROM rust:1.47.0 as builder
 
-ARG PROJECT_NAME
 ENV RUST_BACKTRACE=full
 
 # Compiler
@@ -12,6 +11,7 @@ RUN rustup target add x86_64-unknown-linux-musl && \
     rustup component add rustfmt
 
 # Dummy project
+ARG PROJECT_NAME
 WORKDIR /build
 RUN USER=root cargo new --bin $PROJECT_NAME
 
@@ -29,8 +29,6 @@ RUN cargo install --target x86_64-unknown-linux-musl --path . && \
 # Assemble final container
 FROM scratch
 EXPOSE 8080
-
-ENV RUST_BACKTRACE=full
 
 USER 1000
 COPY --from=builder /usr/local/cargo/bin/service ./service

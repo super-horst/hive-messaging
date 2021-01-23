@@ -45,7 +45,7 @@ services:
             context: ./
             args:
                 PROJECT_NAME: hive-accounts-svc
-            dockerfile: docker/Dockerfile.services
+            dockerfile: docker/debug/Dockerfile.services
         volumes:
             - type: bind
               source: ./hive-accounts-svc/certs
@@ -76,7 +76,7 @@ services:
             context: ./
             args:
                 PROJECT_NAME: hive-messages-svc
-            dockerfile: docker/Dockerfile.services
+            dockerfile: docker/debug/Dockerfile.services
         environment:
             - 'CONFIG={
             "port":8080,
