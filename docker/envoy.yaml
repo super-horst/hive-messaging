@@ -22,6 +22,8 @@ static_resources:
                       routes:
                         - match: { prefix: "/accounts.Accounts" }
                           route: { cluster: accounts_svc }
+                        - match: { prefix: "/messages.Messages" }
+                          route: { cluster: messages_svc }
                         - match: { prefix: "/" }
                           route: { cluster: app_server }
                       cors:
@@ -59,4 +61,21 @@ static_resources:
                   address:
                     socket_address:
                       address: accounts_svc
+                      port_value: 8080
+
+    - name: messages_svc
+      connect_timeout: 0.25s
+      type: LOGICAL_DNS
+      http2_protocol_options: { }
+      # Comment out the following line to test on v6 networks
+      dns_lookup_family: V4_ONLY
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: messages_svc
                       port_value: 8080
