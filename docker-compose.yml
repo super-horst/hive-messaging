@@ -49,10 +49,10 @@ services:
         volumes:
             - type: bind
               source: ./hive-accounts-svc/certificate.json
-              target: /certs
+              target: /certificate.json
             - type: bind
               source: ./hive-accounts-svc/privates.json
-              target: /privates
+              target: /privates.json
         environment:
             - 'CONFIG={
             "port":8080,
