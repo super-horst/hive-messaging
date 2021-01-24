@@ -11,6 +11,7 @@ use wasm_bindgen::__rt::std::sync::{Arc, RwLock};
 
 const IDENTITY_KEY: &'static str = "hive.webapp.identity";
 const CONTACTS_KEY: &'static str = "hive.webapp.contacts";
+const MSG_KEY_PREFIX: &'static str = "hive.webapp.messages.";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct IdentityModel {
@@ -49,6 +50,27 @@ impl std::cmp::PartialEq<ContactModel> for ContactModel {
 }
 
 impl Eq for ContactModel {}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MessageModel {
+    pub id: Uuid,
+    pub message: String,
+    pub timestamp: u64,
+}
+
+impl Hash for MessageModel {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+impl std::cmp::PartialEq<MessageModel> for MessageModel {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for MessageModel {}
 
 #[derive(Clone)]
 pub struct StorageController {
@@ -89,5 +111,20 @@ impl StorageController {
         //TODO error handling
         let mut storage = self.service.write().unwrap();
         storage.store(CONTACTS_KEY, Json(&contacts));
+    }
+
+    pub fn get_messages(&self, contact: &ContactModel) -> Vec<MessageModel> {
+        //TODO error handling
+        let key = MSG_KEY_PREFIX.to_owned() + &contact.id.to_string();
+        let storage = self.service.read().unwrap();
+        let Json(messages) = storage.restore(&key);
+        messages.unwrap_or_else(|_| vec![])
+    }
+
+    pub fn set_messages(&self, contact: &ContactModel, messages: &Vec<MessageModel>) {
+        //TODO error handling
+        let key = MSG_KEY_PREFIX.to_owned() + &contact.id.to_string();
+        let mut storage = self.service.write().unwrap();
+        storage.store(&key, Json(&messages));
     }
 }
