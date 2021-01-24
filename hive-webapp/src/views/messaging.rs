@@ -1,6 +1,8 @@
 use yew::prelude::*;
 use yew::{html, Component, ComponentLink, Html, Properties, ShouldRender};
 
+use log::*;
+
 use wasm_bindgen::__rt::std::sync::Arc;
 
 use crate::identity::LocalIdentity;
@@ -10,6 +12,8 @@ use crate::transport::ConnectionManager;
 use crate::views::contacts;
 
 pub enum MessagingViewMessage {
+    Update(String),
+    Send,
     SelectContact(Arc<ContactModel>),
     Nope,
 }
@@ -18,6 +22,7 @@ pub struct MessagingView {
     link: ComponentLink<Self>,
     props: MessagingProperties,
     selected_contact: Option<Arc<ContactModel>>,
+    composed_message: String,
 }
 
 #[derive(Clone, Properties)]
@@ -36,6 +41,7 @@ impl Component for MessagingView {
             link,
             props,
             selected_contact: None,
+            composed_message: "".to_string(),
         }
     }
 
@@ -43,6 +49,22 @@ impl Component for MessagingView {
         match msg {
             MessagingViewMessage::Nope => {
                 //NOOP
+            }
+            MessagingViewMessage::Send => {
+                info!("Sending {}", &self.composed_message);
+
+                let mut c = self.selected_contact.as_ref().unwrap().as_ref().clone();
+
+                let mut ratchet = c.ratchet.unwrap();
+
+                let send_step = ratchet.send_step();
+
+                // TODO find a way to propagate mutated contact back
+
+                self.composed_message = "".to_string();
+            }
+            MessagingViewMessage::Update(val) => {
+                self.composed_message = val;
             }
             MessagingViewMessage::SelectContact(c) => {
                 self.selected_contact = Some(c);
@@ -58,6 +80,17 @@ impl Component for MessagingView {
     }
 
     fn view(&self) -> Html {
+        let messages: Vec<String> = match &self.selected_contact {
+            Some(c) => self
+                .props
+                .storage
+                .get_messages(c)
+                .iter()
+                .map(|m| m.message.clone())
+                .collect(),
+            None => vec![],
+        };
+
         html! {
         <div class="view_layout">
             <contacts::ContactList
@@ -76,12 +109,19 @@ impl Component for MessagingView {
                 </div>
 
                 <div class="msg_view">
-                    {"Messages"}
+                    {for messages.iter().map(|c| {
+                        html! {
+                        <p>{c}</p>
+                        }
+                    } )}
                 </div>
-
                 <div class="msg_input_view">
-                    <input class="center" placeholder="Compose a message" style="width: 100%;"/>
-                    <button class="center" onclick=self.link.callback(move |_| MessagingViewMessage::Nope)>{"Send"}</button>
+                    <input placeholder="Compose a message..." style="width: 100%;"
+                        value=&self.composed_message
+                        oninput=self.link.callback(|e: InputData| MessagingViewMessage::Update(e.value))
+                        onkeypress=self.link.callback(|e: KeyboardEvent| {
+                           if e.key() == "Enter" { MessagingViewMessage::Send } else { MessagingViewMessage::Nope }
+                   }) />
                 </div>
             </div>
         </div>

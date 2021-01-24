@@ -18,6 +18,7 @@ use crate::bindings::*;
 use crate::identity::LocalIdentity;
 use crate::storage::{ContactModel, StorageController};
 use crate::transport::ConnectionManager;
+use wasm_bindgen::__rt::std::borrow::Borrow;
 
 pub enum ContactListMsg {
     Update(String),
@@ -74,8 +75,6 @@ impl Component for ContactList {
                     return false;
                 }
 
-                info!("adding account {}", &val);
-
                 let bytes = hex::decode(&val).unwrap();
                 let public = crypto::PublicKey::from_bytes(&bytes[..]).unwrap();
 
@@ -84,6 +83,8 @@ impl Component for ContactList {
                     key: public,
                     ratchet: None,
                 });
+
+                info!("Adding account {}", &contact.id);
 
                 self.stored_contacts.push(contact);
                 let contact_copy = self
@@ -102,7 +103,26 @@ impl Component for ContactList {
                 self.props.on_select.emit(key);
                 true
             }
-            ContactListMsg::ContactUpdate(contact) => true,
+            ContactListMsg::ContactUpdate(contact) =>{
+                let position = self.stored_contacts
+                    .iter()
+                    .position(|s| s.as_ref().eq(contact.as_ref()));
+
+                debug!("Update account {}", &contact.id);
+
+                self.stored_contacts[position.unwrap()] = contact;
+
+                let contact_copy = self
+                    .stored_contacts
+                    .iter()
+                    .map(Arc::as_ref)
+                    .map(ContactModel::clone)
+                    .collect();
+
+                self.props.storage.set_contacts(&contact_copy);
+
+                true
+            },
             _ => true,
         };
     }
@@ -224,6 +244,11 @@ impl Component for Contact {
 }
 
 impl Contact {
+
+    pub async fn send_message(&mut self, message: String) {
+        // TODO implement crypto & transport here
+    }
+
     async fn retrieve_pre_key_bundle(
         &self,
         other: &crypto::PublicKey,
