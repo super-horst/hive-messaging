@@ -7,9 +7,9 @@ import "common.proto";
 // Messages service definition.
 service Messages {
 
-  rpc GetMessages (MessageFilter) returns (MessageEnvelope);
+  rpc GetMessages (MessageFilter) returns (Envelope);
 
-  rpc SendMessage (MessageEnvelope) returns (MessageSendResult);
+  rpc SendMessage (Envelope) returns (MessageSendResult);
 
 }
 
@@ -44,7 +44,7 @@ message Payload {
   bytes payload = 2;
 }
 
-message MessageEnvelope {
+message Envelope {
   common.Peer dst = 1;
 
   EncryptionParameters params = 2;

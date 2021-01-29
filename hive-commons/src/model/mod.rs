@@ -13,9 +13,9 @@ pub mod accounts;
 /// message protos
 pub mod messages;
 
-impl Eq for messages::MessageEnvelope {}
+impl Eq for messages::Envelope {}
 
-impl Hash for messages::MessageEnvelope {
+impl Hash for messages::Envelope {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.dst.hash(state);
     }
