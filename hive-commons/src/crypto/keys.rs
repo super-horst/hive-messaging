@@ -367,14 +367,41 @@ mod key_tests {
     }
 
     #[test]
-    fn test_dalek_sign_verify() {
+    fn test_signature_verify() {
         let data: &[u8] = b"testdata is overrated";
 
         let wrapped_privates = PrivateKey::generate().unwrap();
 
         let signed = wrapped_privates.sign(data).unwrap();
 
-        wrapped_privates.public_key().verify(data, &signed).unwrap();
+        let verify_res = wrapped_privates.public_key().verify(data, &signed);
+        assert!(verify_res.is_ok());
+    }
+
+    #[test]
+    fn test_signature_modified_signature() {
+        let data: &[u8] = b"testdata is overrated";
+
+        let wrapped_privates = PrivateKey::generate().unwrap();
+
+        let mut signed = wrapped_privates.sign(data).unwrap();
+        signed[5] &= 0;
+
+        let verify_res =wrapped_privates.public_key().verify(data, &signed);
+        assert!(verify_res.is_err());
+    }
+
+    #[test]
+    fn test_signature_modified_data() {
+        let data: &[u8] = b"testdata is overrated";
+
+        let wrapped_privates = PrivateKey::generate().unwrap();
+
+        let signed = wrapped_privates.sign(data).unwrap();
+
+        let data = b"testdata is an illusion";
+        let verify_res =wrapped_privates.public_key().verify(data, &signed);
+        assert!(verify_res.is_err());
     }
 
     #[test]
@@ -404,7 +431,7 @@ mod key_tests {
     }
 
     #[test]
-    fn test_dalek_dh() {
+    fn test_dh() {
         let a_privates = PrivateKey::generate().unwrap();
         let b_privates = PrivateKey::generate().unwrap();
 
