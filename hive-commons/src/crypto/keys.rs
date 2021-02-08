@@ -387,7 +387,7 @@ mod key_tests {
         let mut signed = wrapped_privates.sign(data).unwrap();
         signed[5] &= 0;
 
-        let verify_res =wrapped_privates.public_key().verify(data, &signed);
+        let verify_res = wrapped_privates.public_key().verify(data, &signed);
         assert!(verify_res.is_err());
     }
 
@@ -400,7 +400,7 @@ mod key_tests {
         let signed = wrapped_privates.sign(data).unwrap();
 
         let data = b"testdata is an illusion";
-        let verify_res =wrapped_privates.public_key().verify(data, &signed);
+        let verify_res = wrapped_privates.public_key().verify(data, &signed);
         assert!(verify_res.is_err());
     }
 

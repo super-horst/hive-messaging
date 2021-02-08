@@ -10,7 +10,7 @@ pub fn x3dh_agree_initial(
     ik_a: &PrivateKey,
     ik_b: &PublicKey,
     pre_key: &PublicKey,
-    onetime_pre_key: Option<PublicKey>,
+    onetime_pre_key: Option<&PublicKey>,
 ) -> (PublicKey, [u8; 32]) {
     let ek_a = PrivateKey::generate().unwrap();
 
@@ -24,7 +24,7 @@ pub fn x3dh_agree_initial(
     dh.extend_from_slice(&dh3[..]);
 
     if let Some(opk) = onetime_pre_key {
-        let dh4 = ek_a.diffie_hellman(&opk);
+        let dh4 = ek_a.diffie_hellman(opk);
 
         dh.extend_from_slice(&dh4[..]);
     }
@@ -44,7 +44,7 @@ pub fn x3dh_agree_respond(
     ik_b: &PrivateKey,
     ek_a: &PublicKey,
     pre_key: &PrivateKey,
-    onetime_pre_key: Option<PrivateKey>,
+    onetime_pre_key: Option<&PrivateKey>,
 ) -> [u8; 32] {
     let dh1 = pre_key.diffie_hellman(&ik_a);
     let dh2 = ik_b.diffie_hellman(ek_a);
@@ -99,9 +99,9 @@ mod x3dh_tests {
             &ik_a,
             ik_b.public_key(),
             pre_key.public_key(),
-            Some(opk.public_key().clone()),
+            Some(opk.public_key()),
         );
-        let dh2 = x3dh_agree_respond(&ik_a.public_key(), &ik_b, &eph_pub, &pre_key, Some(opk));
+        let dh2 = x3dh_agree_respond(&ik_a.public_key(), &ik_b, &eph_pub, &pre_key, Some(&opk));
 
         assert_eq!(dh1, dh2);
     }

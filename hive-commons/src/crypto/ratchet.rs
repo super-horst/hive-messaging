@@ -69,10 +69,9 @@ impl ManagedRatchet {
     pub fn initialise_received(
         root_key: &[u8; 32],
         my_private: &PrivateKey,
-        other_public: PublicKey,
     ) -> Result<ManagedRatchet, CryptoError> {
         Ok(ManagedRatchet {
-            ratchet: DoubleRatchet::initialise_received(root_key, my_private, other_public)?,
+            ratchet: DoubleRatchet::initialise_received(root_key, my_private)?,
             unused_keys: HashSet::new(),
         })
     }
@@ -142,8 +141,9 @@ impl DoubleRatchet {
         let init_private = PrivateKey::generate()?;
         let init_public = init_private.public_key().clone();
 
-        let root_chain = KdfChain(root_key.clone());
-        let send_chain = CountingChain::new(init_private.diffie_hellman(other_public));
+        let mut root_chain = KdfChain(root_key.clone());
+        let root_dh = init_private.diffie_hellman(other_public);
+        let send_chain = CountingChain::new(root_chain.update(&root_dh[..]));
 
         Ok(DoubleRatchet {
             send_chain,
@@ -161,25 +161,19 @@ impl DoubleRatchet {
     fn initialise_received(
         root_key: &[u8; 32],
         my_private: &PrivateKey,
-        other_public: PublicKey,
     ) -> Result<DoubleRatchet, CryptoError> {
         let mut root_chain = KdfChain(root_key.clone());
-        let recv_chain = CountingChain::new(my_private.diffie_hellman(&other_public));
-
-        let init_private = PrivateKey::generate()?;
-        let init_public = init_private.public_key().clone();
-
-        let init_dh = init_private.diffie_hellman(&other_public);
-        let send_chain = CountingChain::new(root_chain.update(&init_dh));
 
         Ok(DoubleRatchet {
-            send_chain,
+            // leave the chains detached
+            // the next asymmetric step will sync all chains
+            send_chain: CountingChain::new([0u8; 32]),
             prev_send_counter: 0,
-            recv_chain,
+            recv_chain: CountingChain::new([0u8; 32]),
             root_chain,
-            current_private: init_private,
-            current_public: init_public,
-            current_other: other_public,
+            current_private: my_private.clone(),
+            current_public: my_private.public_key().clone(),
+            current_other: my_private.public_key().clone(),
         })
     }
 
@@ -190,9 +184,8 @@ impl DoubleRatchet {
             return Ok(());
         }
 
-        let dh_current = self.current_private.diffie_hellman(&other_public);
-
-        self.recv_chain.reset(self.root_chain.update(&dh_current));
+        let root_dh = self.current_private.diffie_hellman(&other_public);
+        self.recv_chain.reset(self.root_chain.update(&root_dh));
 
         let new_private = PrivateKey::generate()?;
         let dh_new = new_private.diffie_hellman(&other_public);
@@ -291,8 +284,7 @@ pub mod ratchet_tests {
 
         // alice starts the conversation & sends bob her current ratchet key
         let alice = DoubleRatchet::initialise_to_send(&root, b.public_key()).unwrap();
-        let bob =
-            DoubleRatchet::initialise_received(&root, &b, alice.current_public.clone()).unwrap();
+        let bob = DoubleRatchet::initialise_received(&root, &b).unwrap();
 
         (alice, bob)
     }
@@ -429,61 +421,6 @@ pub mod ratchet_tests {
     }
 
     #[test]
-    fn test_ratchet_manager_chaotic_order_messages() {
-        let (alice, bob) = entangled_ratchets();
-
-        let mut alice_mgmt = ManagedRatchet {
-            ratchet: alice,
-            unused_keys: HashSet::new(),
-        };
-        let mut bob_mgmt = ManagedRatchet {
-            ratchet: bob,
-            unused_keys: HashSet::new(),
-        };
-
-        let a1 = alice_mgmt.send_step();
-        let b1 = bob_mgmt
-            .recv_step_for(a1.ratchet_key.clone(), a1.counter, a1.prev_ratchet_counter)
-            .unwrap();
-        assert_send_recv(a1, b1);
-
-        let a2 = alice_mgmt.send_step();
-        let a3 = alice_mgmt.send_step();
-        let a4 = alice_mgmt.send_step();
-        let a5 = alice_mgmt.send_step();
-        let a6 = alice_mgmt.send_step();
-
-        let b2 = bob_mgmt.send_step();
-        let b3 = bob_mgmt.send_step();
-        let b4 = bob_mgmt.send_step();
-        let b5 = bob_mgmt.send_step();
-        let b6 = bob_mgmt.send_step();
-
-        // do it random
-        let ab3 = receive(&mut bob_mgmt, &a3);
-        let ba5 = receive(&mut bob_mgmt, &b5);
-        let ba3 = receive(&mut bob_mgmt, &b3);
-        let ab2 = receive(&mut bob_mgmt, &a2);
-        let ab5 = receive(&mut bob_mgmt, &a5);
-        let ba4 = receive(&mut bob_mgmt, &b4);
-        let ba6 = receive(&mut bob_mgmt, &b6);
-        let ba2 = receive(&mut bob_mgmt, &b2);
-        let ab6 = receive(&mut bob_mgmt, &a6);
-        let ab4 = receive(&mut bob_mgmt, &a4);
-
-        assert_send_recv(a2, ab2);
-        assert_send_recv(a3, ab3);
-        assert_send_recv(a4, ab4);
-        assert_send_recv(a5, ab5);
-        assert_send_recv(a6, ab6);
-        assert_send_recv(b2, ba2);
-        assert_send_recv(b3, ba3);
-        assert_send_recv(b4, ba4);
-        assert_send_recv(b5, ba5);
-        assert_send_recv(b6, ba6);
-    }
-
-    #[test]
     fn test_ratchet_manager_linear_operation() {
         let (alice, bob) = entangled_ratchets();
 
@@ -533,7 +470,10 @@ pub mod ratchet_tests {
     fn test_double_ratchet_interaction() {
         let (mut alice, mut bob) = entangled_ratchets();
 
-        assert_send_recv(alice.send_step(), bob.recv_step());
+        let initial_step = alice.send_step();
+        bob.asymmetric_step(initial_step.ratchet_key.clone());
+
+        assert_send_recv(initial_step, bob.recv_step());
         assert_send_recv(alice.send_step(), bob.recv_step());
         assert_send_recv(alice.send_step(), bob.recv_step());
 

@@ -7,8 +7,8 @@ use crate::model::*;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PrivatePreKeys {
-    pre_key: PrivateKey,
-    one_time_keys: Vec<PrivateKey>,
+    pub(crate) pre_key: PrivateKey,
+    pub(crate) one_time_keys: Vec<PrivateKey>,
 }
 
 pub fn sign_challenge(identity: &PrivateKey) -> Result<common::SignedChallenge, CryptoError> {
