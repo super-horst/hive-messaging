@@ -13,6 +13,7 @@ web = ["uuid/wasm-bindgen", "js-sys"]
 [dependencies]
 # structural
 failure = "0.1.8"
+async-trait = "0.1.33"
 
 # tools
 hex = "0.4.2"
@@ -40,6 +41,7 @@ tonic = { version = "0.3.1" , optional = true}
 
 [dev-dependencies]
 serde_json = "1.0"
+mockall = "0.8.1"
 tokio = { version = "0.2.22", features = ["full"]}
 
 [build-dependencies]

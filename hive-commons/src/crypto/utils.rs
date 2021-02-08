@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::error::*;
-use crate::crypto::{FromBytes, ManagedRatchet, PrivateKey, PublicKey};
+use crate::crypto::{PrivateKey, PublicKey};
 
 use crate::model::*;
 
