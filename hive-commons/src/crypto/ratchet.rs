@@ -162,7 +162,7 @@ impl DoubleRatchet {
         root_key: &[u8; 32],
         my_private: &PrivateKey,
     ) -> Result<DoubleRatchet, CryptoError> {
-        let mut root_chain = KdfChain(root_key.clone());
+        let root_chain = KdfChain(root_key.clone());
 
         Ok(DoubleRatchet {
             // leave the chains detached
@@ -471,7 +471,7 @@ pub mod ratchet_tests {
         let (mut alice, mut bob) = entangled_ratchets();
 
         let initial_step = alice.send_step();
-        bob.asymmetric_step(initial_step.ratchet_key.clone());
+        bob.asymmetric_step(initial_step.ratchet_key.clone()).unwrap();
 
         assert_send_recv(initial_step, bob.recv_step());
         assert_send_recv(alice.send_step(), bob.recv_step());
@@ -508,15 +508,5 @@ pub mod ratchet_tests {
         assert_eq!(chain1.update(&dummy_info), chain2.update(&dummy_info));
         assert_eq!(chain1.update(&dummy_info), chain2.update(&dummy_info));
         assert_eq!(chain1.update(&dummy_info), chain2.update(&dummy_info));
-    }
-
-    fn receive(ratchet: &mut ManagedRatchet, step: &SendStep) -> RecvStep {
-        ratchet
-            .recv_step_for(
-                step.ratchet_key.clone(),
-                step.counter,
-                step.prev_ratchet_counter,
-            )
-            .unwrap()
     }
 }
