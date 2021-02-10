@@ -30,11 +30,11 @@ pub enum SessionError {
 
 #[cfg_attr(test, automock)]
 #[async_trait::async_trait]
-pub trait SessionProvider {
+pub trait PreKeyProvider {
     async fn retrieve_pre_keys(&self) -> Result<PreKeyBundle, ()>;
 }
 
-pub trait CryptoProvider {
+pub trait KeyAccess {
     fn identity_access(&self) -> &PrivateKey;
 
     fn pre_key_access(&self) -> &PrivateKey;
@@ -49,16 +49,18 @@ enum SessionState {
 
 pub struct SessionManager {
     state: SessionState,
-    prov: Arc<dyn SessionProvider>,
-    crypto: Arc<dyn CryptoProvider>,
+    peer_identity: PublicKey,
+    pre_keys: Arc<dyn PreKeyProvider>,
+    keys: Arc<dyn KeyAccess>,
 }
 
 impl SessionManager {
-    pub fn new(prov: Arc<dyn SessionProvider>, crypto: Arc<dyn CryptoProvider>) -> SessionManager {
+    pub fn new(peer_identity: PublicKey, pre_keys: Arc<dyn PreKeyProvider>, keys: Arc<dyn KeyAccess>) -> SessionManager {
         SessionManager {
             state: SessionState::New {},
-            prov,
-            crypto,
+            peer_identity,
+            pre_keys,
+            keys,
         }
     }
 
@@ -73,6 +75,13 @@ impl SessionManager {
                 cause: e,
             }
         })?;
+
+        if other_identity != self.peer_identity {
+            return Err(SessionError::InvalidSessionState {
+                message: "Peer identity in key exchange does not match session".to_string(),
+            });
+        }
+
         let ephemeral = PublicKey::from_bytes(&exchange.ephemeral_key[..]).map_err(|e| {
             SessionError::FailedCryptography {
                 message: "Decode of ephemeral key".to_string(),
@@ -91,11 +100,11 @@ impl SessionManager {
             })?;
             Some(key)
         }
-        .map(|otk_pub| self.crypto.one_time_key_access(&otk_pub))
-        .flatten();
+            .map(|otk_pub| self.keys.one_time_key_access(&otk_pub))
+            .flatten();
 
-        let identity = self.crypto.identity_access();
-        let pre_key = self.crypto.pre_key_access();
+        let identity = self.keys.identity_access();
+        let pre_key = self.keys.pre_key_access();
 
         let secret =
             x3dh_agree_respond(&other_identity, identity, &ephemeral, pre_key, otk.as_ref());
@@ -145,7 +154,7 @@ impl SessionManager {
             SessionState::Initialised { ratchet } => Ok((None, ratchet.send_step())),
             SessionState::New {} => {
                 let bundle: PreKeyBundle =
-                    self.prov
+                    self.pre_keys
                         .retrieve_pre_keys()
                         .await
                         .map_err(|()| SessionError::Message {
@@ -164,6 +173,12 @@ impl SessionManager {
                         cause: e,
                     }
                 })?;
+
+                if other_identity != self.peer_identity {
+                    return Err(SessionError::InvalidSessionState {
+                        message: "Peer identity in pre key bundle does not match session".to_string(),
+                    });
+                }
 
                 other_identity
                     .verify(&bundle.pre_key[..], &bundle.pre_key_signature[..])
@@ -191,7 +206,7 @@ impl SessionManager {
                     Ok(None)
                 }?;
 
-                let identity = self.crypto.identity_access();
+                let identity = self.keys.identity_access();
                 let (eph_key, secret) =
                     x3dh_agree_initial(identity, &other_identity, &pre_key, otk.as_ref());
 
@@ -227,10 +242,10 @@ mod session_tests {
 
     #[tokio::test]
     async fn test_new_state_receives() {
-        let mock_crypto = Arc::new(MockCryptoProvider::any());
-        let mock_session = Arc::new(MockSessionProvider::new());
+        let mock_keys = Arc::new(MockCryptoProvider::any());
+        let mock_pre_keys = Arc::new(MockPreKeyProvider::new());
 
-        let mut sess_mgr = SessionManager::new(mock_session, mock_crypto);
+        let mut sess_mgr = SessionManager::new(PrivateKey::generate().unwrap().public_key().clone(), mock_pre_keys, mock_keys);
 
         let params = EncryptionParameters {
             ratchet_key: vec![],
@@ -253,14 +268,14 @@ mod session_tests {
 
         let bob_key = PrivateKey::generate().unwrap();
 
-        let mock_crypto = Arc::new(MockCryptoProvider::new(bob_key.clone()));
-        let mut mock_session = MockSessionProvider::new();
-        mock_session
+        let mock_keys = Arc::new(MockCryptoProvider::new(bob_key.clone()));
+        let mut mock_pre_keys = MockPreKeyProvider::new();
+        mock_pre_keys
             .expect_retrieve_pre_keys()
             .times(1)
             .return_const(Ok(alice_bundle));
 
-        let mut sess_mgr = SessionManager::new(Arc::new(mock_session), mock_crypto);
+        let mut sess_mgr = SessionManager::new(alice_key.public_key().clone(), Arc::new(mock_pre_keys), mock_keys);
 
         let result = sess_mgr.send().await;
         assert!(result.is_ok());
@@ -296,7 +311,7 @@ mod session_tests {
     async fn test_intialised_state_send() {
         let alice_key = PrivateKey::generate().unwrap();
         let (_alice_bundle, alice_bundle_privates) = prepare_pre_keys(&alice_key);
-        let mock_crypto = Arc::new(MockCryptoProvider::with_pre_key(
+        let mock_keys = Arc::new(MockCryptoProvider::with_pre_key(
             alice_key.clone(),
             alice_bundle_privates.pre_key,
         ));
@@ -310,10 +325,10 @@ mod session_tests {
             one_time_key: vec![],
         };
 
-        let mut mock_session = MockSessionProvider::new();
-        mock_session.expect_retrieve_pre_keys().times(0);
+        let mut mock_pre_keys = MockPreKeyProvider::new();
+        mock_pre_keys.expect_retrieve_pre_keys().times(0);
 
-        let mut sess_mgr = SessionManager::new(Arc::new(mock_session), mock_crypto);
+        let mut sess_mgr = SessionManager::new(bob_key.public_key().clone(), Arc::new(mock_pre_keys), mock_keys);
 
         let result = sess_mgr.refresh(exchange);
         assert!(result.is_ok());
@@ -323,6 +338,54 @@ mod session_tests {
 
         let (key_exchange, _) = result.unwrap();
         assert!(key_exchange.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_new_state_sends_with_wrong_identity() {
+        let alice_key = PrivateKey::generate().unwrap();
+        let (alice_bundle, _) = prepare_pre_keys(&alice_key);
+
+        let bob_key = PrivateKey::generate().unwrap();
+
+        let mut mock_pre_keys = MockPreKeyProvider::new();
+        mock_pre_keys
+            .expect_retrieve_pre_keys()
+            .times(1)
+            .return_const(Ok(alice_bundle));
+
+        let any_unrelated_key = PrivateKey::generate().unwrap().public_key().clone();
+        let mut sess_mgr = SessionManager::new(any_unrelated_key, Arc::new(mock_pre_keys), Arc::new(MockCryptoProvider::any()));
+
+        let result = sess_mgr.send().await;
+        assert!(result.is_err());
+        assert!(match result.unwrap_err() {
+            SessionError::InvalidSessionState { .. } => true,
+            _ => false,
+        });
+    }
+
+    #[tokio::test]
+    async fn test_refresh_with_wrong_identity() {
+        let bob_key = PrivateKey::generate().unwrap();
+
+        let exchange = KeyExchange {
+            origin: Some(bob_key.public_key().into_peer()),
+            ephemeral_key: vec![],
+            one_time_key: vec![],
+        };
+
+        let mut mock_pre_keys = MockPreKeyProvider::new();
+        mock_pre_keys.expect_retrieve_pre_keys().times(0);
+
+        let any_unrelated_key = PrivateKey::generate().unwrap().public_key().clone();
+        let mut sess_mgr = SessionManager::new(any_unrelated_key, Arc::new(mock_pre_keys), Arc::new(MockCryptoProvider::any()));
+
+        let result = sess_mgr.refresh(exchange);
+        assert!(result.is_err());
+        assert!(match result.unwrap_err() {
+            SessionError::InvalidSessionState { .. } => true,
+            _ => false,
+        });
     }
 
     fn prepare_pre_keys(alice_key: &PrivateKey) -> (PreKeyBundle, PrivatePreKeys) {
@@ -361,7 +424,7 @@ mod session_tests {
         }
     }
 
-    impl CryptoProvider for MockCryptoProvider {
+    impl KeyAccess for MockCryptoProvider {
         fn identity_access(&self) -> &PrivateKey {
             &self.key
         }
