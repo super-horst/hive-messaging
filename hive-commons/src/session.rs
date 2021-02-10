@@ -1,13 +1,14 @@
-use crate::model::common::PreKeyBundle;
-use crate::model::messages::{EncryptionParameters, KeyExchange};
+use failure::Fail;
+use std::sync::Arc;
+
+use serde::{Deserialize, Serialize};
 
 use crate::crypto::{
     x3dh_agree_initial, x3dh_agree_respond, CryptoError, FromBytes, ManagedRatchet, PrivateKey,
     PublicKey, RecvStep, SendStep,
 };
-use std::sync::Arc;
-
-use failure::Fail;
+use crate::model::common::PreKeyBundle;
+use crate::model::messages::{EncryptionParameters, KeyExchange};
 
 #[cfg(test)]
 use mockall::automock;
@@ -42,26 +43,54 @@ pub trait KeyAccess {
     fn one_time_key_access(&self, public: &PublicKey) -> Option<PrivateKey>;
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
 enum SessionState {
     Initialised { ratchet: ManagedRatchet },
     New {},
 }
 
-pub struct SessionManager {
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Session {
     state: SessionState,
     peer_identity: PublicKey,
+}
+
+pub struct SessionManager {
+    session: Session,
     pre_keys: Arc<dyn PreKeyProvider>,
     keys: Arc<dyn KeyAccess>,
 }
 
 impl SessionManager {
-    pub fn new(peer_identity: PublicKey, pre_keys: Arc<dyn PreKeyProvider>, keys: Arc<dyn KeyAccess>) -> SessionManager {
+    pub fn new(
+        peer_identity: PublicKey,
+        pre_keys: Arc<dyn PreKeyProvider>,
+        keys: Arc<dyn KeyAccess>,
+    ) -> SessionManager {
         SessionManager {
-            state: SessionState::New {},
-            peer_identity,
+            session: Session {
+                peer_identity,
+                state: SessionState::New {},
+            },
             pre_keys,
             keys,
         }
+    }
+
+    pub fn manage_session(
+        session: Session,
+        pre_keys: Arc<dyn PreKeyProvider>,
+        keys: Arc<dyn KeyAccess>,
+    ) -> SessionManager {
+        SessionManager {
+            session,
+            pre_keys,
+            keys,
+        }
+    }
+
+    pub fn session(&self) -> &Session {
+        &self.session
     }
 
     pub fn refresh(&mut self, exchange: KeyExchange) -> Result<(), SessionError> {
@@ -76,7 +105,7 @@ impl SessionManager {
             }
         })?;
 
-        if other_identity != self.peer_identity {
+        if other_identity != self.session.peer_identity {
             return Err(SessionError::InvalidSessionState {
                 message: "Peer identity in key exchange does not match session".to_string(),
             });
@@ -117,7 +146,7 @@ impl SessionManager {
         })?;
 
         // TODO history
-        self.state = SessionState::Initialised { ratchet };
+        self.session.state = SessionState::Initialised { ratchet };
 
         Ok(())
     }
@@ -126,7 +155,7 @@ impl SessionManager {
         &mut self,
         params: EncryptionParameters,
     ) -> Result<RecvStep, SessionError> {
-        match &mut self.state {
+        match &mut self.session.state {
             SessionState::Initialised { ratchet } => {
                 let ratchet_key = PublicKey::from_bytes(&params.ratchet_key[..]).map_err(|e| {
                     SessionError::FailedCryptography {
@@ -150,16 +179,15 @@ impl SessionManager {
     }
 
     pub async fn send(&mut self) -> Result<(Option<KeyExchange>, SendStep), SessionError> {
-        match &mut self.state {
+        match &mut self.session.state {
             SessionState::Initialised { ratchet } => Ok((None, ratchet.send_step())),
             SessionState::New {} => {
                 let bundle: PreKeyBundle =
-                    self.pre_keys
-                        .retrieve_pre_keys()
-                        .await
-                        .map_err(|()| SessionError::Message {
+                    self.pre_keys.retrieve_pre_keys().await.map_err(|()| {
+                        SessionError::Message {
                             message: "Failed to get pre keys".to_string(),
-                        })?;
+                        }
+                    })?;
 
                 let peer = bundle
                     .identity
@@ -174,9 +202,10 @@ impl SessionManager {
                     }
                 })?;
 
-                if other_identity != self.peer_identity {
+                if other_identity != self.session.peer_identity {
                     return Err(SessionError::InvalidSessionState {
-                        message: "Peer identity in pre key bundle does not match session".to_string(),
+                        message: "Peer identity in pre key bundle does not match session"
+                            .to_string(),
                     });
                 }
 
@@ -220,7 +249,7 @@ impl SessionManager {
 
                 let step = ratchet.send_step();
 
-                self.state = SessionState::Initialised { ratchet };
+                self.session.state = SessionState::Initialised { ratchet };
 
                 // TODO sign key exchange?
                 let exchange = KeyExchange {
@@ -245,7 +274,11 @@ mod session_tests {
         let mock_keys = Arc::new(MockCryptoProvider::any());
         let mock_pre_keys = Arc::new(MockPreKeyProvider::new());
 
-        let mut sess_mgr = SessionManager::new(PrivateKey::generate().unwrap().public_key().clone(), mock_pre_keys, mock_keys);
+        let mut sess_mgr = SessionManager::new(
+            PrivateKey::generate().unwrap().public_key().clone(),
+            mock_pre_keys,
+            mock_keys,
+        );
 
         let params = EncryptionParameters {
             ratchet_key: vec![],
@@ -275,7 +308,11 @@ mod session_tests {
             .times(1)
             .return_const(Ok(alice_bundle));
 
-        let mut sess_mgr = SessionManager::new(alice_key.public_key().clone(), Arc::new(mock_pre_keys), mock_keys);
+        let mut sess_mgr = SessionManager::new(
+            alice_key.public_key().clone(),
+            Arc::new(mock_pre_keys),
+            mock_keys,
+        );
 
         let result = sess_mgr.send().await;
         assert!(result.is_ok());
@@ -328,7 +365,11 @@ mod session_tests {
         let mut mock_pre_keys = MockPreKeyProvider::new();
         mock_pre_keys.expect_retrieve_pre_keys().times(0);
 
-        let mut sess_mgr = SessionManager::new(bob_key.public_key().clone(), Arc::new(mock_pre_keys), mock_keys);
+        let mut sess_mgr = SessionManager::new(
+            bob_key.public_key().clone(),
+            Arc::new(mock_pre_keys),
+            mock_keys,
+        );
 
         let result = sess_mgr.refresh(exchange);
         assert!(result.is_ok());
@@ -345,8 +386,6 @@ mod session_tests {
         let alice_key = PrivateKey::generate().unwrap();
         let (alice_bundle, _) = prepare_pre_keys(&alice_key);
 
-        let bob_key = PrivateKey::generate().unwrap();
-
         let mut mock_pre_keys = MockPreKeyProvider::new();
         mock_pre_keys
             .expect_retrieve_pre_keys()
@@ -354,7 +393,11 @@ mod session_tests {
             .return_const(Ok(alice_bundle));
 
         let any_unrelated_key = PrivateKey::generate().unwrap().public_key().clone();
-        let mut sess_mgr = SessionManager::new(any_unrelated_key, Arc::new(mock_pre_keys), Arc::new(MockCryptoProvider::any()));
+        let mut sess_mgr = SessionManager::new(
+            any_unrelated_key,
+            Arc::new(mock_pre_keys),
+            Arc::new(MockCryptoProvider::any()),
+        );
 
         let result = sess_mgr.send().await;
         assert!(result.is_err());
@@ -378,7 +421,11 @@ mod session_tests {
         mock_pre_keys.expect_retrieve_pre_keys().times(0);
 
         let any_unrelated_key = PrivateKey::generate().unwrap().public_key().clone();
-        let mut sess_mgr = SessionManager::new(any_unrelated_key, Arc::new(mock_pre_keys), Arc::new(MockCryptoProvider::any()));
+        let mut sess_mgr = SessionManager::new(
+            any_unrelated_key,
+            Arc::new(mock_pre_keys),
+            Arc::new(MockCryptoProvider::any()),
+        );
 
         let result = sess_mgr.refresh(exchange);
         assert!(result.is_err());

@@ -19,7 +19,7 @@ pub struct SendStep {
 }
 
 /// a single receiving ratchet step
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Clone, Debug, Deserialize,  Serialize)]
 pub struct RecvStep {
     pub counter: u64,
     pub secret: [u8; 32],
@@ -47,7 +47,7 @@ impl std::cmp::PartialEq<RecvStep> for RecvStep {
 impl Eq for RecvStep {}
 
 /// manage a double ratchet and cache lost steps
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Clone, Debug, Deserialize,  Serialize)]
 pub struct ManagedRatchet {
     ratchet: DoubleRatchet,
     unused_keys: HashSet<RecvStep>,
@@ -118,7 +118,7 @@ impl ManagedRatchet {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Clone, Debug, Deserialize,  Serialize)]
 struct DoubleRatchet {
     current_private: PrivateKey,
     current_public: PublicKey,
@@ -225,7 +225,7 @@ impl DoubleRatchet {
 }
 
 /// 1-based counting chain
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Clone, Debug, Deserialize,  Serialize)]
 struct CountingChain(KdfChain, u64);
 
 impl CountingChain {
@@ -246,7 +246,7 @@ impl CountingChain {
 }
 
 /// simple HKDF chain
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Clone, Debug, Deserialize,  Serialize)]
 struct KdfChain([u8; 32]);
 
 impl KdfChain {
@@ -471,7 +471,8 @@ pub mod ratchet_tests {
         let (mut alice, mut bob) = entangled_ratchets();
 
         let initial_step = alice.send_step();
-        bob.asymmetric_step(initial_step.ratchet_key.clone()).unwrap();
+        bob.asymmetric_step(initial_step.ratchet_key.clone())
+            .unwrap();
 
         assert_send_recv(initial_step, bob.recv_step());
         assert_send_recv(alice.send_step(), bob.recv_step());
