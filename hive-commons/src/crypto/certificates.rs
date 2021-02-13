@@ -14,7 +14,7 @@ use crate::model::{common, Decodable, Encodable};
 ///
 /// Carries an encoded certificate, signature and some decoded
 /// additional information.
-#[derive(Clone, Debug, Deserialize,  Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Certificate {
     pub(crate) cert: Vec<u8>,
     pub(crate) signature: Vec<u8>,
@@ -79,7 +79,7 @@ impl std::hash::Hash for Certificate {
 /// An inner certificate.
 ///
 /// Contains parsed information about a certificate.
-#[derive(Clone, Debug, Deserialize,  Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CertificateInfoBundle {
     pub(crate) identity: PublicKey,
     pub(crate) expiration: SystemTime,

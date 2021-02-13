@@ -1,5 +1,7 @@
-use failure::Fail;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+
+use failure::Fail;
 
 use serde::{Deserialize, Serialize};
 
@@ -29,12 +31,6 @@ pub enum SessionError {
     InvalidInput { message: String },
 }
 
-#[cfg_attr(test, automock)]
-#[async_trait::async_trait]
-pub trait PreKeyProvider {
-    async fn retrieve_pre_keys(&self) -> Result<PreKeyBundle, ()>;
-}
-
 pub trait KeyAccess {
     fn identity_access(&self) -> &PrivateKey;
 
@@ -43,10 +39,31 @@ pub trait KeyAccess {
     fn one_time_key_access(&self, public: &PublicKey) -> Option<PrivateKey>;
 }
 
+pub enum ReceivingStatus {
+    RequireKeyExchange {},
+    Ok { step: RecvStep },
+}
+
+pub enum SendingStatus {
+    RequirePreKeys {},
+    Ok { key_exchange: Option<KeyExchange>, step: SendStep },
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 enum SessionState {
     Initialised { ratchet: ManagedRatchet },
+    ReceivedPreKeyBundle { identity: PublicKey, pre_key: PublicKey, one_time_key: Option<PublicKey> },
     New {},
+}
+
+impl Hash for SessionState {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_i8(match *self {
+            SessionState::New {} => 1,
+            SessionState::ReceivedPreKeyBundle { .. } => 2,
+            SessionState::Initialised { .. } => 3,
+        })
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -55,16 +72,50 @@ pub struct Session {
     peer_identity: PublicKey,
 }
 
+impl Hash for Session {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.peer_identity.hash(state);
+        self.state.hash(state);
+    }
+}
+
+impl std::cmp::PartialEq<Session> for Session {
+    fn eq(&self, other: &Session) -> bool {
+        if self.peer_identity == other.peer_identity {
+            return match (&self.state, &other.state) {
+                (SessionState::New {}, SessionState::New {}) => true,
+                (SessionState::Initialised { .. }, SessionState::Initialised { .. }) => true,
+                _ => false,
+            };
+        }
+        return false;
+    }
+}
+
+impl<'a> std::cmp::PartialEq<Session> for &'a Session {
+    fn eq(&self, other: &Session) -> bool {
+        if self.peer_identity == other.peer_identity {
+            return match (&self.state, &other.state) {
+                (SessionState::New {}, SessionState::New {}) => true,
+                (SessionState::Initialised { .. }, SessionState::Initialised { .. }) => true,
+                _ => false,
+            };
+        }
+        return false;
+    }
+}
+
+impl Eq for Session {}
+
+#[derive(Clone)]
 pub struct SessionManager {
     session: Session,
-    pre_keys: Arc<dyn PreKeyProvider>,
     keys: Arc<dyn KeyAccess>,
 }
 
 impl SessionManager {
     pub fn new(
         peer_identity: PublicKey,
-        pre_keys: Arc<dyn PreKeyProvider>,
         keys: Arc<dyn KeyAccess>,
     ) -> SessionManager {
         SessionManager {
@@ -72,19 +123,16 @@ impl SessionManager {
                 peer_identity,
                 state: SessionState::New {},
             },
-            pre_keys,
             keys,
         }
     }
 
     pub fn manage_session(
         session: Session,
-        pre_keys: Arc<dyn PreKeyProvider>,
         keys: Arc<dyn KeyAccess>,
     ) -> SessionManager {
         SessionManager {
             session,
-            pre_keys,
             keys,
         }
     }
@@ -93,7 +141,65 @@ impl SessionManager {
         &self.session
     }
 
-    pub fn refresh(&mut self, exchange: KeyExchange) -> Result<(), SessionError> {
+    pub fn received_pre_keys(&mut self, bundle: PreKeyBundle) -> Result<(), SessionError> {
+        match &mut self.session.state {
+            SessionState::Initialised { .. } => Err(SessionError::InvalidSessionState {
+                message: "Received pre keys, but session is already initialised".to_string(),
+            }),
+            SessionState::New {} | SessionState::ReceivedPreKeyBundle { .. } => {
+                let peer = bundle
+                    .identity
+                    .clone()
+                    .ok_or_else(|| SessionError::InvalidInput {
+                        message: "Identity missing in pre key bundle".to_string(),
+                    })?;
+                let identity = PublicKey::from_bytes(&peer.identity[..]).map_err(|e| {
+                    SessionError::FailedCryptography {
+                        message: "Decode of peer identity".to_string(),
+                        cause: e,
+                    }
+                })?;
+
+                if identity != self.session.peer_identity {
+                    return Err(SessionError::InvalidSessionState {
+                        message: "Peer identity in pre key bundle does not match session"
+                            .to_string(),
+                    });
+                }
+
+                identity
+                    .verify(&bundle.pre_key[..], &bundle.pre_key_signature[..])
+                    .map_err(|e| SessionError::FailedCryptography {
+                        message: "Verification of pre key signature".to_string(),
+                        cause: e,
+                    })?;
+
+                let pre_key = PublicKey::from_bytes(&bundle.pre_key[..]).map_err(|e| {
+                    SessionError::FailedCryptography {
+                        message: "Decode of pre key".to_string(),
+                        cause: e,
+                    }
+                })?;
+
+                let one_time_key = if let Some(bytes) = bundle.one_time_pre_keys.first() {
+                    let one_time_key = PublicKey::from_bytes(&bytes[..]).map_err(|e| {
+                        SessionError::FailedCryptography {
+                            message: "Decode of one time key".to_string(),
+                            cause: e,
+                        }
+                    })?;
+                    Ok(Some(one_time_key))
+                } else {
+                    Ok(None)
+                }?;
+
+                self.session.state = SessionState::ReceivedPreKeyBundle { identity, pre_key, one_time_key };
+                Ok(())
+            }
+        }
+    }
+
+    pub fn received_key_exchange(&mut self, exchange: KeyExchange) -> Result<(), SessionError> {
         let peer = exchange.origin.ok_or_else(|| SessionError::InvalidInput {
             message: "Origin missing in exchange".to_string(),
         })?;
@@ -151,10 +257,10 @@ impl SessionManager {
         Ok(())
     }
 
-    pub async fn receive(
+    pub fn receive(
         &mut self,
         params: EncryptionParameters,
-    ) -> Result<RecvStep, SessionError> {
+    ) -> Result<ReceivingStatus, SessionError> {
         match &mut self.session.state {
             SessionState::Initialised { ratchet } => {
                 let ratchet_key = PublicKey::from_bytes(&params.ratchet_key[..]).map_err(|e| {
@@ -170,74 +276,21 @@ impl SessionManager {
                         message: "Decode of ratchet key".to_string(),
                         cause: e,
                     })?;
-                Ok(step)
+                Ok(ReceivingStatus::Ok { step })
             }
-            SessionState::New {} => Err(SessionError::InvalidSessionState {
-                message: "'New' can't handle params ... ".to_string(),
-            }),
+            // for now ignore the existing pre keys, being able to decrypt an incoming message is priority
+            SessionState::New {} | SessionState::ReceivedPreKeyBundle { .. } => Ok(ReceivingStatus::RequireKeyExchange {}),
         }
     }
 
-    pub async fn send(&mut self) -> Result<(Option<KeyExchange>, SendStep), SessionError> {
+    pub fn send(&mut self) -> Result<SendingStatus, SessionError> {
         match &mut self.session.state {
-            SessionState::Initialised { ratchet } => Ok((None, ratchet.send_step())),
-            SessionState::New {} => {
-                let bundle: PreKeyBundle =
-                    self.pre_keys.retrieve_pre_keys().await.map_err(|()| {
-                        SessionError::Message {
-                            message: "Failed to get pre keys".to_string(),
-                        }
-                    })?;
-
-                let peer = bundle
-                    .identity
-                    .clone()
-                    .ok_or_else(|| SessionError::InvalidInput {
-                        message: "Identity missing in pre key bundle".to_string(),
-                    })?;
-                let other_identity = PublicKey::from_bytes(&peer.identity[..]).map_err(|e| {
-                    SessionError::FailedCryptography {
-                        message: "Decode of peer identity".to_string(),
-                        cause: e,
-                    }
-                })?;
-
-                if other_identity != self.session.peer_identity {
-                    return Err(SessionError::InvalidSessionState {
-                        message: "Peer identity in pre key bundle does not match session"
-                            .to_string(),
-                    });
-                }
-
-                other_identity
-                    .verify(&bundle.pre_key[..], &bundle.pre_key_signature[..])
-                    .map_err(|e| SessionError::FailedCryptography {
-                        message: "Verification of pre key signature".to_string(),
-                        cause: e,
-                    })?;
-
-                let pre_key = PublicKey::from_bytes(&bundle.pre_key[..]).map_err(|e| {
-                    SessionError::FailedCryptography {
-                        message: "Decode of pre key".to_string(),
-                        cause: e,
-                    }
-                })?;
-
-                let otk = if let Some(bytes) = bundle.one_time_pre_keys.first() {
-                    let one_time_key = PublicKey::from_bytes(&bytes[..]).map_err(|e| {
-                        SessionError::FailedCryptography {
-                            message: "Decode of one time key".to_string(),
-                            cause: e,
-                        }
-                    })?;
-                    Ok(Some(one_time_key))
-                } else {
-                    Ok(None)
-                }?;
-
+            SessionState::New {} => Ok(SendingStatus::RequirePreKeys {}),
+            SessionState::Initialised { ratchet } => Ok(SendingStatus::Ok { key_exchange: None, step: ratchet.send_step() }),
+            SessionState::ReceivedPreKeyBundle { identity: other_identity, pre_key, one_time_key } => {
                 let identity = self.keys.identity_access();
                 let (eph_key, secret) =
-                    x3dh_agree_initial(identity, &other_identity, &pre_key, otk.as_ref());
+                    x3dh_agree_initial(identity, &other_identity, &pre_key, one_time_key.as_ref());
 
                 let mut ratchet =
                     ManagedRatchet::initialise_to_send(&secret, &pre_key).map_err(|e| {
@@ -249,16 +302,16 @@ impl SessionManager {
 
                 let step = ratchet.send_step();
 
-                self.session.state = SessionState::Initialised { ratchet };
-
                 // TODO sign key exchange?
                 let exchange = KeyExchange {
                     origin: Some(identity.public_key().into_peer()),
                     ephemeral_key: eph_key.id_bytes(),
-                    one_time_key: otk.map(|otk_pub| otk_pub.id_bytes()).unwrap_or(vec![]),
+                    one_time_key: one_time_key.map(|otk_pub| otk_pub.id_bytes()).unwrap_or(vec![]),
                 };
 
-                Ok((Some(exchange), step))
+                self.session.state = SessionState::Initialised { ratchet };
+
+                Ok(SendingStatus::Ok { key_exchange: Some(exchange), step })
             }
         }
     }
@@ -268,16 +321,13 @@ impl SessionManager {
 mod session_tests {
     use super::*;
     use crate::crypto::utils::{create_pre_key_bundle, PrivatePreKeys};
+    use mockall::predicate;
 
-    #[tokio::test]
-    async fn test_new_state_receives() {
-        let mock_keys = Arc::new(MockCryptoProvider::any());
-        let mock_pre_keys = Arc::new(MockPreKeyProvider::new());
-
+    #[test]
+    fn new_state_requires_key_exchange_to_receive() {
         let mut sess_mgr = SessionManager::new(
             PrivateKey::generate().unwrap().public_key().clone(),
-            mock_pre_keys,
-            mock_keys,
+            Arc::new(MockCryptoProvider::any()),
         );
 
         let params = EncryptionParameters {
@@ -286,40 +336,59 @@ mod session_tests {
             prev_chain_count: 0,
         };
 
-        let result = sess_mgr.receive(params).await;
-        assert!(result.is_err());
-        assert!(match result.unwrap_err() {
-            SessionError::InvalidSessionState { .. } => true,
+        let result = sess_mgr.receive(params);
+        assert!(result.is_ok());
+        assert!(match result.unwrap() {
+            ReceivingStatus::RequireKeyExchange {} => true,
             _ => false,
         });
     }
 
-    #[tokio::test]
-    async fn test_new_state_sends() {
+    #[test]
+    fn new_state_requires_pre_keys_to_send() {
+        let bob_key = PrivateKey::generate().unwrap();
+
+        let mut sess_mgr = SessionManager::new(
+            PrivateKey::generate().unwrap().public_key().clone(),
+            Arc::new(MockCryptoProvider::new(bob_key)),
+        );
+
+        let result = sess_mgr.send();
+        assert!(result.is_ok());
+        assert!(match result.unwrap() {
+            SendingStatus::RequirePreKeys {} => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    fn pre_key_state_sends() {
         let alice_key = PrivateKey::generate().unwrap();
         let (alice_bundle, alice_bundle_privates) = prepare_pre_keys(&alice_key);
 
         let bob_key = PrivateKey::generate().unwrap();
 
         let mock_keys = Arc::new(MockCryptoProvider::new(bob_key.clone()));
-        let mut mock_pre_keys = MockPreKeyProvider::new();
-        mock_pre_keys
-            .expect_retrieve_pre_keys()
-            .times(1)
-            .return_const(Ok(alice_bundle));
 
         let mut sess_mgr = SessionManager::new(
             alice_key.public_key().clone(),
-            Arc::new(mock_pre_keys),
             mock_keys,
         );
 
-        let result = sess_mgr.send().await;
+        sess_mgr.received_pre_keys(alice_bundle).unwrap();
+
+        let result = sess_mgr.send();
         assert!(result.is_ok());
 
-        let (key_exchange, send_step) = result.unwrap();
-        assert!(key_exchange.is_some());
-        let key_exchange = key_exchange.unwrap();
+        let key_exchange;
+        let send_step;
+        if let SendingStatus::Ok { key_exchange: inner_exchange, step } = result.unwrap() {
+            send_step = step;
+            assert!(inner_exchange.is_some());
+            key_exchange = inner_exchange.unwrap();
+        } else {
+            panic!("Invalid state")
+        }
 
         let eph_key = PublicKey::from_bytes(&key_exchange.ephemeral_key[..]).unwrap();
 
@@ -344,10 +413,10 @@ mod session_tests {
         assert_eq!(send_step.secret, recv_step.secret)
     }
 
-    #[tokio::test]
-    async fn test_intialised_state_send() {
+    #[test]
+    fn intialised_state_send() {
         let alice_key = PrivateKey::generate().unwrap();
-        let (_alice_bundle, alice_bundle_privates) = prepare_pre_keys(&alice_key);
+        let (_, alice_bundle_privates) = prepare_pre_keys(&alice_key);
         let mock_keys = Arc::new(MockCryptoProvider::with_pre_key(
             alice_key.clone(),
             alice_bundle_privates.pre_key,
@@ -362,44 +431,32 @@ mod session_tests {
             one_time_key: vec![],
         };
 
-        let mut mock_pre_keys = MockPreKeyProvider::new();
-        mock_pre_keys.expect_retrieve_pre_keys().times(0);
-
         let mut sess_mgr = SessionManager::new(
             bob_key.public_key().clone(),
-            Arc::new(mock_pre_keys),
             mock_keys,
         );
 
-        let result = sess_mgr.refresh(exchange);
+        let result = sess_mgr.received_key_exchange(exchange);
         assert!(result.is_ok());
 
-        let result = sess_mgr.send().await;
+        let result = sess_mgr.send();
         assert!(result.is_ok());
-
-        let (key_exchange, _) = result.unwrap();
-        assert!(key_exchange.is_none());
+        assert!(match result.unwrap() {
+            SendingStatus::Ok { key_exchange, step } => key_exchange.is_none(),
+            _ => false
+        });
     }
 
-    #[tokio::test]
-    async fn test_new_state_sends_with_wrong_identity() {
-        let alice_key = PrivateKey::generate().unwrap();
-        let (alice_bundle, _) = prepare_pre_keys(&alice_key);
-
-        let mut mock_pre_keys = MockPreKeyProvider::new();
-        mock_pre_keys
-            .expect_retrieve_pre_keys()
-            .times(1)
-            .return_const(Ok(alice_bundle));
-
+    #[test]
+    fn new_state_receives_pre_keys_with_wrong_identity() {
         let any_unrelated_key = PrivateKey::generate().unwrap().public_key().clone();
         let mut sess_mgr = SessionManager::new(
             any_unrelated_key,
-            Arc::new(mock_pre_keys),
             Arc::new(MockCryptoProvider::any()),
         );
 
-        let result = sess_mgr.send().await;
+        let (alice_bundle, _) = prepare_pre_keys(&PrivateKey::generate().unwrap());
+        let result = sess_mgr.received_pre_keys(alice_bundle);
         assert!(result.is_err());
         assert!(match result.unwrap_err() {
             SessionError::InvalidSessionState { .. } => true,
@@ -407,27 +464,21 @@ mod session_tests {
         });
     }
 
-    #[tokio::test]
-    async fn test_refresh_with_wrong_identity() {
-        let bob_key = PrivateKey::generate().unwrap();
-
+    #[test]
+    fn receives_key_exchange_with_wrong_identity() {
         let exchange = KeyExchange {
-            origin: Some(bob_key.public_key().into_peer()),
+            origin: Some(PrivateKey::generate().unwrap().public_key().into_peer()),
             ephemeral_key: vec![],
             one_time_key: vec![],
         };
 
-        let mut mock_pre_keys = MockPreKeyProvider::new();
-        mock_pre_keys.expect_retrieve_pre_keys().times(0);
-
         let any_unrelated_key = PrivateKey::generate().unwrap().public_key().clone();
         let mut sess_mgr = SessionManager::new(
             any_unrelated_key,
-            Arc::new(mock_pre_keys),
             Arc::new(MockCryptoProvider::any()),
         );
 
-        let result = sess_mgr.refresh(exchange);
+        let result = sess_mgr.received_key_exchange(exchange);
         assert!(result.is_err());
         assert!(match result.unwrap_err() {
             SessionError::InvalidSessionState { .. } => true,

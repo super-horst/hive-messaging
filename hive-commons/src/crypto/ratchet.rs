@@ -19,7 +19,7 @@ pub struct SendStep {
 }
 
 /// a single receiving ratchet step
-#[derive(Clone, Debug, Deserialize,  Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RecvStep {
     pub counter: u64,
     pub secret: [u8; 32],
@@ -47,7 +47,7 @@ impl std::cmp::PartialEq<RecvStep> for RecvStep {
 impl Eq for RecvStep {}
 
 /// manage a double ratchet and cache lost steps
-#[derive(Clone, Debug, Deserialize,  Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ManagedRatchet {
     ratchet: DoubleRatchet,
     unused_keys: HashSet<RecvStep>,
@@ -118,7 +118,7 @@ impl ManagedRatchet {
     }
 }
 
-#[derive(Clone, Debug, Deserialize,  Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct DoubleRatchet {
     current_private: PrivateKey,
     current_public: PublicKey,
@@ -225,7 +225,7 @@ impl DoubleRatchet {
 }
 
 /// 1-based counting chain
-#[derive(Clone, Debug, Deserialize,  Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct CountingChain(KdfChain, u64);
 
 impl CountingChain {
@@ -246,7 +246,7 @@ impl CountingChain {
 }
 
 /// simple HKDF chain
-#[derive(Clone, Debug, Deserialize,  Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct KdfChain([u8; 32]);
 
 impl KdfChain {

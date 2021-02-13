@@ -13,7 +13,6 @@ web = ["uuid/wasm-bindgen", "js-sys"]
 [dependencies]
 # structural
 failure = "0.1.8"
-async-trait = "0.1.33"
 
 # tools
 hex = "0.4.2"
