@@ -30,6 +30,29 @@ extern "C" {
     pub fn setPrevChainCount(this: &EncryptionParameters, idx: u64);
 }
 
+impl From<messages::EncryptionParameters> for EncryptionParameters {
+    fn from(parameters: messages::EncryptionParameters) -> Self {
+        let ratchet_key = js_sys::Uint8Array::from(&parameters.ratchet_key[..]);
+
+        let binding = Self::new();
+        binding.setRatchetKey(ratchet_key);
+        binding.setChainIdx(parameters.chain_idx);
+        binding.setPrevChainCount(parameters.prev_chain_count);
+
+        return binding;
+    }
+}
+
+impl Into<messages::EncryptionParameters> for EncryptionParameters {
+    fn into(self) -> messages::EncryptionParameters {
+        return messages::EncryptionParameters {
+            ratchet_key: self.getRatchetKey_asU8().to_vec(),
+            chain_idx: self.getChainIdx(),
+            prev_chain_count: self.getPrevChainCount(),
+        };
+    }
+}
+
 #[wasm_bindgen(module = "/js/generated/messages_svc_pb.js")]
 extern "C" {
     pub type KeyExchange;
