@@ -46,13 +46,22 @@ pub enum ReceivingStatus {
 
 pub enum SendingStatus {
     RequirePreKeys {},
-    Ok { key_exchange: Option<KeyExchange>, step: SendStep },
+    Ok {
+        key_exchange: Option<KeyExchange>,
+        step: SendStep,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 enum SessionState {
-    Initialised { ratchet: ManagedRatchet },
-    ReceivedPreKeyBundle { identity: PublicKey, pre_key: PublicKey, one_time_key: Option<PublicKey> },
+    Initialised {
+        ratchet: ManagedRatchet,
+    },
+    ReceivedPreKeyBundle {
+        identity: PublicKey,
+        pre_key: PublicKey,
+        one_time_key: Option<PublicKey>,
+    },
     New {},
 }
 
@@ -69,7 +78,7 @@ impl Hash for SessionState {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Session {
     state: SessionState,
-    peer_identity: PublicKey,
+    pub peer_identity: PublicKey,
 }
 
 impl Hash for Session {
@@ -114,10 +123,7 @@ pub struct SessionManager {
 }
 
 impl SessionManager {
-    pub fn new(
-        peer_identity: PublicKey,
-        keys: Arc<dyn KeyAccess>,
-    ) -> SessionManager {
+    pub fn new(peer_identity: PublicKey, keys: Arc<dyn KeyAccess>) -> SessionManager {
         SessionManager {
             session: Session {
                 peer_identity,
@@ -127,14 +133,8 @@ impl SessionManager {
         }
     }
 
-    pub fn manage_session(
-        session: Session,
-        keys: Arc<dyn KeyAccess>,
-    ) -> SessionManager {
-        SessionManager {
-            session,
-            keys,
-        }
+    pub fn manage_session(session: Session, keys: Arc<dyn KeyAccess>) -> SessionManager {
+        SessionManager { session, keys }
     }
 
     pub fn session(&self) -> &Session {
@@ -193,7 +193,11 @@ impl SessionManager {
                     Ok(None)
                 }?;
 
-                self.session.state = SessionState::ReceivedPreKeyBundle { identity, pre_key, one_time_key };
+                self.session.state = SessionState::ReceivedPreKeyBundle {
+                    identity,
+                    pre_key,
+                    one_time_key,
+                };
                 Ok(())
             }
         }
@@ -235,8 +239,8 @@ impl SessionManager {
             })?;
             Some(key)
         }
-            .map(|otk_pub| self.keys.one_time_key_access(&otk_pub))
-            .flatten();
+        .map(|otk_pub| self.keys.one_time_key_access(&otk_pub))
+        .flatten();
 
         let identity = self.keys.identity_access();
         let pre_key = self.keys.pre_key_access();
@@ -279,15 +283,24 @@ impl SessionManager {
                 Ok(ReceivingStatus::Ok { step })
             }
             // for now ignore the existing pre keys, being able to decrypt an incoming message is priority
-            SessionState::New {} | SessionState::ReceivedPreKeyBundle { .. } => Ok(ReceivingStatus::RequireKeyExchange {}),
+            SessionState::New {} | SessionState::ReceivedPreKeyBundle { .. } => {
+                Ok(ReceivingStatus::RequireKeyExchange {})
+            }
         }
     }
 
     pub fn send(&mut self) -> Result<SendingStatus, SessionError> {
         match &mut self.session.state {
             SessionState::New {} => Ok(SendingStatus::RequirePreKeys {}),
-            SessionState::Initialised { ratchet } => Ok(SendingStatus::Ok { key_exchange: None, step: ratchet.send_step() }),
-            SessionState::ReceivedPreKeyBundle { identity: other_identity, pre_key, one_time_key } => {
+            SessionState::Initialised { ratchet } => Ok(SendingStatus::Ok {
+                key_exchange: None,
+                step: ratchet.send_step(),
+            }),
+            SessionState::ReceivedPreKeyBundle {
+                identity: other_identity,
+                pre_key,
+                one_time_key,
+            } => {
                 let identity = self.keys.identity_access();
                 let (eph_key, secret) =
                     x3dh_agree_initial(identity, &other_identity, &pre_key, one_time_key.as_ref());
@@ -306,12 +319,17 @@ impl SessionManager {
                 let exchange = KeyExchange {
                     origin: Some(identity.public_key().into_peer()),
                     ephemeral_key: eph_key.id_bytes(),
-                    one_time_key: one_time_key.map(|otk_pub| otk_pub.id_bytes()).unwrap_or(vec![]),
+                    one_time_key: one_time_key
+                        .map(|otk_pub| otk_pub.id_bytes())
+                        .unwrap_or(vec![]),
                 };
 
                 self.session.state = SessionState::Initialised { ratchet };
 
-                Ok(SendingStatus::Ok { key_exchange: Some(exchange), step })
+                Ok(SendingStatus::Ok {
+                    key_exchange: Some(exchange),
+                    step,
+                })
             }
         }
     }
@@ -370,10 +388,7 @@ mod session_tests {
 
         let mock_keys = Arc::new(MockCryptoProvider::new(bob_key.clone()));
 
-        let mut sess_mgr = SessionManager::new(
-            alice_key.public_key().clone(),
-            mock_keys,
-        );
+        let mut sess_mgr = SessionManager::new(alice_key.public_key().clone(), mock_keys);
 
         sess_mgr.received_pre_keys(alice_bundle).unwrap();
 
@@ -382,7 +397,11 @@ mod session_tests {
 
         let key_exchange;
         let send_step;
-        if let SendingStatus::Ok { key_exchange: inner_exchange, step } = result.unwrap() {
+        if let SendingStatus::Ok {
+            key_exchange: inner_exchange,
+            step,
+        } = result.unwrap()
+        {
             send_step = step;
             assert!(inner_exchange.is_some());
             key_exchange = inner_exchange.unwrap();
@@ -431,10 +450,7 @@ mod session_tests {
             one_time_key: vec![],
         };
 
-        let mut sess_mgr = SessionManager::new(
-            bob_key.public_key().clone(),
-            mock_keys,
-        );
+        let mut sess_mgr = SessionManager::new(bob_key.public_key().clone(), mock_keys);
 
         let result = sess_mgr.received_key_exchange(exchange);
         assert!(result.is_ok());
@@ -443,17 +459,15 @@ mod session_tests {
         assert!(result.is_ok());
         assert!(match result.unwrap() {
             SendingStatus::Ok { key_exchange, step } => key_exchange.is_none(),
-            _ => false
+            _ => false,
         });
     }
 
     #[test]
     fn new_state_receives_pre_keys_with_wrong_identity() {
         let any_unrelated_key = PrivateKey::generate().unwrap().public_key().clone();
-        let mut sess_mgr = SessionManager::new(
-            any_unrelated_key,
-            Arc::new(MockCryptoProvider::any()),
-        );
+        let mut sess_mgr =
+            SessionManager::new(any_unrelated_key, Arc::new(MockCryptoProvider::any()));
 
         let (alice_bundle, _) = prepare_pre_keys(&PrivateKey::generate().unwrap());
         let result = sess_mgr.received_pre_keys(alice_bundle);
@@ -473,10 +487,8 @@ mod session_tests {
         };
 
         let any_unrelated_key = PrivateKey::generate().unwrap().public_key().clone();
-        let mut sess_mgr = SessionManager::new(
-            any_unrelated_key,
-            Arc::new(MockCryptoProvider::any()),
-        );
+        let mut sess_mgr =
+            SessionManager::new(any_unrelated_key, Arc::new(MockCryptoProvider::any()));
 
         let result = sess_mgr.received_key_exchange(exchange);
         assert!(result.is_err());
