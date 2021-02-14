@@ -260,7 +260,7 @@ impl SessionManager {
 
     pub fn receive(
         &mut self,
-        params: EncryptionParameters,
+        params: &EncryptionParameters,
     ) -> Result<ReceivingStatus, SessionError> {
         match &mut self.session.state {
             SessionState::Initialised { ratchet } => {
@@ -350,7 +350,7 @@ mod session_tests {
             prev_chain_count: 0,
         };
 
-        let result = sess_mgr.receive(params);
+        let result = sess_mgr.receive(&params);
         assert!(result.is_ok());
         assert!(match result.unwrap() {
             ReceivingStatus::RequireKeyExchange {} => true,
