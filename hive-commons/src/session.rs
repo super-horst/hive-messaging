@@ -12,9 +12,6 @@ use crate::crypto::{
 use crate::model::common::PreKeyBundle;
 use crate::model::messages::{EncryptionParameters, KeyExchange};
 
-#[cfg(test)]
-use mockall::automock;
-
 #[derive(Debug, Fail)]
 pub enum SessionError {
     #[fail(display = "Error message: {}", message)]
@@ -339,7 +336,6 @@ impl SessionManager {
 mod session_tests {
     use super::*;
     use crate::crypto::utils::{create_pre_key_bundle, PrivatePreKeys};
-    use mockall::predicate;
 
     #[test]
     fn new_state_requires_key_exchange_to_receive() {
@@ -458,7 +454,7 @@ mod session_tests {
         let result = sess_mgr.send();
         assert!(result.is_ok());
         assert!(match result.unwrap() {
-            SendingStatus::Ok { key_exchange, step } => key_exchange.is_none(),
+            SendingStatus::Ok { key_exchange, .. } => key_exchange.is_none(),
             _ => false,
         });
     }
