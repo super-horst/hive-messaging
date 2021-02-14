@@ -1,4 +1,3 @@
-use wasm_bindgen::__rt::core::borrow::Borrow;
 use wasm_bindgen::__rt::std::sync::Arc;
 
 use crate::bindings::accounts_svc_bindings::AccountsPromiseClient;
@@ -36,10 +35,10 @@ impl ConnectionManager {
     }
 
     pub fn accounts(&self) -> &AccountsPromiseClient {
-        self.accounts.borrow()
+        &self.accounts
     }
 
     pub fn messages(&self) -> &MessagesPromiseClient {
-        self.messages.borrow()
+        &self.messages
     }
 }
