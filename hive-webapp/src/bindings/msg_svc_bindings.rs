@@ -109,34 +109,34 @@ impl Into<messages::KeyExchange> for KeyExchange {
 
 #[wasm_bindgen(module = "/js/generated/messages_svc_pb.js")]
 extern "C" {
-    pub type MessageEnvelope;
+    pub type Envelope;
 
     #[wasm_bindgen(constructor)]
-    pub fn new() -> MessageEnvelope;
+    pub fn new() -> Envelope;
 
     #[wasm_bindgen(method)]
-    pub fn getDst(this: &MessageEnvelope) -> common_bindings::Peer;
+    pub fn getDst(this: &Envelope) -> common_bindings::Peer;
 
     #[wasm_bindgen(method)]
-    pub fn setDst(this: &MessageEnvelope, dst: common_bindings::Peer);
+    pub fn setDst(this: &Envelope, dst: common_bindings::Peer);
 
     #[wasm_bindgen(method)]
-    pub fn getParams(this: &MessageEnvelope) -> EncryptionParameters;
+    pub fn getParams(this: &Envelope) -> EncryptionParameters;
 
     #[wasm_bindgen(method)]
-    pub fn setParams(this: &MessageEnvelope, params: EncryptionParameters);
+    pub fn setParams(this: &Envelope, params: EncryptionParameters);
 
     #[wasm_bindgen(method)]
-    pub fn getKeyExchange(this: &MessageEnvelope) -> KeyExchange;
+    pub fn getKeyExchange(this: &Envelope) -> KeyExchange;
 
     #[wasm_bindgen(method)]
-    pub fn setKeyExchange(this: &MessageEnvelope, params: KeyExchange);
+    pub fn setKeyExchange(this: &Envelope, params: KeyExchange);
 
     #[wasm_bindgen(method)]
-    pub fn getEncryptedPayload_asU8(this: &MessageEnvelope) -> js_sys::Uint8Array;
+    pub fn getEncryptedPayload_asU8(this: &Envelope) -> js_sys::Uint8Array;
 
     #[wasm_bindgen(method)]
-    pub fn setEncryptedPayload(this: &MessageEnvelope, payload: js_sys::Uint8Array);
+    pub fn setEncryptedPayload(this: &Envelope, payload: js_sys::Uint8Array);
 }
 
 #[wasm_bindgen(module = "/js/generated/messages_svc_pb.js")]
@@ -152,5 +152,5 @@ extern "C" {
     pub fn new(hostname: String) -> MessagesPromiseClient;
 
     #[wasm_bindgen(method)]
-    pub fn sendMessage(this: &MessagesPromiseClient, request: MessageEnvelope) -> js_sys::Promise;
+    pub fn sendMessage(this: &MessagesPromiseClient, request: Envelope) -> js_sys::Promise;
 }
