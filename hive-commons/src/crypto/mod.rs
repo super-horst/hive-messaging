@@ -17,7 +17,7 @@ pub use x3dh::*;
 mod ratchet;
 pub use ratchet::{ManagedRatchet, RecvStep, SendStep};
 
-mod encryption;
+pub mod encryption;
 
 pub mod utils;
 

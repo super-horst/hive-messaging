@@ -75,7 +75,7 @@ impl Hash for SessionState {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Session {
     state: SessionState,
-    pub peer_identity: PublicKey,
+    peer_identity: PublicKey,
 }
 
 impl Hash for Session {
