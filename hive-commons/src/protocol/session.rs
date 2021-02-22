@@ -4,8 +4,8 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::{
-    x3dh_agree_initial, x3dh_agree_respond, FromBytes, ManagedRatchet, PublicKey, RecvStep,
-    SendStep,
+    x3dh_agree_initial, x3dh_agree_respond, CertificateFactory, FromBytes, ManagedRatchet,
+    PublicKey, RecvStep, SendStep,
 };
 use crate::model::common::PreKeyBundle;
 use crate::model::messages::{KeyExchange, SessionMessage};
@@ -233,16 +233,18 @@ impl SessionManager {
             .as_ref()
             .ok_or_else(|| ProtocolError::InvalidInput {
                 message: "Origin missing in exchange".to_string(),
-            })?;
+            })?
+            .clone();
 
-        let other_identity = PublicKey::from_bytes(&peer.identity[..]).map_err(|cause| {
+        // TODO validate signer
+        let (peer_certificate, _) = CertificateFactory::decode(peer).map_err(|cause| {
             ProtocolError::FailedCryptography {
                 message: "Decode of peer identity".to_string(),
                 cause,
             }
         })?;
 
-        if other_identity != self.session.peer_identity {
+        if peer_certificate.public_key() != self.session.peer_identity {
             return Err(ProtocolError::InvalidSessionState {
                 message: "Peer identity in session message does not match session".to_string(),
                 // TODO advice?
@@ -336,14 +338,24 @@ impl SessionManager {
 mod session_tests {
     use super::*;
 
-    use crate::crypto::PrivateKey;
+    use crate::crypto::certificates::certificate_tests::create_self_signed_cert;
     use crate::crypto::utils::{create_pre_key_bundle, PrivatePreKeys};
+    use crate::crypto::PrivateKey;
+
+    use crate::model::common;
     use crate::model::messages::EncryptionParameters;
 
     #[test]
     fn new_state_requires_key_exchange_to_receive() {
+        let (my_key, my_cert) = create_self_signed_cert();
+
+        let my_cert = common::Certificate {
+            certificate: my_cert.encoded_certificate().to_vec(),
+            signature: my_cert.signature().to_vec(),
+        };
+
         let mut sess_mgr = SessionManager::new(
-            PrivateKey::generate().unwrap().public_key().clone(),
+            my_key.public_key().clone(),
             Arc::new(MockCryptoProvider::any()),
         );
 
@@ -354,7 +366,7 @@ mod session_tests {
         };
 
         let session_msg = SessionMessage {
-            origin: Some(sess_mgr.session.peer_identity.into_peer()),
+            origin: Some(my_cert),
             params: Some(params),
             key_exchange: None,
         };
@@ -484,13 +496,20 @@ mod session_tests {
 
     #[test]
     fn receives_key_exchange_with_wrong_identity() {
+        let (_, my_cert) = create_self_signed_cert();
+
+        let my_cert = common::Certificate {
+            certificate: my_cert.encoded_certificate().to_vec(),
+            signature: my_cert.signature().to_vec(),
+        };
+
         let exchange = KeyExchange {
             ephemeral_key: vec![],
             one_time_key: vec![],
         };
 
         let session_msg = SessionMessage {
-            origin: Some(PrivateKey::generate().unwrap().public_key().into_peer()),
+            origin: Some(my_cert),
             params: None,
             key_exchange: Some(exchange),
         };

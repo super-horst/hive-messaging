@@ -8,7 +8,7 @@ pub use error::*;
 mod keys;
 pub use keys::{FromBytes, PrivateKey, PublicKey};
 
-mod certificates;
+pub(crate) mod certificates;
 pub use certificates::{Certificate, CertificateFactory, CertificateInfoBundle};
 
 mod x3dh;

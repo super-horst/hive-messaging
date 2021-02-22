@@ -24,8 +24,7 @@ pub trait KeyAccess {
 
 pub struct MyIdentity {
     my_key: PrivateKey,
-    // TODO append certificate
-    //my_certificate: Certificate,
+    my_certificate: Certificate,
 }
 
 impl MyIdentity {
@@ -55,8 +54,13 @@ impl MyIdentity {
             (okm, tmp_key.public_key().clone())
         };
 
+        let certificate = common::Certificate {
+            certificate: self.my_certificate.encoded_certificate().to_vec(),
+            signature: self.my_certificate.signature().to_vec(),
+        };
+
         let session_msg = messages::SessionMessage {
-            origin: Some(self.my_key.public_key().into_peer()),
+            origin: Some(certificate),
             params: Some(enc_params),
             key_exchange,
         };
@@ -134,6 +138,8 @@ impl MyIdentity {
 mod protocol_tests {
     use super::*;
 
+    use crate::crypto::certificates::certificate_tests::create_self_signed_cert;
+
     #[test]
     fn test_public_serialise_deserialise() {
         let data: &[u8] = b"testdata is overrated";
@@ -143,18 +149,24 @@ mod protocol_tests {
             prev_chain_count: 0,
         };
 
+        let (alices_key, alices_cert) = create_self_signed_cert();
         let alices_identity = MyIdentity {
-            my_key: PrivateKey::generate().unwrap(),
+            my_key: alices_key,
+            my_certificate: alices_cert,
         };
+        let (bobs_key, bobs_cert) = create_self_signed_cert();
         let bobs_identity = MyIdentity {
-            my_key: PrivateKey::generate().unwrap(),
+            my_key: bobs_key,
+            my_certificate: bobs_cert,
         };
 
         let (eph_key, encrypted_session) = alices_identity
             .encrypt_session(bobs_identity.my_key.public_key(), enc_params, None)
             .unwrap();
 
-        let recylced_session = bobs_identity.decrypt_session(eph_key, &encrypted_session).unwrap();
+        let recylced_session = bobs_identity
+            .decrypt_session(eph_key, &encrypted_session)
+            .unwrap();
         let recycled_params = recylced_session.params.unwrap();
 
         assert_eq!(data.to_vec(), recycled_params.ratchet_key)

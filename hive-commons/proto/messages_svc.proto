@@ -35,7 +35,7 @@ message KeyExchange {
 }
 
 message SessionMessage {
-  common.Peer origin = 1 ;
+  common.Certificate origin = 1 ;
   EncryptionParameters params = 2;
   KeyExchange key_exchange = 3;
 }
