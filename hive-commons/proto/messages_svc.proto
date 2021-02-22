@@ -30,9 +30,14 @@ message EncryptionParameters {
 }
 
 message KeyExchange {
+  bytes ephemeral_key = 1;
+  bytes one_time_key = 2;
+}
+
+message SessionMessage {
   common.Peer origin = 1 ;
-  bytes ephemeral_key = 2;
-  bytes one_time_key = 3;
+  EncryptionParameters params = 2;
+  KeyExchange key_exchange = 3;
 }
 
 message PayloadHeader {
@@ -47,8 +52,8 @@ message Payload {
 message Envelope {
   common.Peer dst = 1;
 
-  EncryptionParameters params = 2;
-  KeyExchange key_exchange = 3;
+  bytes ephemeral_session_key = 5;
+  bytes encrypted_session = 6;
 
   bytes encrypted_payload = 10;
 }
