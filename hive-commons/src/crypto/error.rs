@@ -26,12 +26,6 @@ pub enum CryptoError {
         #[fail(cause)]
         cause: hkdf::InvalidLength,
     },
-    #[fail(display = "Serialisation failed: {}", message)]
-    Serialisation {
-        message: String,
-        #[fail(cause)]
-        cause: crate::model::SerialisationError,
-    },
     #[fail(display = "Failure: {}", message)]
     Common {
         message: String,

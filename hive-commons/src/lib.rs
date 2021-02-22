@@ -1,8 +1,9 @@
 pub mod crypto;
 pub mod model;
-pub mod time;
 
-pub mod session;
+pub mod protocol;
+
+pub mod time;
 
 pub mod error;
 pub use error::*;
