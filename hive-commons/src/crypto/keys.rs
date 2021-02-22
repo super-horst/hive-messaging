@@ -265,21 +265,21 @@ impl PrivateKey {
         hash1.update(&random_bytes[..]);
 
         let r = Scalar::from_hash(hash1);
-        let cap_r = (&r * &ED25519_BASEPOINT_TABLE).compress();
+        let signature_r = (&r * &ED25519_BASEPOINT_TABLE).compress();
 
         let ed_public_point = self.public.ed_public.compress().to_bytes();
 
         let mut hash = Sha512::new();
-        hash.update(cap_r.as_bytes());
+        hash.update(signature_r.as_bytes());
         hash.update(&ed_public_point);
         hash.update(&data);
 
         let h = Scalar::from_hash(hash);
-        let s = (h * self.ed_private) + r;
+        let signature_s = (h * self.ed_private) + r;
 
         let mut result = [0u8; SIGNATURE_LENGTH];
-        result[..32].copy_from_slice(cap_r.as_bytes());
-        result[32..].copy_from_slice(s.as_bytes());
+        result[..32].copy_from_slice(signature_r.as_bytes());
+        result[32..].copy_from_slice(signature_s.as_bytes());
 
         Ok(Vec::from(&result[..]))
     }

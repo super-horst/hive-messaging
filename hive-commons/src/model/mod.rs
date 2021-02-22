@@ -38,9 +38,9 @@ impl<T: prost::Message> Encodable for T {
     fn encode(&self) -> Result<Vec<u8>, SerialisationError> {
         let mut buf: Vec<u8> = Vec::with_capacity(self.encoded_len());
         self.encode(&mut buf)
-            .map_err(|e| SerialisationError::Encoding {
-                message: "failed to encode TBS certificate".to_string(),
-                cause: e,
+            .map_err(|cause| SerialisationError::Encoding {
+                message: "Failed to encode object".to_string(),
+                cause,
             })?;
         Ok(buf)
     }
@@ -54,9 +54,9 @@ impl<T: prost::Message + Default> Decodable<T> for T {
     fn decode(bytes: Vec<u8>) -> Result<T, SerialisationError> {
         let buf = Bytes::from(bytes);
 
-        Self::decode(buf).map_err(|e| SerialisationError::Decoding {
-            message: "failed to decode object".to_string(),
-            cause: e,
+        Self::decode(buf).map_err(|cause| SerialisationError::Decoding {
+            message: "Failed to decode object".to_string(),
+            cause,
         })
     }
 }

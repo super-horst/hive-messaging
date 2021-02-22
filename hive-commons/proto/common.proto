@@ -27,6 +27,7 @@ message SignedChallenge {
   bytes signature = 2;
 }
 
+// TODO rename -> SignedCertificate & CertificateData(?)
 message Certificate {
   message TbsCertificate {
     bytes identity = 1;
