@@ -3,12 +3,9 @@ use crate::model::*;
 
 mod error;
 
-use hkdf::Hkdf;
-use sha2::Sha512;
-
 pub use error::*;
 
-pub mod session;
+mod session;
 
 pub use session::*;
 
@@ -28,31 +25,26 @@ pub struct MyIdentity {
 }
 
 impl MyIdentity {
+    pub fn new(my_key: PrivateKey, my_certificate: Certificate) -> MyIdentity {
+        MyIdentity {
+            my_key,
+            my_certificate,
+        }
+    }
+
     pub fn encrypt_session(
         &self,
         destination: &PublicKey,
         enc_params: messages::EncryptionParameters,
         key_exchange: Option<messages::KeyExchange>,
     ) -> Result<(PublicKey, Vec<u8>), ProtocolError> {
-        let (eph_key_data, eph_key) = {
-            let tmp_key =
-                PrivateKey::generate().map_err(|cause| ProtocolError::FailedCryptography {
-                    message: "Generate ephemeral key".to_string(),
-                    cause,
-                })?;
+        let eph_key =
+            PrivateKey::generate().map_err(|cause| ProtocolError::FailedCryptography {
+                message: "Generate ephemeral key".to_string(),
+                cause,
+            })?;
 
-            let mut salt = Vec::with_capacity(2 * 32);
-            salt.extend_from_slice(&destination.id_bytes());
-            salt.extend_from_slice(&tmp_key.public_key().id_bytes());
-
-            let shared_secret = tmp_key.diffie_hellman(destination);
-
-            let kdf = Hkdf::<Sha512>::new(Some(&salt), &shared_secret);
-            let mut okm = [0u8; 32];
-            // ignore the error, length should always match
-            let _r = kdf.expand(&[0u8; 0], &mut okm);
-            (okm, tmp_key.public_key().clone())
-        };
+        let shared_secret = eph_key.diffie_hellman(destination);
 
         let certificate = common::Certificate {
             certificate: self.my_certificate.encoded_certificate().to_vec(),
@@ -68,9 +60,9 @@ impl MyIdentity {
         let encoded_session = session_msg
             .encode()
             .map_err(|cause| ProtocolError::FailedSerialisation { cause })?;
-        let encrypted_session = encryption::encrypt(&eph_key_data[..], &encoded_session[..]);
+        let encrypted_session = encryption::encrypt(&shared_secret[..], &encoded_session[..]);
 
-        Ok((eph_key, encrypted_session))
+        Ok((eph_key.public_key().clone(), encrypted_session))
     }
 
     pub fn decrypt_session(
@@ -78,21 +70,9 @@ impl MyIdentity {
         eph_key: PublicKey,
         encrypted_session: &[u8],
     ) -> Result<messages::SessionMessage, ProtocolError> {
-        let eph_key_data = {
-            let mut salt = Vec::with_capacity(2 * 32);
-            salt.extend_from_slice(&self.my_key.public_key().id_bytes());
-            salt.extend_from_slice(&eph_key.id_bytes());
+        let shared_secret = self.my_key.diffie_hellman(&eph_key);
 
-            let shared_secret = self.my_key.diffie_hellman(&eph_key);
-
-            let kdf = Hkdf::<Sha512>::new(Some(&salt), &shared_secret);
-            let mut okm = [0u8; 32];
-            // ignore the error, length should always match
-            let _r = kdf.expand(&[0u8; 0], &mut okm);
-            okm
-        };
-
-        let encoded_session = encryption::decrypt(&eph_key_data[..], encrypted_session);
+        let encoded_session = encryption::decrypt(&shared_secret[..], encrypted_session);
         messages::SessionMessage::decode(encoded_session)
             .map_err(|cause| ProtocolError::FailedSerialisation { cause })
     }

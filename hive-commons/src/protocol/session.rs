@@ -14,11 +14,6 @@ use crate::protocol::error::*;
 use crate::protocol::KeyAccess;
 
 #[derive(Debug)]
-pub enum ReceivingStatus {
-    Ok { step: RecvStep },
-}
-
-#[derive(Debug)]
 pub enum SendingStatus {
     RequirePreKeys {},
     Ok {
@@ -197,8 +192,8 @@ impl SessionManager {
             })?;
             Some(key)
         }
-        .map(|otk_pub| self.keys.one_time_key_access(&otk_pub))
-        .flatten();
+            .map(|otk_pub| self.keys.one_time_key_access(&otk_pub))
+            .flatten();
 
         let identity = self.keys.identity_access();
         let pre_key = self.keys.pre_key_access();
@@ -227,7 +222,7 @@ impl SessionManager {
     pub fn receive(
         &mut self,
         session_msg: &SessionMessage,
-    ) -> Result<ReceivingStatus, ProtocolError> {
+    ) -> Result<RecvStep, ProtocolError> {
         let peer = session_msg
             .origin
             .as_ref()
@@ -278,7 +273,7 @@ impl SessionManager {
                         message: "Decode of ratchet key".to_string(),
                         cause,
                     })?;
-                Ok(ReceivingStatus::Ok { step })
+                Ok(step)
             }
             // for now ignore the existing pre keys, being able to decrypt an incoming message is priority
             SessionState::New {} | SessionState::ReceivedPreKeyBundle { .. } => {
