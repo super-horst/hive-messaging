@@ -14,7 +14,7 @@ mod errors;
 pub use errors::*;
 
 use hive_commons::crypto::PublicKey;
-use hive_commons::model::messages::MessageEnvelope;
+use hive_commons::model::messages::Envelope;
 #[cfg(test)]
 use mockall::automock;
 

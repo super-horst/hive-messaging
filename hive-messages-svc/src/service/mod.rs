@@ -12,7 +12,7 @@ pub use model::messages::messages_server::*;
 use model::{Decodable, Encodable};
 
 use crate::persistence::*;
-use hive_commons::model::messages::{MessageEnvelope, MessageFilter, MessageSendResult};
+use hive_commons::model::messages::{Envelope, MessageFilter, MessageSendResult};
 use tonic::{Request, Response, Status};
 
 #[cfg(test)]
@@ -45,7 +45,7 @@ impl Messages for MessageService {
     async fn get_messages(
         &self,
         request: Request<MessageFilter>,
-    ) -> Result<Response<MessageEnvelope>, Status> {
+    ) -> Result<Response<Envelope>, Status> {
         let filter = request.into_inner();
 
         let state = match filter.state {
@@ -64,7 +64,7 @@ impl Messages for MessageService {
             .map_err(|e| tonic::Status::internal("internal error"))?;
 
         if let Some(message) = messages.pop() {
-            let envelope = MessageEnvelope::decode(message)
+            let envelope = Envelope::decode(message)
                 .map_err(|e| tonic::Status::internal("failed to decode message"))?;
 
             Ok(tonic::Response::new(envelope))
@@ -75,7 +75,7 @@ impl Messages for MessageService {
 
     async fn send_message(
         &self,
-        request: Request<MessageEnvelope>,
+        request: Request<Envelope>,
     ) -> Result<Response<MessageSendResult>, Status> {
         let envelope = request.into_inner();
         let x: Vec<u8> = envelope
@@ -285,7 +285,7 @@ async fn bob_request_and_send_messages() {
         key_ex: Some(key_ex),
     };
 
-    let envelope = hive_grpc::messages::MessageEnvelope {
+    let envelope = hive_grpc::messages::Envelope {
         payload: Some(payload),
         dst: Some(peer.clone()),
         ratchet_key: ratchet.current_public().id_bytes(),
