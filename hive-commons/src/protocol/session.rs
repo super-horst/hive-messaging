@@ -8,7 +8,7 @@ use crate::crypto::{
     PublicKey, RecvStep, SendStep,
 };
 use crate::model::common::PreKeyBundle;
-use crate::model::messages::{KeyExchange, SessionMessage};
+use crate::model::messages::{KeyExchange, SessionParameters};
 
 use crate::protocol::error::*;
 use crate::protocol::KeyAccess;
@@ -47,8 +47,8 @@ impl Hash for SessionState {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Session {
+    pub peer_identity: PublicKey,
     state: SessionState,
-    peer_identity: PublicKey,
 }
 
 impl Hash for Session {
@@ -192,8 +192,8 @@ impl SessionManager {
             })?;
             Some(key)
         }
-            .map(|otk_pub| self.keys.one_time_key_access(&otk_pub))
-            .flatten();
+        .map(|otk_pub| self.keys.one_time_key_access(&otk_pub))
+        .flatten();
 
         let identity = self.keys.identity_access();
         let pre_key = self.keys.pre_key_access();
@@ -221,23 +221,24 @@ impl SessionManager {
 
     pub fn receive(
         &mut self,
-        session_msg: &SessionMessage,
+        session_params: &SessionParameters,
     ) -> Result<RecvStep, ProtocolError> {
-        let peer = session_msg
-            .origin
-            .as_ref()
-            .ok_or_else(|| ProtocolError::InvalidInput {
-                message: "Origin missing in exchange".to_string(),
-            })?
-            .clone();
+        let peer_certificate =
+            session_params
+                .origin
+                .as_ref()
+                .ok_or_else(|| ProtocolError::InvalidInput {
+                    message: "Origin missing in exchange".to_string(),
+                })?;
 
         // TODO validate signer
-        let (peer_certificate, _) = CertificateFactory::decode(peer).map_err(|cause| {
-            ProtocolError::FailedCryptography {
-                message: "Decode of peer identity".to_string(),
-                cause,
-            }
-        })?;
+        let (peer_certificate, _) =
+            CertificateFactory::decode(peer_certificate).map_err(|cause| {
+                ProtocolError::FailedCryptography {
+                    message: "Decode of peer identity".to_string(),
+                    cause,
+                }
+            })?;
 
         if peer_certificate.public_key() != self.session.peer_identity {
             return Err(ProtocolError::InvalidSessionState {
@@ -246,11 +247,11 @@ impl SessionManager {
             });
         }
 
-        if let Some(ref key_exchange) = session_msg.key_exchange {
+        if let Some(ref key_exchange) = session_params.key_exchange {
             self.received_key_exchange(key_exchange)?;
         }
 
-        let params = session_msg
+        let params = session_params
             .params
             .as_ref()
             .ok_or_else(|| ProtocolError::InvalidInput {
@@ -360,7 +361,7 @@ mod session_tests {
             prev_chain_count: 0,
         };
 
-        let session_msg = SessionMessage {
+        let session_msg = SessionParameters {
             origin: Some(my_cert),
             params: Some(params),
             key_exchange: None,
@@ -503,7 +504,7 @@ mod session_tests {
             one_time_key: vec![],
         };
 
-        let session_msg = SessionMessage {
+        let session_msg = SessionParameters {
             origin: Some(my_cert),
             params: None,
             key_exchange: Some(exchange),

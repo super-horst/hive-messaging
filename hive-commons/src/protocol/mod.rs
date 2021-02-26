@@ -51,13 +51,13 @@ impl MyIdentity {
             signature: self.my_certificate.signature().to_vec(),
         };
 
-        let session_msg = messages::SessionMessage {
+        let session_params = messages::SessionParameters {
             origin: Some(certificate),
             params: Some(enc_params),
             key_exchange,
         };
 
-        let encoded_session = session_msg
+        let encoded_session = session_params
             .encode()
             .map_err(|cause| ProtocolError::FailedSerialisation { cause })?;
         let encrypted_session = encryption::encrypt(&shared_secret[..], &encoded_session[..]);
@@ -69,11 +69,11 @@ impl MyIdentity {
         &self,
         eph_key: PublicKey,
         encrypted_session: &[u8],
-    ) -> Result<messages::SessionMessage, ProtocolError> {
+    ) -> Result<messages::SessionParameters, ProtocolError> {
         let shared_secret = self.my_key.diffie_hellman(&eph_key);
 
         let encoded_session = encryption::decrypt(&shared_secret[..], encrypted_session);
-        messages::SessionMessage::decode(encoded_session)
+        messages::SessionParameters::decode(encoded_session)
             .map_err(|cause| ProtocolError::FailedSerialisation { cause })
     }
 

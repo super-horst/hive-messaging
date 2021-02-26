@@ -34,7 +34,7 @@ message KeyExchange {
   bytes one_time_key = 2;
 }
 
-message SessionMessage {
+message SessionParameters {
   common.Certificate origin = 1 ;
   EncryptionParameters params = 2;
   KeyExchange key_exchange = 3;

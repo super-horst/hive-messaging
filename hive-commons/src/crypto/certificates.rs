@@ -133,7 +133,7 @@ impl CertificateFactory {
     /// decode a certificate from DTO
     /// TODO resolve dependency to model::common
     pub fn decode(
-        serialised: common::Certificate,
+        serialised: &common::Certificate,
     ) -> Result<(Certificate, Option<common::Certificate>), CryptoError> {
         let tbs_cert = common::certificate::TbsCertificate::decode(serialised.certificate.to_vec())
             .map_err(|e| CryptoError::Unspecified {
@@ -152,7 +152,11 @@ impl CertificateFactory {
         let cert_info =
             CertificateInfoBundle::new(signed_identity, expiration, tbs_cert.uuid, None);
 
-        let cert = Certificate::new(serialised.certificate, serialised.signature, cert_info);
+        let cert = Certificate::new(
+            serialised.certificate.to_vec(),
+            serialised.signature.to_vec(),
+            cert_info,
+        );
 
         Ok((cert, tbs_cert.signer))
     }
