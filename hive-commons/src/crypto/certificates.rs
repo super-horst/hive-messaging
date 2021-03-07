@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use rand_core::RngCore;
 
-use crate::crypto::{CryptoError, FromBytes, PrivateKey, PublicKey};
+use crate::crypto::{CryptoError, FromBytes, PrivateKey, PublicKey, Signer, Verifier};
 use crate::model::{common, Decodable, Encodable};
 
 /// A certificate representation.

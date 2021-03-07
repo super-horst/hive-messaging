@@ -12,6 +12,7 @@ pub use session::*;
 // TODO add error::advice field to maybe mitigate error
 
 pub trait KeyAccess {
+    //TODO refactor ... make identity key inaccessible
     fn identity_access(&self) -> &PrivateKey;
 
     fn pre_key_access(&self) -> &PrivateKey;
@@ -44,7 +45,7 @@ impl MyIdentity {
                 cause,
             })?;
 
-        let shared_secret = eph_key.diffie_hellman(destination);
+        let shared_secret = eph_key.agree(destination);
 
         let certificate = common::Certificate {
             certificate: self.my_certificate.encoded_certificate().to_vec(),
@@ -70,7 +71,7 @@ impl MyIdentity {
         eph_key: PublicKey,
         encrypted_session: &[u8],
     ) -> Result<messages::SessionParameters, ProtocolError> {
-        let shared_secret = self.my_key.diffie_hellman(&eph_key);
+        let shared_secret = self.my_key.agree(&eph_key);
 
         let encoded_session = encryption::decrypt(&shared_secret[..], encrypted_session);
         messages::SessionParameters::decode(encoded_session)

@@ -13,61 +13,10 @@ use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::crypto::error::*;
+use crate::crypto::{FromBytes, KeyAgreement, Signer, Verifier};
 
 const KEY_LENGTH: usize = 32;
 const SIGNATURE_LENGTH: usize = 64;
-
-pub trait FromBytes: Sized {
-    fn from_bytes(bytes: &[u8]) -> Result<Self, CryptoError>;
-}
-
-struct FromBytesVisitor<K> {
-    _a: PhantomData<K>,
-}
-
-impl<K> FromBytesVisitor<K> {
-    fn new() -> FromBytesVisitor<K>
-    where
-        K: FromBytes,
-    {
-        FromBytesVisitor { _a: PhantomData }
-    }
-}
-
-impl<'de, K> Visitor<'de> for FromBytesVisitor<K>
-where
-    K: FromBytes,
-{
-    type Value = K;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("some bytes")
-    }
-
-    fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        K::from_bytes(v).map_err(|_ce| E::invalid_length(v.len(), &self))
-    }
-
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: SeqAccess<'de>,
-        A::Error: serde::de::Error,
-    {
-        let mut buff = seq
-            .size_hint()
-            .map_or_else(|| Vec::new(), |size| Vec::with_capacity(size));
-
-        // Update the max while there are additional values.
-        while let Some(value) = seq.next_element()? {
-            buff.push(value);
-        }
-
-        self.visit_bytes(&buff[..])
-    }
-}
 
 /// Dalek public key
 #[derive(Copy, Clone)]
@@ -99,9 +48,11 @@ impl PublicKey {
         //TODO
         "my::namespace".to_string()
     }
+}
 
+impl Verifier for PublicKey {
     ///Verify a raw byte signature
-    pub fn verify(&self, data: &[u8], signature: &[u8]) -> Result<(), CryptoError> {
+    fn verify(&self, data: &[u8], signature: &[u8]) -> Result<(), CryptoError> {
         if signature.len() != SIGNATURE_LENGTH {
             return Err(CryptoError::Message {
                 message: "Invalid signature format".to_string(),
@@ -245,15 +196,13 @@ impl PrivateKey {
     pub(crate) fn secret_bytes(&self) -> &[u8; 32] {
         self.ed_private.as_bytes()
     }
+}
 
-    pub fn diffie_hellman(&self, their_public: &PublicKey) -> [u8; 32] {
-        (self.ed_private * their_public.x_public).to_bytes()
-    }
-
+impl Signer for PrivateKey {
     /// Sign some data using the underlying private key.
     /// Signature output will be 64 bytes
     /// XEdDSA derived from https://signal.org/docs/specifications/xeddsa
-    pub fn sign(&self, data: &[u8]) -> Result<Vec<u8>, CryptoError> {
+    fn sign(&self, data: &[u8]) -> Result<Vec<u8>, CryptoError> {
         use rand_core::{OsRng, RngCore};
 
         let mut random_bytes = [0u8; 64];
@@ -282,6 +231,12 @@ impl PrivateKey {
         result[32..].copy_from_slice(signature_s.as_bytes());
 
         Ok(Vec::from(&result[..]))
+    }
+}
+
+impl KeyAgreement for PrivateKey {
+    fn agree(&self, their_public: &PublicKey) -> [u8; 32] {
+        (self.ed_private * their_public.x_public).to_bytes()
     }
 }
 
@@ -335,6 +290,54 @@ impl Eq for PrivateKey {}
 impl std::hash::Hash for PrivateKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.ed_private.hash(state);
+    }
+}
+
+struct FromBytesVisitor<K> {
+    _a: PhantomData<K>,
+}
+
+impl<K> FromBytesVisitor<K> {
+    fn new() -> FromBytesVisitor<K>
+    where
+        K: FromBytes,
+    {
+        FromBytesVisitor { _a: PhantomData }
+    }
+}
+
+impl<'de, K> Visitor<'de> for FromBytesVisitor<K>
+where
+    K: FromBytes,
+{
+    type Value = K;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("some bytes")
+    }
+
+    fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        K::from_bytes(v).map_err(|_ce| E::invalid_length(v.len(), &self))
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+        A::Error: serde::de::Error,
+    {
+        let mut buff = seq
+            .size_hint()
+            .map_or_else(|| Vec::new(), |size| Vec::with_capacity(size));
+
+        // Update the max while there are additional values.
+        while let Some(value) = seq.next_element()? {
+            buff.push(value);
+        }
+
+        self.visit_bytes(&buff[..])
     }
 }
 
@@ -435,8 +438,8 @@ mod key_tests {
         let a_privates = PrivateKey::generate().unwrap();
         let b_privates = PrivateKey::generate().unwrap();
 
-        let dh1 = a_privates.diffie_hellman(&b_privates.public);
-        let dh2 = b_privates.diffie_hellman(&a_privates.public);
+        let dh1 = a_privates.agree(&b_privates.public);
+        let dh2 = b_privates.agree(&a_privates.public);
 
         assert_eq!(dh1, dh2);
     }

@@ -14,9 +14,9 @@ pub fn x3dh_agree_initial(
 ) -> (PublicKey, [u8; 32]) {
     let ek_a = PrivateKey::generate().unwrap();
 
-    let dh1 = ik_a.diffie_hellman(pre_key);
-    let dh2 = ek_a.diffie_hellman(ik_b);
-    let dh3 = ek_a.diffie_hellman(pre_key);
+    let dh1 = ik_a.agree(pre_key);
+    let dh2 = ek_a.agree(ik_b);
+    let dh3 = ek_a.agree(pre_key);
 
     let mut dh = Vec::with_capacity(DH_BUFFER_SIZE);
     dh.extend_from_slice(&dh1[..]);
@@ -24,7 +24,7 @@ pub fn x3dh_agree_initial(
     dh.extend_from_slice(&dh3[..]);
 
     if let Some(opk) = onetime_pre_key {
-        let dh4 = ek_a.diffie_hellman(opk);
+        let dh4 = ek_a.agree(opk);
 
         dh.extend_from_slice(&dh4[..]);
     }
@@ -46,9 +46,9 @@ pub fn x3dh_agree_respond(
     pre_key: &PrivateKey,
     onetime_pre_key: Option<&PrivateKey>,
 ) -> [u8; 32] {
-    let dh1 = pre_key.diffie_hellman(&ik_a);
-    let dh2 = ik_b.diffie_hellman(ek_a);
-    let dh3 = pre_key.diffie_hellman(ek_a);
+    let dh1 = pre_key.agree(&ik_a);
+    let dh2 = ik_b.agree(ek_a);
+    let dh3 = pre_key.agree(ek_a);
 
     let mut dh = Vec::with_capacity(DH_BUFFER_SIZE);
     dh.extend_from_slice(&dh1[..]);
@@ -56,7 +56,7 @@ pub fn x3dh_agree_respond(
     dh.extend_from_slice(&dh3[..]);
 
     if let Some(opk) = onetime_pre_key {
-        let dh4 = opk.diffie_hellman(&ek_a);
+        let dh4 = opk.agree(&ek_a);
 
         dh.extend_from_slice(&dh4[..]);
     }

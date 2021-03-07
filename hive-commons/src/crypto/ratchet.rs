@@ -7,7 +7,7 @@ use sha2::Sha512;
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::error::*;
-use crate::crypto::{PrivateKey, PublicKey};
+use crate::crypto::{KeyAgreement, PrivateKey, PublicKey};
 
 /// a single sending ratchet step
 #[derive(Debug)]
@@ -142,7 +142,7 @@ impl DoubleRatchet {
         let init_public = init_private.public_key().clone();
 
         let mut root_chain = KdfChain(root_key.clone());
-        let root_dh = init_private.diffie_hellman(other_public);
+        let root_dh = init_private.agree(other_public);
         let send_chain = CountingChain::new(root_chain.update(&root_dh[..]));
 
         Ok(DoubleRatchet {
@@ -184,11 +184,11 @@ impl DoubleRatchet {
             return Ok(());
         }
 
-        let root_dh = self.current_private.diffie_hellman(&other_public);
+        let root_dh = self.current_private.agree(&other_public);
         self.recv_chain.reset(self.root_chain.update(&root_dh));
 
         let new_private = PrivateKey::generate()?;
-        let dh_new = new_private.diffie_hellman(&other_public);
+        let dh_new = new_private.agree(&other_public);
 
         self.prev_send_counter = self.send_chain.1;
         self.send_chain.reset(self.root_chain.update(&dh_new));
@@ -280,7 +280,7 @@ pub mod ratchet_tests {
         let a = PrivateKey::generate().unwrap();
         let b = PrivateKey::generate().unwrap();
 
-        let root = a.diffie_hellman(b.public_key());
+        let root = a.agree(b.public_key());
 
         // alice starts the conversation & sends bob her current ratchet key
         let alice = DoubleRatchet::initialise_to_send(&root, b.public_key()).unwrap();

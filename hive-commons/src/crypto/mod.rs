@@ -6,7 +6,7 @@ mod error;
 pub use error::*;
 
 mod keys;
-pub use keys::{FromBytes, PrivateKey, PublicKey};
+pub use keys::{PrivateKey, PublicKey};
 
 pub(crate) mod certificates;
 pub use certificates::{Certificate, CertificateFactory, CertificateInfoBundle};
@@ -21,13 +21,29 @@ pub mod encryption;
 
 pub mod utils;
 
+pub trait Verifier {
+    fn verify(&self, data: &[u8], signature: &[u8]) -> Result<(), CryptoError>;
+}
+
+pub trait Signer {
+    fn sign(&self, data: &[u8]) -> Result<Vec<u8>, CryptoError>;
+}
+
+pub trait KeyAgreement {
+    fn agree(&self, public: &PublicKey) -> [u8; 32];
+}
+
+pub trait FromBytes: Sized {
+    fn from_bytes(bytes: &[u8]) -> Result<Self, CryptoError>;
+}
+
 impl Encodable for Certificate {
     fn encode(&self) -> Result<Vec<u8>, SerialisationError> {
         common::Certificate {
             certificate: self.encoded_certificate().to_vec(),
             signature: self.signature().to_vec(),
         }
-        .encode()
+            .encode()
     }
 }
 

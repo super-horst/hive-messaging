@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::crypto::{
     x3dh_agree_initial, x3dh_agree_respond, CertificateFactory, FromBytes, ManagedRatchet,
-    PublicKey, RecvStep, SendStep,
+    PublicKey, RecvStep, SendStep, Verifier,
 };
 use crate::model::common::PreKeyBundle;
 use crate::model::messages::{KeyExchange, SessionParameters};
@@ -15,7 +15,7 @@ use crate::protocol::KeyAccess;
 
 #[derive(Debug)]
 pub enum SendingStatus {
-    RequirePreKeys {},
+    RequirePreKeys,
     Ok {
         key_exchange: Option<KeyExchange>,
         step: SendStep,
@@ -32,7 +32,7 @@ enum SessionState {
         pre_key: PublicKey,
         one_time_key: Option<PublicKey>,
     },
-    New {},
+    New,
 }
 
 impl Hash for SessionState {
