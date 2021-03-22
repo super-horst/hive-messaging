@@ -10,6 +10,7 @@ mod service_tests {
     use mockall::predicate;
 
     use hive_commons::crypto;
+    use hive_commons::crypto::Signer;
     use hive_commons::model::{common, Encodable};
 
     use crate::persistence::*;

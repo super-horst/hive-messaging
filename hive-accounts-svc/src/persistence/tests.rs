@@ -9,6 +9,7 @@ mod entity_tests {
 
     use testcontainers::images::postgres::Postgres as PsqlImage;
     use testcontainers::{clients, Docker};
+    use hive_commons::crypto::Signer;
 
     #[tokio::test]
     async fn entity_test() {

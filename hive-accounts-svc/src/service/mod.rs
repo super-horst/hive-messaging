@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use log::*;
 
-use crypto::FromBytes;
+use crypto::{FromBytes, Verifier};
 use hive_commons::*;
 
 pub use model::accounts::accounts_server::*;
