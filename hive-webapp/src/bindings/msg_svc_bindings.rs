@@ -48,6 +48,9 @@ pub enum MessageFilterState {
 extern "C" {
     pub type MessageFilter;
 
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> MessageFilter;
+
     #[wasm_bindgen(method)]
     pub fn getState(this: &MessageFilter) -> MessageFilterState;
 
