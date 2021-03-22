@@ -19,8 +19,6 @@ pub use ratchet::{ManagedRatchet, RecvStep, SendStep};
 
 pub mod encryption;
 
-pub mod utils;
-
 pub trait Verifier {
     fn verify(&self, data: &[u8], signature: &[u8]) -> Result<(), CryptoError>;
 }

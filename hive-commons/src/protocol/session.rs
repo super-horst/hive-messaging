@@ -11,7 +11,7 @@ use crate::model::common::PreKeyBundle;
 use crate::model::messages::{KeyExchange, SessionParameters};
 
 use crate::protocol::error::*;
-use crate::protocol::KeyAccess;
+use crate::protocol::*;
 
 #[derive(Debug)]
 pub enum SendingStatus {
@@ -335,7 +335,6 @@ mod session_tests {
     use super::*;
 
     use crate::crypto::certificates::certificate_tests::create_self_signed_cert;
-    use crate::crypto::utils::{create_pre_key_bundle, PrivatePreKeys};
     use crate::crypto::{PrivateKey, Signer};
 
     use crate::model::common;
