@@ -188,17 +188,17 @@ impl PrivateKey {
         })
     }
 
-    /// corresponding public key
-    pub fn public_key(&self) -> &PublicKey {
-        &self.public
-    }
-
     pub(crate) fn secret_bytes(&self) -> &[u8; 32] {
         self.ed_private.as_bytes()
     }
 }
 
 impl Signer for PrivateKey {
+    /// corresponding public key
+    fn public_key(&self) -> &PublicKey {
+        &self.public
+    }
+
     /// Sign some data using the underlying private key.
     /// Signature output will be 64 bytes
     /// XEdDSA derived from https://signal.org/docs/specifications/xeddsa

@@ -7,7 +7,7 @@ use sha2::Sha512;
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::error::*;
-use crate::crypto::{KeyAgreement, PrivateKey, PublicKey};
+use crate::crypto::{KeyAgreement, PrivateKey, PublicKey, Signer};
 
 /// a single sending ratchet step
 #[derive(Debug)]

@@ -26,6 +26,8 @@ pub trait Verifier {
 }
 
 pub trait Signer {
+    fn public_key(&self) -> &PublicKey;
+
     fn sign(&self, data: &[u8]) -> Result<Vec<u8>, CryptoError>;
 }
 
@@ -43,7 +45,7 @@ impl Encodable for Certificate {
             certificate: self.encoded_certificate().to_vec(),
             signature: self.signature().to_vec(),
         }
-            .encode()
+        .encode()
     }
 }
 

@@ -336,7 +336,7 @@ mod session_tests {
 
     use crate::crypto::certificates::certificate_tests::create_self_signed_cert;
     use crate::crypto::utils::{create_pre_key_bundle, PrivatePreKeys};
-    use crate::crypto::PrivateKey;
+    use crate::crypto::{PrivateKey, Signer};
 
     use crate::model::common;
     use crate::model::messages::EncryptionParameters;
