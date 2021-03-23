@@ -10,6 +10,7 @@ pub use error::*;
 mod session;
 
 pub use session::*;
+use std::sync::Arc;
 
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
