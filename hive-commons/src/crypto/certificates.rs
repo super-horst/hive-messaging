@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use rand_core::RngCore;
 
-use crate::crypto::{CryptoError, FromBytes, PrivateKey, PublicKey, Signer, Verifier};
+use crate::crypto::{CryptoError, FromBytes, PrivateKey, PublicKey, Signer};
 use crate::model::{common, Decodable, Encodable};
 
 /// A certificate representation.
@@ -232,7 +232,7 @@ impl CertificateFactory {
 #[cfg(test)]
 pub mod certificate_tests {
     use super::*;
-    use crate::crypto::PrivateKey;
+    use crate::crypto::{PrivateKey, Verifier};
 
     /// convenience method to create any signed certificate
     pub fn create_signed_cert() -> Certificate {

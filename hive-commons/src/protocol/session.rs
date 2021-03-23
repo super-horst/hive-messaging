@@ -10,7 +10,6 @@ use crate::crypto::{
 use crate::model::common::PreKeyBundle;
 use crate::model::messages::{KeyExchange, SessionParameters};
 
-use crate::protocol::error::*;
 use crate::protocol::*;
 
 #[derive(Debug)]

@@ -1,4 +1,4 @@
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 use crate::crypto::*;
 use crate::model::*;
@@ -99,7 +99,7 @@ pub fn sign_challenge(
 }
 
 pub fn create_pre_key_bundle(
-    identity: &PrivateKey,
+    identity: &impl Signer,
 ) -> Result<(common::PreKeyBundle, PrivatePreKeys), CryptoError> {
     let pre_private_key = PrivateKey::generate()?;
     let pre_public_key = pre_private_key.public_key().clone();
