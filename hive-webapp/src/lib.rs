@@ -2,10 +2,10 @@
 use wasm_bindgen::prelude::*;
 
 mod bindings;
-mod identity;
-mod storage;
 mod transport;
 mod views;
+
+mod ctrl;
 
 mod app;
 

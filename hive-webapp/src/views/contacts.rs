@@ -1,69 +1,58 @@
+use std::sync::Arc;
+
 use yew::prelude::*;
 use yew::{
     html, Component, ComponentLink, Html, InputData, KeyboardEvent, Properties, ShouldRender,
 };
 
-use log::*;
+use hive_commons::crypto::{FromBytes, PublicKey};
 
-use wasm_bindgen::JsCast;
-use wasm_bindgen::__rt::std::sync::Arc;
-use wasm_bindgen_futures::futures_0_3::spawn_local;
-use wasm_bindgen_futures::futures_0_3::JsFuture;
+use crate::ctrl::{Contact, ContactManager, ContactProfileModel};
 
-use hive_commons::crypto;
-use hive_commons::crypto::FromBytes;
-use hive_commons::model;
-
-use crate::bindings::*;
-use crate::identity::LocalIdentity;
-use crate::storage::{ContactModel, StorageController};
-use crate::transport::ConnectionManager;
-use wasm_bindgen::__rt::std::borrow::Borrow;
+const CONTACTS_KEY: &'static str = "hive.core.contacts";
 
 pub enum ContactListMsg {
     Update(String),
     Add,
-    Select(Arc<ContactModel>),
-    ContactUpdate(Arc<ContactModel>),
+    Select(ContactProfileModel),
     Nope,
 }
 
 #[derive(Clone, Properties)]
 pub struct ListProps {
-    pub on_select: Callback<Arc<ContactModel>>,
-    pub identity: LocalIdentity,
-    pub storage: StorageController,
-    pub connections: ConnectionManager,
+    pub on_error: Callback<String>,
+    pub on_select: Callback<Arc<Contact>>,
+    pub contacts: ContactManager,
 }
 
-pub struct ContactList {
+pub struct ContactListView {
     link: ComponentLink<Self>,
-    props: ListProps,
+    on_error: Callback<String>,
+    on_select: Callback<Arc<Contact>>,
     value: String,
-    stored_contacts: Vec<Arc<ContactModel>>,
+    contacts: ContactManager,
+    known_contacts: Vec<ContactProfileModel>,
 }
 
-impl Component for ContactList {
+impl Component for ContactListView {
     type Message = ContactListMsg;
     type Properties = ListProps;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let stored_contacts = props
-            .storage
-            .get_contacts()
-            .drain(..)
-            .map(Arc::new)
-            .collect();
+        let known_contacts = props.contacts.access_known_contacts();
 
-        ContactList {
+        ContactListView {
             link,
-            props,
+            on_error: props.on_error,
+            on_select: props.on_select,
             value: "".to_string(),
-            stored_contacts,
+            contacts: props.contacts,
+            known_contacts,
         }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
+        // TODO error handling?
         return match msg {
             ContactListMsg::Update(val) => {
                 self.value = val;
@@ -76,53 +65,29 @@ impl Component for ContactList {
                 }
 
                 let bytes = hex::decode(&val).unwrap();
-                let public = crypto::PublicKey::from_bytes(&bytes[..]).unwrap();
+                let public = PublicKey::from_bytes(&bytes[..]).unwrap();
 
-                let contact = Arc::new(ContactModel {
-                    id: uuid::Uuid::new_v4(),
-                    key: public,
-                    ratchet: None,
-                });
+                let name = format!("User {}", self.known_contacts.len() as u64);
 
-                info!("Adding account {}", &contact.id);
+                let contact_list_update = self.contacts.add_contact(public, name);
 
-                self.stored_contacts.push(contact);
-                let contact_copy = self
-                    .stored_contacts
-                    .iter()
-                    .map(Arc::as_ref)
-                    .map(ContactModel::clone)
-                    .collect();
-
-                self.props.storage.set_contacts(&contact_copy);
-
+                self.known_contacts = contact_list_update;
                 self.value = "".to_string();
-                return true;
-            }
-            ContactListMsg::Select(key) => {
-                self.props.on_select.emit(key);
                 true
             }
-            ContactListMsg::ContactUpdate(contact) =>{
-                let position = self.stored_contacts
-                    .iter()
-                    .position(|s| s.as_ref().eq(contact.as_ref()));
+            ContactListMsg::Select(profile) => {
+                let result = self.contacts.access_contact(&profile.key);
 
-                debug!("Update account {}", &contact.id);
-
-                self.stored_contacts[position.unwrap()] = contact;
-
-                let contact_copy = self
-                    .stored_contacts
-                    .iter()
-                    .map(Arc::as_ref)
-                    .map(ContactModel::clone)
-                    .collect();
-
-                self.props.storage.set_contacts(&contact_copy);
+                match result {
+                    Ok(contact) => self.on_select.emit(contact),
+                    Err(error) => {
+                        self.on_error.emit(format!("{:?}", error));
+                        panic!(error)
+                    },
+                }
 
                 true
-            },
+            }
             _ => true,
         };
     }
@@ -132,7 +97,6 @@ impl Component for ContactList {
     }
 
     fn view(&self) -> Html {
-        let id_string = self.props.identity.public_key().id_string();
         html! {
         <div class="box contacts">
             <div class="box contact_add_field">
@@ -144,66 +108,47 @@ impl Component for ContactList {
                    }) />
             </div>
 
-            {for self.stored_contacts.iter().map(|c| {
-                let stored = Arc::clone(c);
+            {for self.known_contacts.iter().map(|c| {
+                let stored = c.clone();
                 html! {
-                <Contact
-                on_select = self.link.callback(move | c | ContactListMsg::Select(c))
-                on_update = self.link.callback(move | c | ContactListMsg::ContactUpdate(c))
-                identity = self.props.identity.clone()
-                connections = self.props.connections.clone()
+                <ContactView
+                on_select = self.link.callback(|c| ContactListMsg::Select(c))
                 stored = stored />
                 }
             } )}
-            <div style="width:100%;resize:none;overflow:always;">
-                <input style="width: 100%;" value=&id_string/>
-            </div>
         </div>
         }
     }
 }
 
 pub enum ContactMsg {
-    IncomingPreKey(model::common::PreKeyBundle),
-    // TODO
     Select,
     Nope,
 }
 
 #[derive(Clone, Properties)]
 pub struct ContactProps {
-    pub on_select: Callback<Arc<ContactModel>>,
-    pub on_update: Callback<Arc<ContactModel>>,
-    pub stored: Arc<ContactModel>,
-    pub identity: LocalIdentity,
-    pub connections: ConnectionManager,
+    pub on_select: Callback<ContactProfileModel>,
+    pub stored: ContactProfileModel,
 }
 
 #[derive(Clone)]
-pub struct Contact {
+pub struct ContactView {
     link: ComponentLink<Self>,
-    props: ContactProps,
+    on_select: Callback<ContactProfileModel>,
+    stored: ContactProfileModel,
 }
 
-impl Component for Contact {
+impl Component for ContactView {
     type Message = ContactMsg;
     type Properties = ContactProps;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let contact = Contact {
+        let contact = ContactView {
             link: link.clone(),
-            props,
+            on_select: props.on_select,
+            stored: props.stored,
         };
-
-        if contact.props.stored.ratchet.is_none() {
-            let other_key = contact.props.stored.key.clone();
-            let cloned = contact.clone();
-
-            spawn_local(async move {
-                let bundle = cloned.retrieve_pre_key_bundle(&other_key).await;
-                link.send_message(ContactMsg::IncomingPreKey(bundle));
-            });
-        }
 
         return contact;
     }
@@ -211,19 +156,7 @@ impl Component for Contact {
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         return match msg {
             ContactMsg::Select => {
-                self.props.on_select.emit(self.props.stored.clone());
-                true
-            }
-            ContactMsg::IncomingPreKey(pre_key) => {
-                // TODO error handling
-                let ratchet = self.props.identity.prepare_ratchet(pre_key);
-
-                let mut contact = self.props.stored.as_ref().clone();
-                contact.ratchet = Some(ratchet);
-
-                let arced = Arc::new(contact);
-                self.props.on_update.emit(arced);
-
+                self.on_select.emit(self.stored.clone());
                 true
             }
             _ => true,
@@ -237,35 +170,8 @@ impl Component for Contact {
     fn view(&self) -> Html {
         html! {
         <div class = "box contact" onclick = self.link.callback( move | _ | ContactMsg::Select) >
-        { & self.props.stored.id }
+        { & self.stored.name }
         </div>
         }
-    }
-}
-
-impl Contact {
-
-    pub async fn send_message(&mut self, message: String) {
-        // TODO implement crypto & transport here
-    }
-
-    async fn retrieve_pre_key_bundle(
-        &self,
-        other: &crypto::PublicKey,
-    ) -> model::common::PreKeyBundle {
-        // TODO error handling
-        info!("retrieve pre keys");
-
-        let peer = common_bindings::Peer::new();
-        peer.setIdentity(js_sys::Uint8Array::from(&other.id_bytes()[..]));
-        peer.setNamespace(other.namespace());
-
-        let promise = self.props.connections.accounts().getPreKeys(peer);
-        let value = JsFuture::from(promise).await.unwrap();
-
-        let bound_bundle: common_bindings::PreKeyBundle =
-            value.dyn_into().expect("response not working...");
-
-        bound_bundle.into()
     }
 }

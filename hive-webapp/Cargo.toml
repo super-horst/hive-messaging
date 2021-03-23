@@ -12,10 +12,13 @@ wasm-bindgen = "0.2.66"
 js-sys = "0.3.45"
 web-sys =  { version ="0.3.45" , features = ["Location", "Window"]}
 
+failure = "0.1.8"
 hex = "0.4.2"
 uuid = { version = "0.8.1", features = ["v4", "wasm-bindgen", "serde"] }
 log = "0.4.11"
 wasm-logger = "0.2.0"
+async-lock = "2.3.0"
+wasm-timer = "0.2.0"
 
 # keep serde version fixed until update of oxidizer&refinery
 serde = { version = "=1.0.118", features = ["derive"] }
@@ -26,3 +29,6 @@ yew = "0.17.4"
 console_error_panic_hook = { version = "0.1.5" }
 
 hive-commons = { version = "0.1.0", path = "../hive-commons" , features = ["web"]}
+
+[dev-dependencies]
+mockall = "0.8.1"

@@ -1,8 +1,7 @@
-use js_sys;
 use wasm_bindgen::prelude::*;
+use js_sys;
 
-use super::*;
-use hive_commons::model::{common, messages};
+use crate::bindings::*;
 
 #[wasm_bindgen(module = "/js/generated/messages_svc_pb.js")]
 extern "C" {

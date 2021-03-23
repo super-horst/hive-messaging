@@ -1,9 +1,6 @@
-use std::hash::{Hash, Hasher};
 use std::sync::{Arc, RwLock};
 
-use log::*;
-
-use yew::format::{Json, Text};
+use yew::format::Json;
 use yew::services::storage::{Area, StorageService};
 
 use serde::{Deserialize, Serialize};
@@ -27,7 +24,7 @@ impl StorageController {
 
     pub fn load<T>(&self, key: &str) -> Result<T, ControllerError>
     where
-        T: for<'de> serde::Deserialize<'de>,
+        T: for<'de> Deserialize<'de>,
     {
         let storage = self
             .service
@@ -43,7 +40,7 @@ impl StorageController {
 
     pub fn store<'a, T>(&self, key: &str, data: &'a T) -> Result<(), ControllerError>
     where
-        T: ::serde::Serialize,
+        T: Serialize,
     {
         let mut storage = self
             .service
