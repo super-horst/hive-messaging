@@ -10,7 +10,6 @@ pub use error::*;
 mod session;
 
 pub use session::*;
-use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PrivatePreKeys {
@@ -150,9 +149,7 @@ mod protocol_tests {
             prev_chain_count: 0,
         };
 
-        let (alices_key, alices_cert) = create_self_signed_cert();
-
-        let (bobs_key, bobs_cert) = create_self_signed_cert();
+        let bobs_key = PrivateKey::generate().unwrap();
 
         let session_params = messages::SessionParameters {
             origin: None,
