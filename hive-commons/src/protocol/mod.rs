@@ -12,7 +12,6 @@ mod session;
 pub use session::*;
 use std::sync::Arc;
 
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PrivatePreKeys {
     pub(crate) pre_key: PrivateKey,
@@ -20,10 +19,7 @@ pub struct PrivatePreKeys {
 }
 
 // TODO add error::advice field to maybe mitigate error
-pub trait KeyAccess {
-    //TODO refactor ... make identity key inaccessible
-    fn identity_access(&self) -> &PrivateKey;
-
+pub trait KeyAccess: KeyAgreement {
     fn pre_key_access(&self) -> &PrivateKey;
 
     fn one_time_key_access(&self, public: &PublicKey) -> Option<PrivateKey>;
@@ -40,9 +36,8 @@ pub fn encrypt_session(
 
     let shared_secret = eph_key.agree(destination);
 
-    let encoded_session = session_params
-        .encode()
-        .map_err(|cause| ProtocolError::FailedSerialisation { cause })?;
+    let encoded_session =
+        session_params.encode().map_err(|cause| ProtocolError::FailedSerialisation { cause })?;
     let encrypted_session = encryption::encrypt(&shared_secret[..], &encoded_session[..]);
 
     Ok((eph_key.public_key().clone(), encrypted_session))

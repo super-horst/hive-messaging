@@ -7,7 +7,7 @@ use sha2::Sha256;
 const DH_BUFFER_SIZE: usize = 128;
 
 pub fn x3dh_agree_initial(
-    ik_a: &impl KeyAgreement,
+    ik_a: &(impl KeyAgreement + ?Sized),
     ik_b: &PublicKey,
     pre_key: &PublicKey,
     onetime_pre_key: Option<&PublicKey>,
@@ -41,9 +41,9 @@ pub fn x3dh_agree_initial(
 
 pub fn x3dh_agree_respond(
     ik_a: &PublicKey,
-    ik_b: &impl KeyAgreement,
+    ik_b: &(impl KeyAgreement + ?Sized),
     ek_a: &PublicKey,
-    pre_key: &impl KeyAgreement,
+    pre_key: &(impl KeyAgreement + ?Sized),
     onetime_pre_key: Option<&PrivateKey>,
 ) -> [u8; 32] {
     let dh1 = pre_key.agree(&ik_a);

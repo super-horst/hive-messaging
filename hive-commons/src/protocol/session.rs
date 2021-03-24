@@ -1,11 +1,12 @@
 use std::hash::{Hash, Hasher};
+use std::ops::Deref;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::{
-    x3dh_agree_initial, x3dh_agree_respond, CertificateFactory, FromBytes, ManagedRatchet,
-    PublicKey, RecvStep, SendStep, Verifier,
+    x3dh_agree_initial, x3dh_agree_respond, CertificateFactory, FromBytes, KeyAgreement,
+    ManagedRatchet, PublicKey, RecvStep, SendStep, Verifier,
 };
 use crate::model::common::PreKeyBundle;
 use crate::model::messages::{KeyExchange, SessionParameters};
@@ -194,12 +195,11 @@ impl SessionManager {
         .map(|otk_pub| self.keys.one_time_key_access(&otk_pub))
         .flatten();
 
-        let identity = self.keys.identity_access();
         let pre_key = self.keys.pre_key_access();
 
         let secret = x3dh_agree_respond(
             &self.session.peer_identity,
-            identity,
+            self.keys.deref(),
             &ephemeral,
             pre_key,
             otk.as_ref(),
@@ -297,9 +297,12 @@ impl SessionManager {
                 pre_key,
                 one_time_key,
             } => {
-                let identity = self.keys.identity_access();
-                let (eph_key, secret) =
-                    x3dh_agree_initial(identity, &other_identity, &pre_key, one_time_key.as_ref());
+                let (eph_key, secret) = x3dh_agree_initial(
+                    self.keys.deref(),
+                    &other_identity,
+                    &pre_key,
+                    one_time_key.as_ref(),
+                );
 
                 let mut ratchet =
                     ManagedRatchet::initialise_to_send(&secret, &pre_key).map_err(|cause| {
@@ -556,11 +559,13 @@ mod session_tests {
         }
     }
 
-    impl KeyAccess for MockCryptoProvider {
-        fn identity_access(&self) -> &PrivateKey {
-            &self.key
+    impl KeyAgreement for MockCryptoProvider {
+        fn agree(&self, public: &PublicKey) -> [u8; 32] {
+            self.key.agree(public)
         }
+    }
 
+    impl KeyAccess for MockCryptoProvider {
         fn pre_key_access(&self) -> &PrivateKey {
             &self.pre_key
         }

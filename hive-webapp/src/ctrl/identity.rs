@@ -254,10 +254,6 @@ impl IdentityController {
 }
 
 impl protocol::KeyAccess for IdentityController {
-    fn identity_access(&self) -> &PrivateKey {
-        &self.key
-    }
-
     fn pre_key_access(&self) -> &PrivateKey {
         unimplemented!()
     }
