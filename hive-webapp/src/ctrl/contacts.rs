@@ -1,40 +1,36 @@
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use std::sync::{Arc, RwLock};
 
 use wasm_bindgen::JsCast;
-use wasm_bindgen::__rt::std::sync::Arc;
 use wasm_bindgen_futures::futures_0_3::JsFuture;
 
 use log::*;
 use uuid::Uuid;
 
-use hive_commons::crypto::{encryption, PublicKey, SendStep};
+use async_lock::Mutex;
 
+use serde::{Deserialize, Serialize};
+
+use hive_commons::crypto::{encryption, PublicKey, SendStep};
 use hive_commons::model;
 use hive_commons::model::{Decodable, Encodable};
-use serde::{Deserialize, Serialize};
 
 use hive_commons::protocol::{KeyAccess, ProtocolError, SendingStatus, Session, SessionManager};
 
 use crate::bindings::*;
+use crate::ctrl::{ControllerError, IdentityController, StorageController};
 use crate::transport::ConnectionManager;
-
-use super::StorageController;
-use crate::ctrl::ControllerError;
-use crate::ctrl::identity::IdentityController;
-use std::sync::RwLock;
-use async_lock::Mutex;
-use std::hash::{Hash, Hasher};
 
 const KNOWN_CONTACTS_KEY: &'static str = "hive.core.contacts";
 const CONTACT_KEY_PREFIX: &'static str = "hive.core.contact.";
 
 #[derive(Clone, Debug, Hash, Deserialize, Serialize)]
-pub(crate) struct ContactProfileModel {
+pub struct ContactProfileModel {
     pub(crate) id: Uuid,
     pub(crate) key: PublicKey,
     pub(crate) name: String,
 }
-
 
 impl std::cmp::PartialEq<ContactProfileModel> for ContactProfileModel {
     fn eq(&self, other: &Self) -> bool {
@@ -43,7 +39,6 @@ impl std::cmp::PartialEq<ContactProfileModel> for ContactProfileModel {
 }
 
 impl Eq for ContactProfileModel {}
-
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct ContactModel {
@@ -64,7 +59,6 @@ impl std::cmp::PartialEq<ContactModel> for ContactModel {
 
 impl Eq for ContactModel {}
 
-
 #[derive(Clone)]
 pub struct ContactManager {
     storage: StorageController,
@@ -75,10 +69,13 @@ pub struct ContactManager {
 }
 
 impl ContactManager {
-    pub fn new(storage: StorageController,
-               connections: ConnectionManager,
-               identity: IdentityController) -> Result<ContactManager, ControllerError> {
-        let known_contacts = storage.load::<HashMap<PublicKey, ContactProfileModel>>(KNOWN_CONTACTS_KEY)?;
+    pub fn new(
+        storage: StorageController,
+        connections: ConnectionManager,
+        identity: IdentityController,
+    ) -> Result<ContactManager, ControllerError> {
+        let known_contacts =
+            storage.load::<HashMap<PublicKey, ContactProfileModel>>(KNOWN_CONTACTS_KEY)?;
 
         let identity: Arc<dyn KeyAccess> = Arc::new(identity.clone());
 
@@ -102,8 +99,7 @@ impl ContactManager {
     fn store_cached(&self, contact: Contact) -> Arc<Contact> {
         // TODO async or error handling?
         let mut guard = self.cached_contacts.write().unwrap();
-        guard.entry(contact.peer_identity().clone())
-            .or_insert_with(|| Arc::new(contact)).clone()
+        guard.entry(contact.peer_identity().clone()).or_insert_with(|| Arc::new(contact)).clone()
     }
 
     fn access_stored(&self, public_key: &PublicKey) -> Result<Arc<Contact>, ControllerError> {
@@ -116,21 +112,31 @@ impl ContactManager {
             let contact_model = self.storage.load::<Option<ContactModel>>(&key)?;
 
             if let Some(model) = contact_model {
-                let contact = Contact::initialise(profile.clone(), model.session, self.connections.clone(), self.identity.clone());
+                let contact = Contact::initialise(
+                    profile.clone(),
+                    model.session,
+                    self.connections.clone(),
+                    self.identity.clone(),
+                );
 
                 Ok(self.store_cached(contact))
             } else {
-                Err(ControllerError::InvalidState { message: format!("Unable to load contact: '{}'", public_key.id_string()) })
+                Err(ControllerError::InvalidState {
+                    message: format!("Unable to load contact: '{}'", public_key.id_string()),
+                })
             }
         } else {
-            Err(ControllerError::InvalidState { message: format!("Unknown contact: '{}'", public_key.id_string()) })
+            Err(ControllerError::InvalidState {
+                message: format!("Unknown contact: '{}'", public_key.id_string()),
+            })
         };
     }
 
     pub fn access_known_contacts(&self) -> Vec<ContactProfileModel> {
         // TODO async or error handling?
         let guard = self.known_contacts.read().unwrap();
-        let profiles: Vec<ContactProfileModel> = guard.values().into_iter().map(|profile| profile.clone()).collect();
+        let profiles: Vec<ContactProfileModel> =
+            guard.values().into_iter().map(|profile| profile.clone()).collect();
 
         return profiles;
     }
@@ -173,11 +179,7 @@ impl Contact {
     ) -> Contact {
         let mgr = SessionManager::new(model.key.clone(), keys);
 
-        Contact {
-            model,
-            connections,
-            session: Mutex::new(mgr),
-        }
+        Contact { model, connections, session: Mutex::new(mgr) }
     }
 
     pub fn initialise(
@@ -188,11 +190,7 @@ impl Contact {
     ) -> Contact {
         let mgr = SessionManager::manage_session(session, keys);
 
-        Contact {
-            model,
-            connections,
-            session: Mutex::new(mgr),
-        }
+        Contact { model, connections, session: Mutex::new(mgr) }
     }
 
     pub fn profile(&self) -> &ContactProfileModel {
@@ -223,9 +221,8 @@ impl Contact {
     ) -> Result<(model::messages::SessionParameters, Vec<u8>), ProtocolError> {
         let (key_exchange, send_step) = self.step_for_sending().await?;
 
-        let payload = payload
-            .encode()
-            .map_err(|cause| ProtocolError::FailedSerialisation { cause })?;
+        let payload =
+            payload.encode().map_err(|cause| ProtocolError::FailedSerialisation { cause })?;
 
         let encrypted = encryption::encrypt(&send_step.secret[..], &payload[..]);
         let enc_params: model::messages::EncryptionParameters = send_step.into();
@@ -267,13 +264,11 @@ impl Contact {
         let peer: common_bindings::Peer = self.model.key.into_peer().into();
         let promise = self.connections.accounts().getPreKeys(peer);
         let value = JsFuture::from(promise).await.map_err(|e| {
-            e.as_string()
-                .unwrap_or("Unknown error retrieving pre keys".to_string())
+            e.as_string().unwrap_or("Unknown error retrieving pre keys".to_string())
         })?;
 
         let bound_bundle: common_bindings::PreKeyBundle = value.dyn_into().map_err(|e| {
-            e.as_string()
-                .unwrap_or("Unknown error during pre key conversion".to_string())
+            e.as_string().unwrap_or("Unknown error during pre key conversion".to_string())
         })?;
 
         Ok(bound_bundle.into())

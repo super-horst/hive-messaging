@@ -1,9 +1,9 @@
 use log::*;
 
 use wasm_bindgen::prelude::*;
-use yew::{html, Component, ComponentLink, Html, ShouldRender, Callback};
+use yew::{html, Callback, Component, ComponentLink, Html, ShouldRender};
 
-use crate::ctrl::{StorageController, ContactManager, MessagingController, IdentityController};
+use crate::ctrl::{ContactManager, IdentityController, MessagingController, StorageController};
 use crate::transport::ConnectionManager;
 use crate::views::*;
 
@@ -42,37 +42,32 @@ impl Component for AppContainer {
         let storage = StorageController::new();
         let connections = ConnectionManager::new();
 
-        let identity = match IdentityController::new(on_error.clone(), storage.clone(), connections.clone()) {
-            Ok(identity) => {
-                identity
-            }
-            Err(error) => {
-                on_error.emit(format!("Failed to access contacts {:?}", error));
-                panic!(error)
-            }
-        };
+        let identity =
+            match IdentityController::new(on_error.clone(), storage.clone(), connections.clone()) {
+                Ok(identity) => identity,
+                Err(error) => {
+                    on_error.emit(format!("Failed to access contacts {:?}", error));
+                    panic!(error)
+                }
+            };
 
-        let contacts = match ContactManager::new(storage.clone(), connections.clone(), identity.clone()) {
-            Ok(contacts) => {
-                contacts
-            }
-            Err(error) => {
-                on_error.emit(format!("Failed to access contacts {:?}", error));
-                panic!(error)
-            }
-        };
+        let contacts =
+            match ContactManager::new(storage.clone(), connections.clone(), identity.clone()) {
+                Ok(contacts) => contacts,
+                Err(error) => {
+                    on_error.emit(format!("Failed to access contacts {:?}", error));
+                    panic!(error)
+                }
+            };
 
-        let messaging = MessagingController::new(identity.clone(), contacts.clone(), connections.clone(), link.callback(|payload| AppMessage::IncomingMessage(payload)));
+        let messaging = MessagingController::new(
+            identity.clone(),
+            contacts.clone(),
+            connections.clone(),
+            link.callback(|payload| AppMessage::IncomingMessage(payload)),
+        );
 
-        AppContainer {
-            link,
-            on_error,
-            storage,
-            connections,
-            identity,
-            contacts,
-            messaging,
-        }
+        AppContainer { link, on_error, storage, connections, identity, contacts, messaging }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {

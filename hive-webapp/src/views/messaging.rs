@@ -13,7 +13,9 @@ use uuid::Uuid;
 use hive_commons::model;
 use hive_commons::model::Encodable;
 
-use crate::ctrl::{StorageController, ContactManager, Contact, MessagingController, IdentityController};
+use crate::ctrl::{
+    Contact, ContactManager, IdentityController, MessagingController, StorageController,
+};
 use crate::views::contacts;
 
 const MSG_KEY_PREFIX: &'static str = "hive.core.messages.";
@@ -95,20 +97,17 @@ impl Component for MessagingView {
                     let message = self.composed_message.clone();
 
                     // TODO handle errors
-                    let msg_payload = model::messages::MessagePayload { message }
-                        .encode()
-                        .unwrap();
+                    let msg_payload = model::messages::MessagePayload { message }.encode().unwrap();
 
-                    let payload = model::messages::Payload {
-                        header: None,
-                        payload: msg_payload,
-                    };
+                    let payload = model::messages::Payload { header: None, payload: msg_payload };
 
                     let local_contact = contact.clone();
                     let local_messaging = self.messaging.clone();
                     let local_on_error = self.on_error.clone();
                     spawn_local(async move {
-                        if let Err(error) = local_messaging.outgoing_message(&local_contact, &payload).await {
+                        if let Err(error) =
+                            local_messaging.outgoing_message(&local_contact, &payload).await
+                        {
                             local_on_error.emit(format!("Failed to access messages {:?}", error));
                             panic!(error)
                         }
@@ -141,9 +140,7 @@ impl Component for MessagingView {
                 let load_result = self.storage.load::<Vec<MessageModel>>(&key);
 
                 match load_result {
-                    Ok(messages) => messages.iter()
-                        .map(|m| m.message.clone())
-                        .collect(),
+                    Ok(messages) => messages.iter().map(|m| m.message.clone()).collect(),
                     Err(error) => {
                         self.on_error.emit(format!("Failed to access messages {:?}", error));
                         panic!(error)

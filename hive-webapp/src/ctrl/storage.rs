@@ -17,9 +17,7 @@ impl StorageController {
         //TODO error handling
         let service = StorageService::new(Area::Local).expect("storage was disabled by the user");
 
-        StorageController {
-            service: Arc::new(RwLock::new(service)),
-        }
+        StorageController { service: Arc::new(RwLock::new(service)) }
     }
 
     pub fn load<T>(&self, key: &str) -> Result<T, ControllerError>
@@ -29,13 +27,9 @@ impl StorageController {
         let storage = self
             .service
             .read()
-            .map_err(|cause| ControllerError::Message {
-                message: "Locking failed".to_string(),
-            })?;
+            .map_err(|cause| ControllerError::Message { message: "Locking failed".to_string() })?;
         let Json(data) = storage.restore(key);
-        data.map_err(|cause| ControllerError::NoDataFound {
-            message: key.to_string(),
-        })
+        data.map_err(|cause| ControllerError::NoDataFound { message: key.to_string() })
     }
 
     pub fn store<'a, T>(&self, key: &str, data: &'a T) -> Result<(), ControllerError>
@@ -45,9 +39,7 @@ impl StorageController {
         let mut storage = self
             .service
             .write()
-            .map_err(|cause| ControllerError::Message {
-                message: "Locking failed".to_string(),
-            })?;
+            .map_err(|cause| ControllerError::Message { message: "Locking failed".to_string() })?;
 
         storage.store(key, Json(&data));
 

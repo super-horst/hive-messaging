@@ -83,7 +83,7 @@ impl Component for ContactListView {
                     Err(error) => {
                         self.on_error.emit(format!("{:?}", error));
                         panic!(error)
-                    },
+                    }
                 }
 
                 true
@@ -144,11 +144,8 @@ impl Component for ContactView {
     type Properties = ContactProps;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let contact = ContactView {
-            link: link.clone(),
-            on_select: props.on_select,
-            stored: props.stored,
-        };
+        let contact =
+            ContactView { link: link.clone(), on_select: props.on_select, stored: props.stored };
 
         return contact;
     }

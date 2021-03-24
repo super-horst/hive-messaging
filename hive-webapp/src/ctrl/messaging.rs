@@ -10,9 +10,8 @@ use hive_commons::crypto::{CertificateFactory, FromBytes, PublicKey, Signer};
 use hive_commons::{model, protocol};
 
 use crate::bindings::msg_svc_bindings;
-use crate::ctrl::{ControllerError,  IdentityController, ContactManager, Contact};
+use crate::ctrl::{Contact, ContactManager, ControllerError, IdentityController};
 use crate::transport::ConnectionManager;
-
 
 #[derive(Clone)]
 pub struct MessagingController {
@@ -29,12 +28,7 @@ impl MessagingController {
         transport: ConnectionManager,
         incoming_payload: Callback<model::messages::Payload>,
     ) -> MessagingController {
-        let msg_ctrl = MessagingController {
-            identity,
-            contacts,
-            transport,
-            incoming_payload,
-        };
+        let msg_ctrl = MessagingController { identity, contacts, transport, incoming_payload };
 
         let cloned = msg_ctrl.clone();
         let my_id = cloned.identity.public_key().clone();
@@ -75,12 +69,10 @@ impl MessagingController {
 
         // TODO blocking in async
         session_params.origin =
-            self.identity
-                .certificate()
-                .map(|cert| model::common::Certificate {
-                    certificate: cert.encoded_certificate().to_vec(),
-                    signature: cert.signature().to_vec(),
-                });
+            self.identity.certificate().map(|cert| model::common::Certificate {
+                certificate: cert.encoded_certificate().to_vec(),
+                signature: cert.signature().to_vec(),
+            });
 
         let (session_key, encrypted_session) =
             protocol::encrypt_session(&contact.peer_identity(), session_params).map_err(
@@ -116,18 +108,15 @@ impl MessagingController {
             eph_key,
             &envelope.getEncryptedSession_asU8().to_vec(),
         )
-            .map_err(|cause| ControllerError::ProtocolExecution {
-                message: "Failed to decrypt session".to_string(),
-                cause,
-            })?;
+        .map_err(|cause| ControllerError::ProtocolExecution {
+            message: "Failed to decrypt session".to_string(),
+            cause,
+        })?;
 
         // TODO check signer
-        let cert = session_params
-            .origin
-            .as_ref()
-            .ok_or_else(|| ControllerError::Message {
-                message: "Missing certificate in session parameters".to_string(),
-            })?;
+        let cert = session_params.origin.as_ref().ok_or_else(|| ControllerError::Message {
+            message: "Missing certificate in session parameters".to_string(),
+        })?;
         let (cert, _signer) = CertificateFactory::decode(cert).map_err(|cause| {
             ControllerError::CryptographicError {
                 message: "Failed to decode peer certificate".to_string(),
@@ -139,10 +128,8 @@ impl MessagingController {
         let contact = self.contacts.access_contact(cert.public_key())?;
 
         let payload = contact
-            .incoming_message(
-                session_params,
-                &envelope.getEncryptedPayload_asU8().to_vec(),
-            ).await
+            .incoming_message(session_params, &envelope.getEncryptedPayload_asU8().to_vec())
+            .await
             .map_err(|cause| ControllerError::ProtocolExecution {
                 message: "Failed to decrypt incoming message".to_string(),
                 cause,

@@ -3,7 +3,7 @@ use failure::Fail;
 use hive_commons::crypto::CryptoError;
 use hive_commons::protocol::ProtocolError;
 
-#[derive( Debug, Fail)]
+#[derive(Debug, Fail)]
 pub enum ControllerError {
     #[fail(display = "Error message: {}", message)]
     Message { message: String },

@@ -1,5 +1,5 @@
-use wasm_bindgen::prelude::*;
 use js_sys;
+use wasm_bindgen::prelude::*;
 
 use crate::bindings::*;
 
@@ -34,10 +34,7 @@ extern "C" {
     pub type MessageSendResult;
 }
 
-#[wasm_bindgen(
-    module = "/js/generated/messages_svc_pb.js",
-    js_name = "MessageFilter.State"
-)]
+#[wasm_bindgen(module = "/js/generated/messages_svc_pb.js", js_name = "MessageFilter.State")]
 pub enum MessageFilterState {
     UNKNOWN,
     NEW,
