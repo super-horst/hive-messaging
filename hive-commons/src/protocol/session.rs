@@ -5,7 +5,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::{
-    x3dh_agree_initial, x3dh_agree_respond, CertificateFactory, FromBytes, KeyAgreement,
+    x3dh_agree_initial, x3dh_agree_respond, CertificateFactory, FromBytes,
     ManagedRatchet, PublicKey, RecvStep, SendStep, Verifier,
 };
 use crate::model::common::PreKeyBundle;
