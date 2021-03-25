@@ -2,6 +2,7 @@ use failure::Fail;
 
 use hive_commons::crypto::CryptoError;
 use hive_commons::protocol::ProtocolError;
+use hive_commons::model::SerialisationError;
 
 #[derive(Debug, Fail)]
 pub enum ControllerError {
@@ -16,6 +17,16 @@ pub enum ControllerError {
         message: String,
         #[fail(cause)]
         cause: ProtocolError,
+    },
+    #[fail(display = "Serialisation failed")]
+    FailedSerialisation {
+        #[fail(cause)]
+        cause: SerialisationError,
+    },
+    #[fail(display = "Serialisation failed")]
+    IOError {
+        #[fail(cause)]
+        cause: std::io::Error,
     },
     #[fail(display = "Error during cryptography: {}", message)]
     CryptographicError {

@@ -90,39 +90,50 @@ impl IdentityController {
     }
 
     fn identity_maintenance(&self, on_error: Callback<String>) {
-        let cloned = self.clone();
-
-        spawn_local(async move {
-            match cloned.state.read() {
-                Ok(guard) => {
-                    match guard.deref().borrow().deref() {
-                        IdentityState::New { .. } => {
-                            // TODO error handling
-                            cloned.create_account().await.unwrap();
-                            cloned.publish_pre_key_bundle().await.unwrap();
-                        }
-                        IdentityState::Acknowledged { .. } => {
-                            // TODO error handling
-                            cloned.publish_pre_key_bundle().await.unwrap();
-                        }
-                        IdentityState::Initialised { .. } => {}
+        match self.state.read() {
+            Ok(guard) => {
+                match guard.deref().borrow().deref() {
+                    IdentityState::New => {
+                        let cloned = self.clone();
+                        spawn_local(async move {
+                            if let Err(error) = cloned.create_account().await {
+                                on_error.emit(format!("Failed to create account {:?}", error));
+                                panic!(error)
+                            }
+                            if let Err(error) = cloned.publish_pre_key_bundle().await {
+                                on_error.emit(format!("Failed to publish pre keys {:?}", error));
+                                panic!(error)
+                            }
+                        });
                     }
-                }
-                Err(error) => {
-                    on_error.emit(format!("Failed to identity state {:?}", error));
-                    error!("Failed to identity state {:?}", error);
+                    IdentityState::Acknowledged { .. } => {
+                        let cloned = self.clone();
+                        spawn_local(async move {
+                            if let Err(error) = cloned.publish_pre_key_bundle().await {
+                                on_error.emit(format!("Failed to publish pre keys {:?}", error));
+                                panic!(error)
+                            }
+                        });
+                    }
+                    IdentityState::Initialised { .. } => {}
                 }
             }
-        });
+            Err(error) => {
+                on_error.emit(format!("Failed to lock identity state {:?}", error));
+                error!("Failed to lock identity state {:?}", error);
+            }
+        }
     }
 
     async fn create_account(&self) -> Result<(), ControllerError> {
-        // TODO error handling
         debug!("Creating new account");
-        let challenge = protocol::sign_challenge(&self).unwrap();
+        let challenge = protocol::sign_challenge(&self)
+            .map_err(|cause| ControllerError::ProtocolExecution { message: "Failed to sign challenge".to_string(), cause })?;
 
         let unsig_challenge =
-            common::signed_challenge::Challenge::decode(challenge.challenge.clone()).unwrap();
+            common::signed_challenge::Challenge::decode(challenge.challenge.clone())
+                .map_err(|cause| ControllerError::FailedSerialisation { cause })?;
+
         debug!("Challenge timestamp {}", unsig_challenge.timestamp);
 
         let bound_challenge = common_bindings::SignedChallenge::new();
@@ -130,14 +141,23 @@ impl IdentityController {
         bound_challenge.setSignature(js_sys::Uint8Array::from(&challenge.signature[..]));
 
         let promise = self.transport.accounts().createAccount(bound_challenge);
-        let value = JsFuture::from(promise).await.unwrap();
+        let value = JsFuture::from(promise).await.map_err(|e| {
+            ControllerError::Message {
+                message: e.as_string().unwrap_or("Unknown error creating account".to_string())
+            }
+        })?;
 
         let certificate_binding: common_bindings::Certificate =
-            value.dyn_into().expect("response not working...");
+            value.dyn_into().map_err(|e| {
+                ControllerError::Message {
+                    message: e.as_string().unwrap_or("Unknown error during certificate conversion".to_string())
+                }
+            })?;
 
         // TODO how to handle signer cert
         let (certificate, _ignore_for_now) =
-            CertificateFactory::decode(&certificate_binding.into()).unwrap();
+            CertificateFactory::decode(&certificate_binding.into())
+                .map_err(|cause| ControllerError::CryptographicError { message: "Failed to decode incoming certificate".to_string(), cause })?;
 
         debug!("Certificate serial {}", certificate.infos().serial());
 
@@ -167,7 +187,6 @@ impl IdentityController {
     }
 
     async fn publish_pre_key_bundle(&self) -> Result<(), ControllerError> {
-        // TODO error handling
         debug!("Publishing new pre key bundle");
 
         let (pre_keys, privates) = protocol::create_pre_key_bundle(&self).map_err(|cause| {
@@ -180,10 +199,18 @@ impl IdentityController {
         let bound_pre_keys: common_bindings::PreKeyBundle = pre_keys.into();
 
         let promise = self.transport.accounts().updatePreKeys(bound_pre_keys);
-        let value = JsFuture::from(promise).await.unwrap();
+        let value = JsFuture::from(promise).await.map_err(|e| {
+            ControllerError::Message {
+                message: e.as_string().unwrap_or("Unknown error publishing pre keys".to_string())
+            }
+        })?;
 
         let _: accounts_svc_bindings::UpdateKeyResult =
-            value.dyn_into().expect("response not working...");
+            value.dyn_into().map_err(|e| {
+                ControllerError::Message {
+                    message: e.as_string().unwrap_or("Unknown error during update result conversion".to_string())
+                }
+            })?;
 
         self.pre_keys_accepted(privates).await
     }

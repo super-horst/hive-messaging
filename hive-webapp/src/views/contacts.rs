@@ -145,7 +145,11 @@ impl Component for ContactView {
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
         let contact =
-            ContactView { link: link.clone(), on_select: props.on_select, stored: props.stored };
+            ContactView {
+                link: link.clone(),
+                on_select: props.on_select,
+                stored: props.stored,
+            };
 
         return contact;
     }

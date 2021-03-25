@@ -61,6 +61,7 @@ impl Component for AppContainer {
             };
 
         let messaging = MessagingController::new(
+            on_error.clone(),
             identity.clone(),
             contacts.clone(),
             connections.clone(),
