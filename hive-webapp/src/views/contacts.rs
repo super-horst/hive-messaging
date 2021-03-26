@@ -11,8 +11,6 @@ use hive_commons::crypto::{FromBytes, PublicKey};
 
 use crate::ctrl::{Contact, ContactManager, ContactProfileModel};
 
-const CONTACTS_KEY: &'static str = "hive.core.contacts";
-
 pub enum ContactListMsg {
     UpdateInput(String),
     UpdateList(Vec<ContactProfileModel>),

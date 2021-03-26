@@ -190,6 +190,20 @@ pub struct Contact {
     session: Mutex<SessionManager>,
 }
 
+impl Hash for Contact {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.model.id.hash(state);
+    }
+}
+
+impl std::cmp::PartialEq<Contact> for Contact {
+    fn eq(&self, other: &Self) -> bool {
+        return self.model.id == other.model.id;
+    }
+}
+
+impl Eq for Contact {}
+
 impl Contact {
     pub fn new(
         model: ContactProfileModel,

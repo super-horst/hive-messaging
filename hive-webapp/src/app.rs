@@ -15,8 +15,6 @@ extern "C" {
 }
 
 pub enum AppMessage {
-    RenerableIdentityUpdate,
-    IncomingMessage(model::messages::Payload),
     ApplicationError(String),
 }
 
@@ -27,7 +25,6 @@ pub struct AppContainer {
     connections: ConnectionManager,
     identity: IdentityController,
     contacts: ContactManager,
-    messaging: MessagingController,
 }
 
 impl Component for AppContainer {
@@ -60,24 +57,11 @@ impl Component for AppContainer {
                 }
             };
 
-        let messaging = MessagingController::new(
-            on_error.clone(),
-            identity.clone(),
-            contacts.clone(),
-            connections.clone(),
-            link.callback(|payload| AppMessage::IncomingMessage(payload)),
-        );
-
-        AppContainer { link, on_error, storage, connections, identity, contacts, messaging }
+        AppContainer { link, on_error, storage, connections, identity, contacts }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         return match msg {
-            AppMessage::RenerableIdentityUpdate => true,
-            AppMessage::IncomingMessage(payload) => {
-                // TODO handle payload
-                true
-            }
             AppMessage::ApplicationError(message) => {
                 alert(&message);
                 true
@@ -98,7 +82,7 @@ impl Component for AppContainer {
              storage=self.storage.clone()
              identity=self.identity.clone()
              contacts=self.contacts.clone()
-             messaging=self.messaging.clone()
+             connections=self.connections.clone()
               />
         </div>
         }

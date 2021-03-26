@@ -14,13 +14,14 @@ use hive_commons::{model, protocol};
 use crate::bindings::msg_svc_bindings;
 use crate::ctrl::{Contact, ContactManager, ControllerError, IdentityController};
 use crate::transport::ConnectionManager;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct MessagingController {
     identity: IdentityController,
     contacts: ContactManager,
     transport: ConnectionManager,
-    incoming_payload: Callback<model::messages::Payload>,
+    incoming_payload: Callback<(Arc<Contact>, model::messages::Payload)>,
 }
 
 impl MessagingController {
@@ -29,7 +30,7 @@ impl MessagingController {
         identity: IdentityController,
         contacts: ContactManager,
         transport: ConnectionManager,
-        incoming_payload: Callback<model::messages::Payload>,
+        incoming_payload: Callback<(Arc<Contact>, model::messages::Payload)>,
     ) -> MessagingController {
         let msg_ctrl = MessagingController { identity, contacts, transport, incoming_payload };
 
@@ -118,7 +119,7 @@ impl MessagingController {
                 cause,
             })?;
 
-        self.incoming_payload.emit(payload);
+        self.incoming_payload.emit((contact, payload));
 
         Ok(())
     }

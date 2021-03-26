@@ -1,5 +1,6 @@
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+use std::ops::Deref;
 
 use wasm_bindgen_futures::futures_0_3::spawn_local;
 
@@ -11,12 +12,13 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use hive_commons::model;
-use hive_commons::model::Encodable;
+use hive_commons::model::{Encodable, Decodable};
 
 use crate::ctrl::{
     Contact, ContactManager, IdentityController, MessagingController, StorageController,
 };
 use crate::views::contacts;
+use crate::transport::ConnectionManager;
 
 const MSG_KEY_PREFIX: &'static str = "hive.core.messages.";
 
@@ -42,8 +44,9 @@ impl std::cmp::PartialEq<MessageModel> for MessageModel {
 impl Eq for MessageModel {}
 
 pub enum MessagingViewMessage {
-    Update(String),
+    UpdateInput(String),
     Send,
+    ReceiveMessage((Arc<Contact>, model::messages::Payload)),
     SelectContact(Arc<Contact>),
     Nope,
 }
@@ -54,17 +57,17 @@ pub struct MessagingProperties {
     pub storage: StorageController,
     pub identity: IdentityController,
     pub contacts: ContactManager,
-    pub messaging: MessagingController,
+    pub connections: ConnectionManager,
 }
 
 pub struct MessagingView {
     link: ComponentLink<Self>,
     on_error: Callback<String>,
     storage: StorageController,
-    identity: IdentityController,
     contacts: ContactManager,
     messaging: MessagingController,
     selected_contact: Option<Arc<Contact>>,
+    current_messages: Vec<MessageModel>,
     composed_message: String,
 }
 
@@ -73,14 +76,22 @@ impl Component for MessagingView {
     type Properties = MessagingProperties;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
+        let messaging = MessagingController::new(
+            props.on_error.clone(),
+            props.identity.clone(),
+            props.contacts.clone(),
+            props.connections.clone(),
+            link.callback(MessagingViewMessage::ReceiveMessage),
+        );
+
         MessagingView {
             link,
             on_error: props.on_error,
             storage: props.storage,
-            identity: props.identity,
             contacts: props.contacts,
-            messaging: props.messaging,
+            messaging,
             selected_contact: None,
+            current_messages: vec![],
             composed_message: "".to_string(),
         }
     }
@@ -89,41 +100,52 @@ impl Component for MessagingView {
         match msg {
             MessagingViewMessage::Nope => {
                 //NOOP
+                false
             }
             MessagingViewMessage::Send => {
-                info!("Sending {}", &self.composed_message);
-
                 if let Some(ref contact) = self.selected_contact {
-                    let message = self.composed_message.clone();
+                    info!("Sending {}", &self.composed_message);
+                    self.current_messages = self.send_message(contact, &self.composed_message);
 
-                    // TODO handle errors
-                    let msg_payload = model::messages::MessagePayload { message }.encode().unwrap();
-
-                    let payload = model::messages::Payload { header: None, payload: msg_payload };
-
-                    let local_contact = contact.clone();
-                    let local_messaging = self.messaging.clone();
-                    let local_on_error = self.on_error.clone();
-                    spawn_local(async move {
-                        if let Err(error) =
-                            local_messaging.outgoing_message(&local_contact, &payload).await
-                        {
-                            local_on_error.emit(format!("Failed to access messages {:?}", error));
-                            panic!(error)
-                        }
-                    });
                     self.composed_message = "".to_string();
+                    return true;
+                }
+                false
+            }
+            MessagingViewMessage::ReceiveMessage((contact, message)) => {
+                let messages = self.receive_message(&contact, message);
+                match self.selected_contact {
+                    Some(ref selected) => {
+                        if selected.deref().eq(contact.deref()) {
+                            self.current_messages = messages;
+                            return true;
+                        }
+                        false
+                    }
+                    None => false
                 }
             }
-            MessagingViewMessage::Update(val) => {
+            MessagingViewMessage::UpdateInput(val) => {
                 self.composed_message = val;
+                false
             }
             MessagingViewMessage::SelectContact(c) => {
-                self.selected_contact = Some(c);
-            }
-        };
+                let key = MSG_KEY_PREFIX.to_owned() + &c.profile().id.to_string();
 
-        return true;
+                self.selected_contact = Some(c);
+
+                let load_result = self.storage.load::<Vec<MessageModel>>(&key);
+
+                match load_result {
+                    Ok(messages) => self.current_messages = messages,
+                    Err(error) => {
+                        self.on_error.emit(format!("Failed to access messages {:?}", error));
+                        panic!(error)
+                    }
+                }
+                true
+            }
+        }
     }
 
     fn change(&mut self, _: Self::Properties) -> ShouldRender {
@@ -132,23 +154,7 @@ impl Component for MessagingView {
     }
 
     fn view(&self) -> Html {
-        // TODO handle errors
-        let messages: Vec<String> = match self.selected_contact {
-            Some(ref c) => {
-                let key = MSG_KEY_PREFIX.to_owned() + &c.profile().id.to_string();
-
-                let load_result = self.storage.load::<Vec<MessageModel>>(&key);
-
-                match load_result {
-                    Ok(messages) => messages.iter().map(|m| m.message.clone()).collect(),
-                    Err(error) => {
-                        self.on_error.emit(format!("Failed to access messages {:?}", error));
-                        panic!(error)
-                    }
-                }
-            }
-            None => vec![],
-        };
+        let messages: Vec<String> = self.current_messages.iter().map(|m| m.message.clone()).collect();
 
         html! {
         <div class="view_layout">
@@ -159,11 +165,10 @@ impl Component for MessagingView {
             <div class="box msg_view_layout">
                 <div class="msg_header">
                     <div class="center">
-                        {"Not available"}
-                        /*{match &self.selected_contact {
-                            Some(c) => c.key.id_string(),
-                            None => "".to_string(),
-                         }}*/
+                        {match &self.selected_contact {
+                            Some(c) => &c.profile().name,
+                            None => "",
+                         }}
                     </div>
                 </div>
 
@@ -177,7 +182,7 @@ impl Component for MessagingView {
                 <div class="msg_input_view">
                     <input placeholder="Compose a message..." style="width: 100%;"
                         value=&self.composed_message
-                        oninput=self.link.callback(|e: InputData| MessagingViewMessage::Update(e.value))
+                        oninput=self.link.callback(|e: InputData| MessagingViewMessage::UpdateInput(e.value))
                         onkeypress=self.link.callback(|e: KeyboardEvent| {
                            if e.key() == "Enter" { MessagingViewMessage::Send } else { MessagingViewMessage::Nope }
                    }) />
@@ -185,5 +190,53 @@ impl Component for MessagingView {
             </div>
         </div>
         }
+    }
+}
+
+impl MessagingView {
+    fn send_message(&self, contact: &Arc<Contact>, message: &str) -> Vec<MessageModel> {
+        // TODO handle errors
+        let msg_payload = model::messages::MessagePayload { message: message.to_string() }.encode().unwrap();
+
+        let messages = self.append_message(&contact, message.to_string());
+
+        let payload = model::messages::Payload { header: None, payload: msg_payload };
+
+        let local_contact = contact.clone();
+        let local_messaging = self.messaging.clone();
+        let local_on_error = self.on_error.clone();
+        spawn_local(async move {
+            if let Err(error) =
+            local_messaging.outgoing_message(&local_contact, &payload).await
+            {
+                local_on_error.emit(format!("Failed to access messages {:?}", error));
+                panic!(error)
+            }
+        });
+
+        messages
+    }
+
+    fn receive_message(&self, contact: &Arc<Contact>, payload: model::messages::Payload) -> Vec<MessageModel> {
+        // TODO handle errors
+        let msg_payload = model::messages::MessagePayload::decode(payload.payload).unwrap();
+
+        self.append_message(contact, msg_payload.message)
+    }
+
+    fn append_message(&self, contact: &Arc<Contact>, message: String) -> Vec<MessageModel> {
+        // TODO handle errors
+        let key = MSG_KEY_PREFIX.to_owned() + &contact.profile().id.to_string();
+
+        let mut load_result = self.storage.load::<Vec<MessageModel>>(&key).unwrap();
+        load_result.insert(0, MessageModel {
+            id: Uuid::new_v4(),
+            message,
+            timestamp: 0,
+        });
+
+        self.storage.store(&key, &load_result).unwrap();
+
+        load_result
     }
 }
