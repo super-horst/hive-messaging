@@ -1,6 +1,6 @@
 use std::borrow::Borrow;
 use std::cell::RefCell;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, RwLock};
 
 use wasm_bindgen::JsCast;
@@ -260,10 +260,6 @@ impl IdentityController {
         };
     }
 
-    fn retrieve_pre_keys(&self) -> Result<protocol::PrivatePreKeys, ControllerError> {
-        unimplemented!()
-    }
-
     fn store(&self) -> Result<(), ControllerError> {
         let read_state = self
             .state
@@ -275,18 +271,41 @@ impl IdentityController {
             state: read_state.deref().borrow().deref().clone(),
         };
 
-        let store_result = self.storage.store(IDENTITY_KEY, &model);
-        store_result
+        self.storage.store(IDENTITY_KEY, &model)?;
+
+        Ok(())
     }
 }
 
 impl protocol::KeyAccess for IdentityController {
-    fn pre_key_access(&self) -> &PrivateKey {
-        unimplemented!()
+    fn pre_key_access(&self) -> PrivateKey {
+        match self.state.read() {
+            Ok(guard) => match guard.deref().borrow().deref() {
+                IdentityState::New | IdentityState::Acknowledged { .. } => panic!("invalid state"),
+                IdentityState::Initialised { pre_keys, .. } => return pre_keys.pre_key.clone(),
+            },
+            Err(cause) => {
+                error!("Failed to lock: {}", cause);
+                panic!("Failed to lock")
+            }
+        };
     }
 
     fn one_time_key_access(&self, public: &PublicKey) -> Option<PrivateKey> {
-        unimplemented!()
+        match self.state.write() {
+            Ok(mut guard) => match guard.deref_mut().borrow_mut().deref_mut() {
+                IdentityState::New | IdentityState::Acknowledged { .. } => panic!("invalid state"),
+                IdentityState::Initialised { pre_keys, .. } => {
+                    let position = pre_keys.one_time_keys.iter().position(|x| x.public_key() == public);
+
+                    position.map(|pos| pre_keys.one_time_keys.remove(pos))
+                }
+            },
+            Err(cause) => {
+                error!("Failed to lock: {}", cause);
+                panic!("Failed to lock")
+            }
+        }
     }
 }
 

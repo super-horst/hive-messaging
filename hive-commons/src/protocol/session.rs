@@ -201,11 +201,11 @@ impl SessionManager {
             &self.session.peer_identity,
             self.keys.deref(),
             &ephemeral,
-            pre_key,
+            &pre_key,
             otk.as_ref(),
         );
 
-        let ratchet = ManagedRatchet::initialise_received(&secret, pre_key).map_err(|cause| {
+        let ratchet = ManagedRatchet::initialise_received(&secret, &pre_key).map_err(|cause| {
             ProtocolError::FailedCryptography {
                 message: "Initialisation of ratchet".to_string(),
                 cause,
@@ -566,8 +566,8 @@ mod session_tests {
     }
 
     impl KeyAccess for MockCryptoProvider {
-        fn pre_key_access(&self) -> &PrivateKey {
-            &self.pre_key
+        fn pre_key_access(&self) ->PrivateKey {
+            self.pre_key.clone()
         }
 
         fn one_time_key_access(&self, _: &PublicKey) -> Option<PrivateKey> {

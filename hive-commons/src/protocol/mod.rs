@@ -13,13 +13,14 @@ pub use session::*;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PrivatePreKeys {
-    pub(crate) pre_key: PrivateKey,
-    pub(crate) one_time_keys: Vec<PrivateKey>,
+    pub pre_key: PrivateKey,
+    pub one_time_keys: Vec<PrivateKey>,
 }
 
 // TODO add error::advice field to maybe mitigate error
 pub trait KeyAccess: KeyAgreement {
-    fn pre_key_access(&self) -> &PrivateKey;
+    //TODO refactor key access
+    fn pre_key_access(&self) -> PrivateKey;
 
     fn one_time_key_access(&self, public: &PublicKey) -> Option<PrivateKey>;
 }
