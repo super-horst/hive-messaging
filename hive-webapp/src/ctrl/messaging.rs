@@ -108,8 +108,7 @@ impl MessagingController {
             }
         })?;
 
-        // TODO blocking in async
-        let contact = self.contacts.access_contact(cert.public_key())?;
+        let contact = self.contacts.access_contact(cert.public_key()).await?;
 
         let payload = contact
             .incoming_message(session_params, &envelope.getEncryptedPayload_asU8().to_vec())

@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use wasm_bindgen_futures::futures_0_3::spawn_local;
+
 use yew::prelude::*;
 use yew::{
     html, Component, ComponentLink, Html, InputData, KeyboardEvent, Properties, ShouldRender,
@@ -12,7 +14,8 @@ use crate::ctrl::{Contact, ContactManager, ContactProfileModel};
 const CONTACTS_KEY: &'static str = "hive.core.contacts";
 
 pub enum ContactListMsg {
-    Update(String),
+    UpdateInput(String),
+    UpdateList(Vec<ContactProfileModel>),
     Add,
     Select(ContactProfileModel),
     Nope,
@@ -39,7 +42,12 @@ impl Component for ContactListView {
     type Properties = ListProps;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let known_contacts = props.contacts.access_known_contacts();
+        let callback = link.callback(|list| ContactListMsg::UpdateList(list));
+        let contacts = props.contacts.clone();
+        spawn_local(async move {
+            let known_contacts = contacts.access_known_contacts().await;
+            callback.emit(known_contacts);
+        });
 
         ContactListView {
             link,
@@ -47,14 +55,14 @@ impl Component for ContactListView {
             on_select: props.on_select,
             value: "".to_string(),
             contacts: props.contacts,
-            known_contacts,
+            known_contacts: vec![],
         }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         // TODO error handling?
         return match msg {
-            ContactListMsg::Update(val) => {
+            ContactListMsg::UpdateInput(val) => {
                 self.value = val;
                 true
             }
@@ -69,23 +77,42 @@ impl Component for ContactListView {
 
                 let name = format!("User {}", self.known_contacts.len() as u64);
 
-                let contact_list_update = self.contacts.add_contact(public, name);
+                let contacts = self.contacts.clone();
+                let callback = self.link.callback(|list| ContactListMsg::UpdateList(list));
+                let on_error = self.on_error.clone();
+                spawn_local(async move {
+                    match contacts.add_contact(public, name).await {
+                        Ok(list) => callback.emit(list),
+                        Err(error) => {
+                            on_error.emit(format!("{:?}", error));
+                            panic!(error)
+                        }
+                    }
+                });
 
-                self.known_contacts = contact_list_update;
                 self.value = "".to_string();
                 true
             }
+            ContactListMsg::UpdateList(contact_list_update) => {
+                self.known_contacts = contact_list_update;
+                true
+            }
             ContactListMsg::Select(profile) => {
-                let result = self.contacts.access_contact(&profile.key);
+                let contacts = self.contacts.clone();
+                let on_select = self.on_select.clone();
+                let on_error = self.on_error.clone();
 
-                match result {
-                    Ok(contact) => self.on_select.emit(contact),
-                    Err(error) => {
-                        self.on_error.emit(format!("{:?}", error));
-                        panic!(error)
+                spawn_local(async move {
+                    let result = contacts.access_contact(&profile.key).await;
+
+                    match result {
+                        Ok(contact) => on_select.emit(contact),
+                        Err(error) => {
+                            on_error.emit(format!("{:?}", error));
+                            panic!(error)
+                        }
                     }
-                }
-
+                });
                 true
             }
             _ => true,
@@ -102,7 +129,7 @@ impl Component for ContactListView {
             <div class="box contact_add_field">
                 <input placeholder="Add new contact..." style="width: 100%;"
                     value=&self.value
-                    oninput=self.link.callback(|e: InputData| ContactListMsg::Update(e.value))
+                    oninput=self.link.callback(|e: InputData| ContactListMsg::UpdateInput(e.value))
                     onkeypress=self.link.callback(|e: KeyboardEvent| {
                        if e.key() == "Enter" { ContactListMsg::Add } else { ContactListMsg::Nope }
                    }) />

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use std::ops::Deref;
 
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::futures_0_3::JsFuture;
@@ -8,7 +9,7 @@ use wasm_bindgen_futures::futures_0_3::JsFuture;
 use log::*;
 use uuid::Uuid;
 
-use async_lock::Mutex;
+use async_lock::{Mutex, RwLock};
 
 use serde::{Deserialize, Serialize};
 
@@ -88,23 +89,20 @@ impl ContactManager {
         })
     }
 
-    fn access_cached(&self, public_key: &PublicKey) -> Option<Arc<Contact>> {
-        // TODO async or error handling?
-        let guard = self.cached_contacts.read().unwrap();
+    async fn access_cached(&self, public_key: &PublicKey) -> Option<Arc<Contact>> {
+        let guard = self.cached_contacts.read().await;
         let retrieved = guard.get(public_key);
 
         retrieved.map(|c| c.clone())
     }
 
-    fn store_cached(&self, contact: Contact) -> Arc<Contact> {
-        // TODO async or error handling?
-        let mut guard = self.cached_contacts.write().unwrap();
+    async fn store_cached(&self, contact: Contact) -> Arc<Contact> {
+        let mut guard = self.cached_contacts.write().await;
         guard.entry(contact.peer_identity().clone()).or_insert_with(|| Arc::new(contact)).clone()
     }
 
-    fn access_stored(&self, public_key: &PublicKey) -> Result<Arc<Contact>, ControllerError> {
-        // TODO async or error handling?
-        let guard = self.known_contacts.read().unwrap();
+    async fn access_stored(&self, public_key: &PublicKey) -> Result<Arc<Contact>, ControllerError> {
+        let guard = self.known_contacts.read().await;
 
         return if let Some(profile) = guard.get(public_key) {
             let key = CONTACT_KEY_PREFIX.to_owned() + &profile.id.to_string();
@@ -119,7 +117,7 @@ impl ContactManager {
                     self.identity.clone(),
                 );
 
-                Ok(self.store_cached(contact))
+                Ok(self.store_cached(contact).await)
             } else {
                 Err(ControllerError::InvalidState {
                     message: format!("Unable to load contact: '{}'", public_key.id_string()),
@@ -132,36 +130,57 @@ impl ContactManager {
         };
     }
 
-    pub fn access_known_contacts(&self) -> Vec<ContactProfileModel> {
-        // TODO async or error handling?
-        let guard = self.known_contacts.read().unwrap();
+    pub async fn access_known_contacts(&self) -> Vec<ContactProfileModel> {
+        let guard = self.known_contacts.read().await;
         let profiles: Vec<ContactProfileModel> =
             guard.values().into_iter().map(|profile| profile.clone()).collect();
 
         return profiles;
     }
 
-    pub fn access_contact(&self, public_key: &PublicKey) -> Result<Arc<Contact>, ControllerError> {
-        let cached = self.access_cached(public_key);
+    pub async fn access_contact(&self, public_key: &PublicKey) -> Result<Arc<Contact>, ControllerError> {
+        let cached = self.access_cached(public_key).await;
         if let Some(contact) = cached {
             return Ok(contact);
         }
 
-        self.access_stored(public_key)
+        self.access_stored(public_key).await
     }
 
-    pub fn add_contact(&self, public_key: PublicKey, name: String) -> Vec<ContactProfileModel> {
-        // TODO async or error handling?
+    pub async fn add_contact(&self, public_key: PublicKey, name: String) -> Result<Vec<ContactProfileModel>, ControllerError> {
+        let profile;
         {
-            let mut guard = self.known_contacts.write().unwrap();
-            guard.entry(public_key.clone()).or_insert_with(|| ContactProfileModel {
+            let mut guard = self.known_contacts.write().await;
+            profile = guard.entry(public_key.clone()).or_insert_with(|| ContactProfileModel {
                 id: Uuid::new_v4(),
-                key: public_key,
+                key: public_key.clone(),
                 name,
-            });
+            }).clone();
+
+            self.storage.store(KNOWN_CONTACTS_KEY, guard.deref())?;
         }
 
-        self.access_known_contacts()
+        let contact = Contact::new(
+            profile.clone(),
+            self.connections.clone(),
+            self.identity.clone(),
+        );
+
+        {
+            let key = CONTACT_KEY_PREFIX.to_owned() + &profile.id.to_string();
+
+            let guard = contact.session.lock().await;
+            self.storage.store(&key, &ContactModel {
+                session: guard.session().clone(),
+            })?;
+        }
+
+        {
+            let mut guard = self.cached_contacts.write().await;
+            guard.insert(public_key, Arc::new(contact));
+        }
+
+        Ok(self.access_known_contacts().await)
     }
 }
 
