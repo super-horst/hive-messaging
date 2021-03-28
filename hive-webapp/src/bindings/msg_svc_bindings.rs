@@ -34,8 +34,8 @@ extern "C" {
     pub type MessageSendResult;
 }
 
-#[wasm_bindgen(module = "/js/generated/messages_svc_pb.js", js_name = "MessageFilter.State")]
-pub enum MessageFilterState {
+#[wasm_bindgen(module = "/js/generated/messages_svc_pb.js")]
+pub enum MessageState {
     UNKNOWN,
     NEW,
 }
@@ -48,10 +48,10 @@ extern "C" {
     pub fn new() -> MessageFilter;
 
     #[wasm_bindgen(method)]
-    pub fn getState(this: &MessageFilter) -> MessageFilterState;
+    pub fn getState(this: &MessageFilter) -> MessageState;
 
     #[wasm_bindgen(method)]
-    pub fn setState(this: &MessageFilter, state: MessageFilterState);
+    pub fn setState(this: &MessageFilter, state: MessageState);
 
     #[wasm_bindgen(method)]
     pub fn getDst(this: &MessageFilter) -> common_bindings::Peer;

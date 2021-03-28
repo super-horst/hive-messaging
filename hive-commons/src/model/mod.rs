@@ -37,10 +37,11 @@ pub trait Encodable {
 impl<T: prost::Message> Encodable for T {
     fn encode(&self) -> Result<Vec<u8>, SerialisationError> {
         let mut buf: Vec<u8> = Vec::with_capacity(self.encoded_len());
-        self.encode(&mut buf).map_err(|cause| SerialisationError::Encoding {
-            message: "Failed to encode object".to_string(),
-            cause,
-        })?;
+        self.encode(&mut buf)
+            .map_err(|cause| SerialisationError::Encoding {
+                message: "Failed to encode object".to_string(),
+                cause,
+            })?;
         Ok(buf)
     }
 }

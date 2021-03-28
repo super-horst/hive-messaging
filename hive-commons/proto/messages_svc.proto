@@ -13,13 +13,14 @@ service Messages {
 
 }
 
-message MessageFilter {
-  enum State {
-    UNKNOWN = 0;
-    NEW = 1;
-  }
+enum MessageState {
+  UNKNOWN = 0;
+  NEW = 1;
+}
 
-  State state = 1;
+message MessageFilter {
+
+  MessageState state = 1;
   common.Peer dst = 2;
 }
 

@@ -1,6 +1,8 @@
 use std::time::Duration;
 
+use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use js_sys::Promise;
 use wasm_bindgen_futures::futures_0_3::{spawn_local, JsFuture};
 use wasm_timer::Delay;
 
@@ -15,6 +17,19 @@ use crate::bindings::msg_svc_bindings;
 use crate::ctrl::{Contact, ContactManager, ControllerError, IdentityController};
 use crate::transport::ConnectionManager;
 use std::sync::Arc;
+use web_sys::window;
+
+pub async fn sleep(ms: i32) -> Result<(), JsValue> {
+    // TODO error handling
+    let promise = Promise::new(&mut |yes, _| {
+        let win = window().unwrap();
+        win.set_timeout_with_callback_and_timeout_and_arguments_0(&yes, ms)
+            .unwrap();
+    });
+    let js_fut = JsFuture::from(promise);
+    js_fut.await?;
+    Ok(())
+}
 
 #[derive(Clone)]
 pub struct MessagingController {
@@ -51,12 +66,11 @@ impl MessagingController {
     }
 
     async fn poll_and_forward_message(&self, my_id: &PublicKey) -> Result<(), ControllerError> {
-        if let Err(cause) = Delay::new(Duration::from_secs(2)).await {
-            return Err(ControllerError::IOError { cause });
-        };
+        // TODO error handling
+        sleep(2000).await.unwrap();
 
         let filter = msg_svc_bindings::MessageFilter::new();
-        filter.setState(msg_svc_bindings::MessageFilterState::NEW);
+        filter.setState(msg_svc_bindings::MessageState::NEW);
         filter.setDst(my_id.into_peer().into());
 
         let promise = self.transport.messages().getMessages(filter);
