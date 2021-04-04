@@ -11,6 +11,12 @@ extern "C" {
     pub fn new() -> Envelope;
 
     #[wasm_bindgen(method)]
+    pub fn getDst(this: &Envelope) -> common_bindings::Peer;
+
+    #[wasm_bindgen(method)]
+    pub fn setDst(this: &Envelope, destination: common_bindings::Peer);
+
+    #[wasm_bindgen(method)]
     pub fn getEphemeralSessionKey_asU8(this: &Envelope) -> js_sys::Uint8Array;
 
     #[wasm_bindgen(method)]

@@ -1,8 +1,8 @@
 use failure::Fail;
 
 use hive_commons::crypto::CryptoError;
-use hive_commons::protocol::ProtocolError;
 use hive_commons::model::SerialisationError;
+use hive_commons::protocol::ProtocolError;
 
 #[derive(Debug, Fail)]
 pub enum ControllerError {

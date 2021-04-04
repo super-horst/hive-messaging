@@ -1,6 +1,6 @@
 use std::hash::{Hash, Hasher};
-use std::sync::Arc;
 use std::ops::Deref;
+use std::sync::Arc;
 
 use wasm_bindgen_futures::futures_0_3::spawn_local;
 
@@ -12,13 +12,14 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use hive_commons::model;
-use hive_commons::model::{Encodable, Decodable};
+use hive_commons::model::{Decodable, Encodable};
 
 use crate::ctrl::{
-    Contact, ContactManager, IdentityController, MessagingController, StorageController,
+    Contact, ContactManager, ControllerError, IdentityController, MessagingController,
+    StorageController,
 };
-use crate::views::contacts;
 use crate::transport::ConnectionManager;
+use crate::views::contacts;
 
 const MSG_KEY_PREFIX: &'static str = "hive.core.messages.";
 
@@ -104,7 +105,6 @@ impl Component for MessagingView {
             }
             MessagingViewMessage::Send => {
                 if let Some(ref contact) = self.selected_contact {
-                    info!("Sending {}", &self.composed_message);
                     self.current_messages = self.send_message(contact, &self.composed_message);
 
                     self.composed_message = "".to_string();
@@ -122,7 +122,7 @@ impl Component for MessagingView {
                         }
                         false
                     }
-                    None => false
+                    None => false,
                 }
             }
             MessagingViewMessage::UpdateInput(val) => {
@@ -130,19 +130,9 @@ impl Component for MessagingView {
                 false
             }
             MessagingViewMessage::SelectContact(c) => {
-                let key = MSG_KEY_PREFIX.to_owned() + &c.profile().id.to_string();
-
+                self.current_messages = self.load_messages(c.deref());
                 self.selected_contact = Some(c);
 
-                let load_result = self.storage.load::<Vec<MessageModel>>(&key);
-
-                match load_result {
-                    Ok(messages) => self.current_messages = messages,
-                    Err(error) => {
-                        self.on_error.emit(format!("Failed to access messages {:?}", error));
-                        panic!(error)
-                    }
-                }
                 true
             }
         }
@@ -154,7 +144,11 @@ impl Component for MessagingView {
     }
 
     fn view(&self) -> Html {
-        let messages: Vec<String> = self.current_messages.iter().map(|m| m.message.clone()).collect();
+        let messages: Vec<String> = self
+            .current_messages
+            .iter()
+            .map(|m| m.message.clone())
+            .collect();
 
         html! {
         <div class="view_layout">
@@ -194,22 +188,46 @@ impl Component for MessagingView {
 }
 
 impl MessagingView {
+    fn load_messages(&self, contact: &Contact) -> Vec<MessageModel> {
+        let key = MSG_KEY_PREFIX.to_owned() + &contact.profile().id.to_string();
+
+        let load_result = self.storage.load::<Vec<MessageModel>>(&key);
+
+        match load_result {
+            Ok(messages) => messages,
+            Err(ControllerError::NoDataFound { .. }) => vec![],
+            Err(error) => {
+                error!("Failed to access messages {:?}", error);
+                panic!(error)
+            }
+        }
+    }
+
     fn send_message(&self, contact: &Arc<Contact>, message: &str) -> Vec<MessageModel> {
         // TODO handle errors
-        let msg_payload = model::messages::MessagePayload { message: message.to_string() }.encode().unwrap();
+        let msg_payload = model::messages::MessagePayload {
+            message: message.to_string(),
+        }
+        .encode()
+        .unwrap();
 
         let messages = self.append_message(&contact, message.to_string());
 
-        let payload = model::messages::Payload { header: None, payload: msg_payload };
+        let payload = model::messages::Payload {
+            header: None,
+            payload: msg_payload,
+        };
 
         let local_contact = contact.clone();
         let local_messaging = self.messaging.clone();
         let local_on_error = self.on_error.clone();
         spawn_local(async move {
-            if let Err(error) =
-            local_messaging.outgoing_message(&local_contact, &payload).await
+            if let Err(error) = local_messaging
+                .outgoing_message(&local_contact, &payload)
+                .await
             {
                 local_on_error.emit(format!("Failed to access messages {:?}", error));
+                error!("Failed to access messages {:?}", error);
                 panic!(error)
             }
         });
@@ -217,7 +235,11 @@ impl MessagingView {
         messages
     }
 
-    fn receive_message(&self, contact: &Arc<Contact>, payload: model::messages::Payload) -> Vec<MessageModel> {
+    fn receive_message(
+        &self,
+        contact: &Arc<Contact>,
+        payload: model::messages::Payload,
+    ) -> Vec<MessageModel> {
         // TODO handle errors
         let msg_payload = model::messages::MessagePayload::decode(payload.payload).unwrap();
 
@@ -225,16 +247,15 @@ impl MessagingView {
     }
 
     fn append_message(&self, contact: &Arc<Contact>, message: String) -> Vec<MessageModel> {
-        // TODO handle errors
-        let key = MSG_KEY_PREFIX.to_owned() + &contact.profile().id.to_string();
-
-        let mut load_result = self.storage.load::<Vec<MessageModel>>(&key).unwrap();
-        load_result.insert(0, MessageModel {
+        let mut load_result = self.load_messages(contact);
+        load_result.push(MessageModel {
             id: Uuid::new_v4(),
             message,
             timestamp: 0,
         });
 
+        // TODO handle errors
+        let key = MSG_KEY_PREFIX.to_owned() + &contact.profile().id.to_string();
         self.storage.store(&key, &load_result).unwrap();
 
         load_result

@@ -43,8 +43,8 @@ impl Component for AppContainer {
             match IdentityController::new(on_error.clone(), storage.clone(), connections.clone()) {
                 Ok(identity) => identity,
                 Err(error) => {
-                    on_error.emit(format!("Failed to access contacts {:?}", error));
-                    panic!(error)
+                    error!("{:?}", error);
+                    panic!(format!("{:?}", error))
                 }
             };
 
@@ -52,12 +52,19 @@ impl Component for AppContainer {
             match ContactManager::new(storage.clone(), connections.clone(), identity.clone()) {
                 Ok(contacts) => contacts,
                 Err(error) => {
-                    on_error.emit(format!("Failed to access contacts {:?}", error));
-                    panic!(error)
+                    error!("{:?}", error);
+                    panic!(format!("{:?}", error))
                 }
             };
 
-        AppContainer { link, on_error, storage, connections, identity, contacts }
+        AppContainer {
+            link,
+            on_error,
+            storage,
+            connections,
+            identity,
+            contacts,
+        }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {

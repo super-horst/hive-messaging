@@ -7,6 +7,8 @@ use yew::{
     html, Component, ComponentLink, Html, InputData, KeyboardEvent, Properties, ShouldRender,
 };
 
+use log::*;
+
 use hive_commons::crypto::{FromBytes, PublicKey};
 
 use crate::ctrl::{Contact, ContactManager, ContactProfileModel};
@@ -73,7 +75,7 @@ impl Component for ContactListView {
                 let bytes = hex::decode(&val).unwrap();
                 let public = PublicKey::from_bytes(&bytes[..]).unwrap();
 
-                let name = format!("User {}", self.known_contacts.len() as u64);
+                let name = format!("User {}", self.known_contacts.len());
 
                 let contacts = self.contacts.clone();
                 let callback = self.link.callback(|list| ContactListMsg::UpdateList(list));
@@ -83,6 +85,7 @@ impl Component for ContactListView {
                         Ok(list) => callback.emit(list),
                         Err(error) => {
                             on_error.emit(format!("{:?}", error));
+                            error!("{:?}", error);
                             panic!(error)
                         }
                     }
@@ -100,6 +103,8 @@ impl Component for ContactListView {
                 let on_select = self.on_select.clone();
                 let on_error = self.on_error.clone();
 
+                debug!("Selected contact: {}", profile.name);
+
                 spawn_local(async move {
                     let result = contacts.access_contact(&profile.key).await;
 
@@ -107,6 +112,7 @@ impl Component for ContactListView {
                         Ok(contact) => on_select.emit(contact),
                         Err(error) => {
                             on_error.emit(format!("{:?}", error));
+                            error!("{:?}", error);
                             panic!(error)
                         }
                     }
@@ -122,8 +128,10 @@ impl Component for ContactListView {
     }
 
     fn view(&self) -> Html {
+        let id = self.contacts.identity();
         html! {
         <div class="box contacts">
+            <div class="box"> {{id}} </div>
             <div class="box contact_add_field">
                 <input placeholder="Add new contact..." style="width: 100%;"
                     value=&self.value
@@ -169,12 +177,11 @@ impl Component for ContactView {
     type Properties = ContactProps;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let contact =
-            ContactView {
-                link: link.clone(),
-                on_select: props.on_select,
-                stored: props.stored,
-            };
+        let contact = ContactView {
+            link: link.clone(),
+            on_select: props.on_select,
+            stored: props.stored,
+        };
 
         return contact;
     }

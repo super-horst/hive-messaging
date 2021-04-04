@@ -33,8 +33,13 @@ pub struct IdentityModel {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum IdentityState {
     New,
-    Acknowledged { certificate: Certificate },
-    Initialised { certificate: Certificate, pre_keys: protocol::PrivatePreKeys },
+    Acknowledged {
+        certificate: Certificate,
+    },
+    Initialised {
+        certificate: Certificate,
+        pre_keys: protocol::PrivatePreKeys,
+    },
 }
 
 #[derive(Clone)]
@@ -72,7 +77,10 @@ impl IdentityController {
                     }
                 })?;
 
-                let model = IdentityModel { key, state: IdentityState::New };
+                let model = IdentityModel {
+                    key,
+                    state: IdentityState::New,
+                };
 
                 storage.store(IDENTITY_KEY, &model)?;
                 let ctrl = IdentityController {
@@ -91,33 +99,34 @@ impl IdentityController {
 
     fn identity_maintenance(&self, on_error: Callback<String>) {
         match self.state.read() {
-            Ok(guard) => {
-                match guard.deref().borrow().deref() {
-                    IdentityState::New => {
-                        let cloned = self.clone();
-                        spawn_local(async move {
-                            if let Err(error) = cloned.create_account().await {
-                                on_error.emit(format!("Failed to create account {:?}", error));
-                                panic!(error)
-                            }
-                            if let Err(error) = cloned.publish_pre_key_bundle().await {
-                                on_error.emit(format!("Failed to publish pre keys {:?}", error));
-                                panic!(error)
-                            }
-                        });
-                    }
-                    IdentityState::Acknowledged { .. } => {
-                        let cloned = self.clone();
-                        spawn_local(async move {
-                            if let Err(error) = cloned.publish_pre_key_bundle().await {
-                                on_error.emit(format!("Failed to publish pre keys {:?}", error));
-                                panic!(error)
-                            }
-                        });
-                    }
-                    IdentityState::Initialised { .. } => {}
+            Ok(guard) => match guard.deref().borrow().deref() {
+                IdentityState::New => {
+                    let cloned = self.clone();
+                    spawn_local(async move {
+                        if let Err(error) = cloned.create_account().await {
+                            on_error.emit(format!("Failed to create account {:?}", error));
+                            error!("Failed to create account {:?}", error);
+                            panic!(error)
+                        }
+                        if let Err(error) = cloned.publish_pre_key_bundle().await {
+                            on_error.emit(format!("Failed to publish pre keys {:?}", error));
+                            error!("Failed to publish pre keys {:?}", error);
+                            panic!(error)
+                        }
+                    });
                 }
-            }
+                IdentityState::Acknowledged { .. } => {
+                    let cloned = self.clone();
+                    spawn_local(async move {
+                        if let Err(error) = cloned.publish_pre_key_bundle().await {
+                            on_error.emit(format!("Failed to publish pre keys {:?}", error));
+                            error!("Failed to publish pre keys {:?}", error);
+                            panic!(error)
+                        }
+                    });
+                }
+                IdentityState::Initialised { .. } => {}
+            },
             Err(error) => {
                 on_error.emit(format!("Failed to lock identity state {:?}", error));
                 error!("Failed to lock identity state {:?}", error);
@@ -127,8 +136,12 @@ impl IdentityController {
 
     async fn create_account(&self) -> Result<(), ControllerError> {
         debug!("Creating new account");
-        let challenge = protocol::sign_challenge(&self)
-            .map_err(|cause| ControllerError::ProtocolExecution { message: "Failed to sign challenge".to_string(), cause })?;
+        let challenge = protocol::sign_challenge(&self).map_err(|cause| {
+            ControllerError::ProtocolExecution {
+                message: "Failed to sign challenge".to_string(),
+                cause,
+            }
+        })?;
 
         let unsig_challenge =
             common::signed_challenge::Challenge::decode(challenge.challenge.clone())
@@ -141,23 +154,25 @@ impl IdentityController {
         bound_challenge.setSignature(js_sys::Uint8Array::from(&challenge.signature[..]));
 
         let promise = self.transport.accounts().createAccount(bound_challenge);
-        let value = JsFuture::from(promise).await.map_err(|e| {
-            ControllerError::Message {
-                message: e.as_string().unwrap_or("Unknown error creating account".to_string())
-            }
-        })?;
+        let value = JsFuture::from(promise)
+            .await
+            .map_err(|cause| ControllerError::Message {
+                message: format!("{:?}", cause),
+            })?;
 
         let certificate_binding: common_bindings::Certificate =
-            value.dyn_into().map_err(|e| {
-                ControllerError::Message {
-                    message: e.as_string().unwrap_or("Unknown error during certificate conversion".to_string())
-                }
+            value.dyn_into().map_err(|cause| ControllerError::Message {
+                message: format!("{:?}", cause),
             })?;
 
         // TODO how to handle signer cert
         let (certificate, _ignore_for_now) =
-            CertificateFactory::decode(&certificate_binding.into())
-                .map_err(|cause| ControllerError::CryptographicError { message: "Failed to decode incoming certificate".to_string(), cause })?;
+            CertificateFactory::decode(&certificate_binding.into()).map_err(|cause| {
+                ControllerError::CryptographicError {
+                    message: "Failed to decode incoming certificate".to_string(),
+                    cause,
+                }
+            })?;
 
         debug!("Certificate serial {}", certificate.infos().serial());
 
@@ -166,17 +181,24 @@ impl IdentityController {
 
     async fn incoming_certificate(&self, certificate: Certificate) -> Result<(), ControllerError> {
         {
-            let write_state = self.state.write().map_err(|cause| ControllerError::Message {
-                message: "Locking failed".to_string(),
-            })?;
+            let write_state = self
+                .state
+                .write()
+                .map_err(|cause| ControllerError::Message {
+                    message: "Locking failed".to_string(),
+                })?;
 
             write_state.replace_with(|state| match state {
                 IdentityState::New | IdentityState::Acknowledged { .. } => {
                     IdentityState::Acknowledged { certificate }
                 }
-                IdentityState::Initialised { certificate: _, pre_keys } => {
-                    IdentityState::Initialised { certificate, pre_keys: pre_keys.clone() }
-                }
+                IdentityState::Initialised {
+                    certificate: _,
+                    pre_keys,
+                } => IdentityState::Initialised {
+                    certificate,
+                    pre_keys: pre_keys.clone(),
+                },
             });
         };
 
@@ -199,17 +221,15 @@ impl IdentityController {
         let bound_pre_keys: common_bindings::PreKeyBundle = pre_keys.into();
 
         let promise = self.transport.accounts().updatePreKeys(bound_pre_keys);
-        let value = JsFuture::from(promise).await.map_err(|e| {
-            ControllerError::Message {
-                message: e.as_string().unwrap_or("Unknown error publishing pre keys".to_string())
-            }
-        })?;
+        let value = JsFuture::from(promise)
+            .await
+            .map_err(|cause| ControllerError::Message {
+                message: format!("{:?}", cause),
+            })?;
 
         let _: accounts_svc_bindings::UpdateKeyResult =
-            value.dyn_into().map_err(|e| {
-                ControllerError::Message {
-                    message: e.as_string().unwrap_or("Unknown error during update result conversion".to_string())
-                }
+            value.dyn_into().map_err(|cause| ControllerError::Message {
+                message: format!("{:?}", cause),
             })?;
 
         self.pre_keys_accepted(privates).await
@@ -220,21 +240,25 @@ impl IdentityController {
         private_pre_keys: protocol::PrivatePreKeys,
     ) -> Result<(), ControllerError> {
         {
-            let write_state = self.state.write().map_err(|cause| ControllerError::Message {
-                message: "Locking failed".to_string(),
-            })?;
+            let write_state = self
+                .state
+                .write()
+                .map_err(|cause| ControllerError::Message {
+                    message: "Locking failed".to_string(),
+                })?;
 
             let update = match write_state.deref().borrow().deref() {
                 IdentityState::New => Err(ControllerError::InvalidState {
                     message: "Did not receive a certificate before pre keys".to_string(),
                 }),
                 IdentityState::Acknowledged { certificate }
-                | IdentityState::Initialised { certificate, pre_keys: _ } => {
-                    Ok(IdentityState::Initialised {
-                        certificate: certificate.clone(),
-                        pre_keys: private_pre_keys,
-                    })
-                }
+                | IdentityState::Initialised {
+                    certificate,
+                    pre_keys: _,
+                } => Ok(IdentityState::Initialised {
+                    certificate: certificate.clone(),
+                    pre_keys: private_pre_keys,
+                }),
             }?;
 
             write_state.replace(update);
@@ -264,7 +288,9 @@ impl IdentityController {
         let read_state = self
             .state
             .read()
-            .map_err(|cause| ControllerError::Message { message: "Locking failed".to_string() })?;
+            .map_err(|cause| ControllerError::Message {
+                message: "Locking failed".to_string(),
+            })?;
 
         let model = IdentityModel {
             key: self.key.clone(),
@@ -296,7 +322,10 @@ impl protocol::KeyAccess for IdentityController {
             Ok(mut guard) => match guard.deref_mut().borrow_mut().deref_mut() {
                 IdentityState::New | IdentityState::Acknowledged { .. } => panic!("invalid state"),
                 IdentityState::Initialised { pre_keys, .. } => {
-                    let position = pre_keys.one_time_keys.iter().position(|x| x.public_key() == public);
+                    let position = pre_keys
+                        .one_time_keys
+                        .iter()
+                        .position(|x| x.public_key() == public);
 
                     position.map(|pos| pre_keys.one_time_keys.remove(pos))
                 }

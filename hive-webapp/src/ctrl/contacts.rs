@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::sync::Arc;
 use std::ops::Deref;
+use std::sync::Arc;
 
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::futures_0_3::JsFuture;
@@ -65,7 +65,7 @@ pub struct ContactManager {
     storage: StorageController,
     connections: ConnectionManager,
     identity: Arc<dyn KeyAccess>,
-    known_contacts: Arc<RwLock<HashMap<PublicKey, ContactProfileModel>>>,
+    known_contacts: Arc<RwLock<HashMap<String, ContactProfileModel>>>,
     cached_contacts: Arc<RwLock<HashMap<PublicKey, Arc<Contact>>>>,
 }
 
@@ -76,7 +76,11 @@ impl ContactManager {
         identity: IdentityController,
     ) -> Result<ContactManager, ControllerError> {
         let known_contacts =
-            storage.load::<HashMap<PublicKey, ContactProfileModel>>(KNOWN_CONTACTS_KEY)?;
+            match storage.load::<HashMap<String, ContactProfileModel>>(KNOWN_CONTACTS_KEY) {
+                Ok(contacts) => Ok(contacts),
+                Err(ControllerError::NoDataFound { .. }) => Ok(Default::default()),
+                Err(e) => Err(e),
+            }?;
 
         let identity: Arc<dyn KeyAccess> = Arc::new(identity.clone());
 
@@ -89,6 +93,22 @@ impl ContactManager {
         })
     }
 
+    pub fn identity(&self) -> String {
+        self.identity.public_key().id_string()
+    }
+
+    pub async fn store_contact(&self, contact: &Contact) -> Result<(), ControllerError> {
+        let key = CONTACT_KEY_PREFIX.to_owned() + &contact.model.id.to_string();
+
+        let guard = contact.session.lock().await;
+        self.storage.store(
+            &key,
+            &ContactModel {
+                session: guard.session().clone(),
+            },
+        )
+    }
+
     async fn access_cached(&self, public_key: &PublicKey) -> Option<Arc<Contact>> {
         let guard = self.cached_contacts.read().await;
         let retrieved = guard.get(public_key);
@@ -98,13 +118,16 @@ impl ContactManager {
 
     async fn store_cached(&self, contact: Contact) -> Arc<Contact> {
         let mut guard = self.cached_contacts.write().await;
-        guard.entry(contact.peer_identity().clone()).or_insert_with(|| Arc::new(contact)).clone()
+        guard
+            .entry(contact.peer_identity().clone())
+            .or_insert_with(|| Arc::new(contact))
+            .clone()
     }
 
     async fn access_stored(&self, public_key: &PublicKey) -> Result<Arc<Contact>, ControllerError> {
         let guard = self.known_contacts.read().await;
 
-        return if let Some(profile) = guard.get(public_key) {
+        return if let Some(profile) = guard.get(&public_key.id_string()) {
             let key = CONTACT_KEY_PREFIX.to_owned() + &profile.id.to_string();
 
             let contact_model = self.storage.load::<Option<ContactModel>>(&key)?;
@@ -132,13 +155,19 @@ impl ContactManager {
 
     pub async fn access_known_contacts(&self) -> Vec<ContactProfileModel> {
         let guard = self.known_contacts.read().await;
-        let profiles: Vec<ContactProfileModel> =
-            guard.values().into_iter().map(|profile| profile.clone()).collect();
+        let profiles: Vec<ContactProfileModel> = guard
+            .values()
+            .into_iter()
+            .map(|profile| profile.clone())
+            .collect();
 
         return profiles;
     }
 
-    pub async fn access_contact(&self, public_key: &PublicKey) -> Result<Arc<Contact>, ControllerError> {
+    pub async fn access_contact(
+        &self,
+        public_key: &PublicKey,
+    ) -> Result<Arc<Contact>, ControllerError> {
         let cached = self.access_cached(public_key).await;
         if let Some(contact) = cached {
             return Ok(contact);
@@ -147,17 +176,26 @@ impl ContactManager {
         self.access_stored(public_key).await
     }
 
-    pub async fn add_contact(&self, public_key: PublicKey, name: String) -> Result<Vec<ContactProfileModel>, ControllerError> {
+    pub async fn add_contact(
+        &self,
+        public_key: PublicKey,
+        name: String,
+    ) -> Result<Vec<ContactProfileModel>, ControllerError> {
         let profile;
         {
             let mut guard = self.known_contacts.write().await;
-            profile = guard.entry(public_key.clone()).or_insert_with(|| ContactProfileModel {
-                id: Uuid::new_v4(),
-                key: public_key.clone(),
-                name,
-            }).clone();
+            profile = guard
+                .entry(public_key.id_string())
+                .or_insert_with(|| ContactProfileModel {
+                    id: Uuid::new_v4(),
+                    key: public_key.clone(),
+                    name,
+                })
+                .clone();
 
-            self.storage.store(KNOWN_CONTACTS_KEY, guard.deref())?;
+            if let Err(e) = self.storage.store(KNOWN_CONTACTS_KEY, &guard.deref()) {
+                error!("{:?}", e);
+            }
         }
 
         let contact = Contact::new(
@@ -170,9 +208,12 @@ impl ContactManager {
             let key = CONTACT_KEY_PREFIX.to_owned() + &profile.id.to_string();
 
             let guard = contact.session.lock().await;
-            self.storage.store(&key, &ContactModel {
-                session: guard.session().clone(),
-            })?;
+            self.storage.store(
+                &key,
+                &ContactModel {
+                    session: guard.session().clone(),
+                },
+            )?;
         }
 
         {
@@ -212,7 +253,11 @@ impl Contact {
     ) -> Contact {
         let mgr = SessionManager::new(model.key.clone(), keys);
 
-        Contact { model, connections, session: Mutex::new(mgr) }
+        Contact {
+            model,
+            connections,
+            session: Mutex::new(mgr),
+        }
     }
 
     pub fn initialise(
@@ -223,7 +268,11 @@ impl Contact {
     ) -> Contact {
         let mgr = SessionManager::manage_session(session, keys);
 
-        Contact { model, connections, session: Mutex::new(mgr) }
+        Contact {
+            model,
+            connections,
+            session: Mutex::new(mgr),
+        }
     }
 
     pub fn profile(&self) -> &ContactProfileModel {
@@ -242,7 +291,11 @@ impl Contact {
         let mut session_guard = self.session.lock().await;
         let recv_step = session_guard.receive(&session_params)?;
 
-        let decrypted = encryption::decrypt(&recv_step.secret[..], &encrypted_payload[..]);
+        let decrypted = encryption::decrypt(&recv_step.secret[..], &encrypted_payload[..])
+            .map_err(|cause| ProtocolError::FailedCryptography {
+                message: "Message decryption failed".to_string(),
+                cause,
+            })?;
 
         model::messages::Payload::decode(decrypted)
             .map_err(|cause| ProtocolError::FailedSerialisation { cause })
@@ -254,10 +307,18 @@ impl Contact {
     ) -> Result<(model::messages::SessionParameters, Vec<u8>), ProtocolError> {
         let (key_exchange, send_step) = self.step_for_sending().await?;
 
-        let payload =
-            payload.encode().map_err(|cause| ProtocolError::FailedSerialisation { cause })?;
+        let payload = payload
+            .encode()
+            .map_err(|cause| ProtocolError::FailedSerialisation { cause })?;
 
-        let encrypted = encryption::encrypt(&send_step.secret[..], &payload[..]);
+        let encrypted =
+            encryption::encrypt(&send_step.secret[..], &payload[..]).map_err(|cause| {
+                ProtocolError::FailedCryptography {
+                    message: "Message encryption failed".to_string(),
+                    cause,
+                }
+            })?;
+
         let enc_params: model::messages::EncryptionParameters = send_step.into();
 
         let session_params = model::messages::SessionParameters {
@@ -296,13 +357,12 @@ impl Contact {
 
         let peer: common_bindings::Peer = self.model.key.into_peer().into();
         let promise = self.connections.accounts().getPreKeys(peer);
-        let value = JsFuture::from(promise).await.map_err(|e| {
-            e.as_string().unwrap_or("Unknown error retrieving pre keys".to_string())
-        })?;
+        let value = JsFuture::from(promise)
+            .await
+            .map_err(|error| format!("{:?}", error))?;
 
-        let bound_bundle: common_bindings::PreKeyBundle = value.dyn_into().map_err(|e| {
-            e.as_string().unwrap_or("Unknown error during pre key conversion".to_string())
-        })?;
+        let bound_bundle: common_bindings::PreKeyBundle =
+            value.dyn_into().map_err(|error| format!("{:?}", error))?;
 
         Ok(bound_bundle.into())
     }
