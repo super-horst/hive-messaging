@@ -6,7 +6,7 @@ use log::*;
 use crypto::FromBytes;
 use hive_commons::*;
 
-use hive_commons::model::messages::message_filter::State;
+use hive_commons::model::messages::MessageState;
 use model::common;
 pub use model::messages::messages_server::*;
 use model::{Decodable, Encodable};
@@ -30,6 +30,11 @@ fn match_to_status(error: RepositoryError) -> tonic::Status {
     }
 }
 
+fn serve_internal_error(error: RepositoryError) -> tonic::Status {
+    error!("Internal error: {:?}", error);
+    tonic::Status::internal("internal error")
+}
+
 pub(crate) struct MessageService {
     repository: Box<dyn MessagesRepository>,
 }
@@ -40,6 +45,8 @@ impl MessageService {
     }
 }
 
+//TODO improve error logging
+
 #[async_trait::async_trait]
 impl Messages for MessageService {
     async fn get_messages(
@@ -49,7 +56,7 @@ impl Messages for MessageService {
         let filter = request.into_inner();
 
         let state = match filter.state {
-            x if x == State::New as i32 => Ok("NEW".to_string()),
+            x if x == MessageState::New as i32 => Ok("NEW".to_string()),
             _ => Err(tonic::Status::failed_precondition("unknown state")),
         }?;
 
@@ -57,13 +64,13 @@ impl Messages for MessageService {
             .dst
             .ok_or_else(|| tonic::Status::failed_precondition("missing peer"))?;
 
-        let mut messages = self
+        let message = self
             .repository
-            .retrieve_messages(dst_peer, state)
+            .retrieve_message(dst_peer, state)
             .await
-            .map_err(|e| tonic::Status::internal("internal error"))?;
+            .map_err(serve_internal_error)?;
 
-        if let Some(message) = messages.pop() {
+        if !message.is_empty() {
             let envelope = Envelope::decode(message)
                 .map_err(|e| tonic::Status::internal("failed to decode message"))?;
 

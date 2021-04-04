@@ -30,11 +30,11 @@ pub(crate) trait MessagesRepository: Send + Sync {
         envelope: Vec<u8>,
     ) -> Result<(), RepositoryError>;
 
-    async fn retrieve_messages(
+    async fn retrieve_message(
         &self,
         peer: common::Peer,
         status: String,
-    ) -> Result<Vec<Vec<u8>>, RepositoryError>;
+    ) -> Result<Vec<u8>, RepositoryError>;
 }
 
 pub struct DatabaseRepository {
@@ -75,48 +75,38 @@ impl MessagesRepository for DatabaseRepository {
         Ok(())
     }
 
-    async fn retrieve_messages(
+    async fn retrieve_message(
         &self,
         peer: common::Peer,
         status: String,
-    ) -> Result<Vec<Vec<u8>>, RepositoryError> {
-        let peer = entities::Peer::from_common(peer);
+    ) -> Result<Vec<u8>, RepositoryError> {
+        let peer = self.get_or_save_peer(peer).await?;
 
-        let peer = entities::Peer::first(
+        let mut message_entity: Option<entities::Message> = match entities::Message::first(
             &self.db,
-            "identity = $1, namespace = $2",
-            &[&peer.identity, &peer.namespace],
-        )
-        .await
-        .map_err(|error| RepositoryError::Database {
-            message: format!("Failed to retrieve peer {:?}", error),
-        })?
-        .ok_or_else(|| RepositoryError::NotFound {
-            message: "Peer not found".to_string(),
-        })?;
-
-        let message_entities: Vec<entities::Message> = entities::Message::find(
-            &self.db,
-            "dst_peer_id = $1, status = $2",
+            "dst_peer_id = $1 AND status = $2",
             &[&peer.id, &status],
         )
         .await
-        .map_err(|e| RepositoryError::Database {
-            message: format!("DB request failed: {:?}", e),
-        })?;
+        {
+            Ok(result) => result,
+            Err(error) => Err(RepositoryError::Database {
+                message: format!("DB request failed: {:?}", error),
+            })?,
+        };
 
-        let mut encoded_messages = Vec::with_capacity(message_entities.len());
+        return match message_entity {
+            Some(mut entity) => {
+                // TODO error handling
+                let encoded_msg = hex::decode(&entity.message).unwrap();
 
-        for entity in message_entities {
-            let decoded = hex::decode(entity.message).map_err(|e| RepositoryError::Conversion {
-                message: "Failed to decode message".to_string(),
-                cause: e,
-            })?;
+                entity.status = "READ".to_string();
+                entity.save(&self.db).await.unwrap();
 
-            encoded_messages.push(decoded);
-        }
-
-        Ok(encoded_messages)
+                Ok(encoded_msg)
+            }
+            None => Ok(vec![]),
+        };
     }
 }
 
@@ -129,7 +119,7 @@ impl DatabaseRepository {
 
         match entities::Peer::first(
             &self.db,
-            "identity = $1, namespace = $2",
+            "identity = $1 AND namespace = $2",
             &[&peer.identity, &peer.namespace],
         )
         .await
