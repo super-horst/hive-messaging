@@ -26,6 +26,8 @@ pub enum CryptoError {
         #[fail(cause)]
         cause: hkdf::InvalidLength,
     },
+    #[fail(display = "Cipher error: {}", message)]
+    Cipher { message: String },
     #[fail(display = "Failure: {}", message)]
     Common {
         message: String,

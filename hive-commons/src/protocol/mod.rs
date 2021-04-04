@@ -18,7 +18,7 @@ pub struct PrivatePreKeys {
 }
 
 // TODO add error::advice field to maybe mitigate error
-pub trait KeyAccess: KeyAgreement {
+pub trait KeyAccess: KeyAgreement + Signer {
     //TODO refactor key access
     fn pre_key_access(&self) -> PrivateKey;
 
@@ -36,9 +36,16 @@ pub fn encrypt_session(
 
     let shared_secret = eph_key.agree(destination);
 
-    let encoded_session =
-        session_params.encode().map_err(|cause| ProtocolError::FailedSerialisation { cause })?;
-    let encrypted_session = encryption::encrypt(&shared_secret[..], &encoded_session[..]);
+    let encoded_session = session_params
+        .encode()
+        .map_err(|cause| ProtocolError::FailedSerialisation { cause })?;
+    let encrypted_session =
+        encryption::encrypt(&shared_secret[..], &encoded_session[..]).map_err(|cause| {
+            ProtocolError::FailedCryptography {
+                message: "Message encryption failed".to_string(),
+                cause,
+            }
+        })?;
 
     Ok((eph_key.public_key().clone(), encrypted_session))
 }
@@ -50,7 +57,13 @@ pub fn decrypt_session(
 ) -> Result<messages::SessionParameters, ProtocolError> {
     let shared_secret = my_key.agree(&ephemeral_key);
 
-    let encoded_session = encryption::decrypt(&shared_secret[..], encrypted_session);
+    let encoded_session =
+        encryption::decrypt(&shared_secret[..], encrypted_session).map_err(|cause| {
+            ProtocolError::FailedCryptography {
+                message: "Message encryption failed".to_string(),
+                cause,
+            }
+        })?;
     messages::SessionParameters::decode(encoded_session)
         .map_err(|cause| ProtocolError::FailedSerialisation { cause })
 }
@@ -112,7 +125,7 @@ pub fn create_pre_key_bundle(
         }
         return None;
     })
-        .collect::<Vec<PrivateKey>>();
+    .collect::<Vec<PrivateKey>>();
 
     let publics = otps
         .iter()
@@ -138,8 +151,6 @@ pub fn create_pre_key_bundle(
 #[cfg(test)]
 mod protocol_tests {
     use super::*;
-
-    use crate::crypto::certificates::certificate_tests::create_self_signed_cert;
 
     #[test]
     fn test_public_serialise_deserialise() {

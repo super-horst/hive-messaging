@@ -1,30 +1,34 @@
-use chacha20poly1305;
+use crate::crypto::CryptoError;
 
 use chacha20poly1305::aead::{Aead, NewAead};
 use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 
-pub fn encrypt(key_bytes: &[u8], payload: &[u8]) -> Vec<u8> {
+pub fn encrypt(key_bytes: &[u8], payload: &[u8]) -> Result<Vec<u8>, CryptoError> {
     let key = Key::from_slice(key_bytes);
     let cipher = ChaCha20Poly1305::new(key);
 
     // TODO improve nonce
     let nonce = Nonce::from_slice(&[0u8; 12] as &[u8]);
 
-    // TODO error handling
-    cipher.encrypt(nonce, payload).expect("encryption failure!")
+    cipher
+        .encrypt(nonce, payload)
+        .map_err(|_cause| CryptoError::Cipher {
+            message: "encryption failure!".to_string(),
+        })
 }
 
-pub fn decrypt(key_bytes: &[u8], encrypted: &[u8]) -> Vec<u8> {
+pub fn decrypt(key_bytes: &[u8], encrypted: &[u8]) -> Result<Vec<u8>, CryptoError> {
     let key = Key::from_slice(key_bytes);
     let cipher = ChaCha20Poly1305::new(key);
 
     // TODO improve nonce
     let nonce = Nonce::from_slice(&[0u8; 12] as &[u8]);
 
-    // TODO error handling
     cipher
         .decrypt(nonce, encrypted)
-        .expect("decryption failure!")
+        .map_err(|_cause| CryptoError::Cipher {
+            message: "decryption failure!".to_string(),
+        })
 }
 
 #[cfg(test)]
@@ -40,8 +44,8 @@ pub mod encryption_tests {
 
         let data: &[u8] = b"testdata is overrated";
 
-        let encrypted = encrypt(&key_bytes, data);
-        let decrypted = decrypt(&key_bytes, &encrypted[..]);
+        let encrypted = encrypt(&key_bytes, data).unwrap();
+        let decrypted = decrypt(&key_bytes, &encrypted[..]).unwrap();
 
         assert_eq!(data, &decrypted[..])
     }

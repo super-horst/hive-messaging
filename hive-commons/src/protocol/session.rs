@@ -5,8 +5,8 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::{
-    x3dh_agree_initial, x3dh_agree_respond, CertificateFactory, FromBytes,
-    ManagedRatchet, PublicKey, RecvStep, SendStep, Verifier,
+    x3dh_agree_initial, x3dh_agree_respond, CertificateFactory, FromBytes, ManagedRatchet,
+    PublicKey, RecvStep, SendStep, Verifier,
 };
 use crate::model::common::PreKeyBundle;
 use crate::model::messages::{KeyExchange, SessionParameters};
@@ -565,8 +565,18 @@ mod session_tests {
         }
     }
 
+    impl Signer for MockCryptoProvider {
+        fn public_key(&self) -> &PublicKey {
+            self.key.public_key()
+        }
+
+        fn sign(&self, data: &[u8]) -> Result<Vec<u8>, CryptoError> {
+            self.key.sign(data)
+        }
+    }
+
     impl KeyAccess for MockCryptoProvider {
-        fn pre_key_access(&self) ->PrivateKey {
+        fn pre_key_access(&self) -> PrivateKey {
             self.pre_key.clone()
         }
 
