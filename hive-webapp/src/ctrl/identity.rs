@@ -19,7 +19,7 @@ use hive_commons::protocol;
 use hive_commons::model::{common, Decodable};
 
 use crate::bindings::{accounts_svc_bindings, common_bindings};
-use crate::ctrl::{ControllerError, StorageController};
+use crate::ctrl::{prompt, ControllerError, StorageController};
 use crate::transport::ConnectionManager;
 
 const IDENTITY_KEY: &'static str = "hive.core.identity";
@@ -27,6 +27,7 @@ const IDENTITY_KEY: &'static str = "hive.core.identity";
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct IdentityModel {
     key: PrivateKey,
+    name: String,
     state: IdentityState,
 }
 
@@ -47,6 +48,7 @@ pub struct IdentityController {
     storage: StorageController,
     transport: ConnectionManager,
     key: PrivateKey,
+    name: String,
     state: Arc<RwLock<RefCell<IdentityState>>>,
 }
 
@@ -61,6 +63,7 @@ impl IdentityController {
                 storage,
                 transport,
                 key: model.key,
+                name: model.name,
                 state: Arc::new(RwLock::new(RefCell::new(model.state))),
             }),
             Err(cause) => {
@@ -77,8 +80,11 @@ impl IdentityController {
                     }
                 })?;
 
+                let name = prompt("Please provide a name");
+
                 let model = IdentityModel {
                     key,
+                    name,
                     state: IdentityState::New,
                 };
 
@@ -87,6 +93,7 @@ impl IdentityController {
                     storage,
                     transport,
                     key: model.key,
+                    name: model.name,
                     state: Arc::new(RwLock::new(RefCell::new(model.state))),
                 };
 
@@ -294,6 +301,7 @@ impl IdentityController {
 
         let model = IdentityModel {
             key: self.key.clone(),
+            name: self.name.clone(),
             state: read_state.deref().borrow().deref().clone(),
         };
 

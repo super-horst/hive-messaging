@@ -20,7 +20,7 @@ use hive_commons::model::{Decodable, Encodable};
 use hive_commons::protocol::{KeyAccess, ProtocolError, SendingStatus, Session, SessionManager};
 
 use crate::bindings::*;
-use crate::ctrl::{ControllerError, IdentityController, StorageController};
+use crate::ctrl::{prompt, ControllerError, IdentityController, StorageController};
 use crate::transport::ConnectionManager;
 
 const KNOWN_CONTACTS_KEY: &'static str = "hive.core.contacts";
@@ -179,8 +179,9 @@ impl ContactManager {
     pub async fn add_contact(
         &self,
         public_key: PublicKey,
-        name: String,
     ) -> Result<Vec<ContactProfileModel>, ControllerError> {
+        let name = prompt("Contact name:");
+
         let profile;
         {
             let mut guard = self.known_contacts.write().await;

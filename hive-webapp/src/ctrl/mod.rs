@@ -1,3 +1,10 @@
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+extern "C" {
+    fn prompt(s: &str)-> String;
+}
+
 mod identity;
 pub use identity::*;
 

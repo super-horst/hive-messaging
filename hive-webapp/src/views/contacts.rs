@@ -75,13 +75,11 @@ impl Component for ContactListView {
                 let bytes = hex::decode(&val).unwrap();
                 let public = PublicKey::from_bytes(&bytes[..]).unwrap();
 
-                let name = format!("User {}", self.known_contacts.len());
-
                 let contacts = self.contacts.clone();
                 let callback = self.link.callback(|list| ContactListMsg::UpdateList(list));
                 let on_error = self.on_error.clone();
                 spawn_local(async move {
-                    match contacts.add_contact(public, name).await {
+                    match contacts.add_contact(public).await {
                         Ok(list) => callback.emit(list),
                         Err(error) => {
                             on_error.emit(format!("{:?}", error));
