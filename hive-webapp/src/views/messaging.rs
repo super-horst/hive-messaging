@@ -24,8 +24,15 @@ use crate::views::contacts;
 const MSG_KEY_PREFIX: &'static str = "hive.core.messages.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MessageOrigin {
+    Me,
+    Other,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessageModel {
     pub id: Uuid,
+    pub origin: MessageOrigin,
     pub message: String,
     pub timestamp: u64,
 }
@@ -144,10 +151,10 @@ impl Component for MessagingView {
     }
 
     fn view(&self) -> Html {
-        let messages: Vec<String> = self
+        let messages: Vec<MessageModel> = self
             .current_messages
             .iter()
-            .map(|m| m.message.clone())
+            .map(|m| m.clone())
             .collect();
 
         html! {
@@ -167,9 +174,18 @@ impl Component for MessagingView {
                 </div>
 
                 <div class="msg_view">
-                    {for messages.iter().map(|c| {
-                        html! {
-                        <p>{c}</p>
+                    {for messages.iter().map(|m| {
+                        match m.origin {
+                            MessageOrigin::Me => {
+                                html! {
+                                    <p style="text-align: right">{&m.message}</p>
+                                }
+                            },
+                            MessageOrigin::Other => {
+                                html! {
+                                    <p style="text-align: left">{&m.message}</p>
+                                }
+                            },
                         }
                     } )}
                 </div>
@@ -211,7 +227,7 @@ impl MessagingView {
         .encode()
         .unwrap();
 
-        let messages = self.append_message(&contact, message.to_string());
+        let messages = self.append_message(&contact, MessageOrigin::Me, message.to_string());
 
         let payload = model::messages::Payload {
             header: None,
@@ -243,13 +259,14 @@ impl MessagingView {
         // TODO handle errors
         let msg_payload = model::messages::MessagePayload::decode(payload.payload).unwrap();
 
-        self.append_message(contact, msg_payload.message)
+        self.append_message(contact, MessageOrigin::Other, msg_payload.message)
     }
 
-    fn append_message(&self, contact: &Arc<Contact>, message: String) -> Vec<MessageModel> {
+    fn append_message(&self, contact: &Arc<Contact>, origin: MessageOrigin, message: String) -> Vec<MessageModel> {
         let mut load_result = self.load_messages(contact);
         load_result.push(MessageModel {
             id: Uuid::new_v4(),
+            origin,
             message,
             timestamp: 0,
         });
