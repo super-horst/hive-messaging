@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc};
 use std::time::Duration;
 
 use js_sys::Promise;
@@ -17,6 +17,22 @@ use hive_commons::{model, protocol};
 use crate::bindings::{msg_svc_bindings, GrpcStatus};
 use crate::ctrl::{Contact, ContactManager, ControllerError, IdentityController};
 use crate::transport::ConnectionManager;
+use std::collections::HashMap;
+use hive_commons::model::messages::PayloadHeader;
+use async_lock::RwLock;
+
+pub struct PayloadHandler(Arc<dyn PayloadHandlerTrait>);
+
+impl PayloadHandler {
+    pub fn new(handler: Arc<dyn PayloadHandlerTrait>) -> Self {
+        PayloadHandler(handler)
+    }
+}
+
+pub trait PayloadHandlerTrait {
+    // TODO handler error condition
+    fn incoming_payload(&self, origin: Arc<Contact>, payload: model::messages::Payload);
+}
 
 pub async fn sleep(ms: i32) -> Result<(), ControllerError> {
     let promise = Promise::new(&mut |yes, _| {
@@ -39,7 +55,7 @@ pub struct MessagingController {
     identity: IdentityController,
     contacts: ContactManager,
     transport: ConnectionManager,
-    incoming_payload: Callback<(Arc<Contact>, model::messages::Payload)>,
+    handlers: Arc<RwLock<HashMap<String, PayloadHandler>>>,
 }
 
 impl MessagingController {
@@ -48,13 +64,12 @@ impl MessagingController {
         identity: IdentityController,
         contacts: ContactManager,
         transport: ConnectionManager,
-        incoming_payload: Callback<(Arc<Contact>, model::messages::Payload)>,
     ) -> MessagingController {
         let msg_ctrl = MessagingController {
             identity,
             contacts,
             transport,
-            incoming_payload,
+            handlers: Default::default(),
         };
 
         let cloned = msg_ctrl.clone();
@@ -157,9 +172,29 @@ impl MessagingController {
             })?;
 
         self.contacts.store_contact(&contact).await?;
-        self.incoming_payload.emit((contact, payload));
+
+        match payload.header {
+            None => { Err(ControllerError::NoDataFound { message: "Payload has no header".to_string() }) }
+            Some(ref header) => {
+                let guard = self.handlers.read().await;
+                match guard.get(&header.identifier) {
+                    None => {
+                        // TODO what if there is no handler?
+                    }
+                    Some(handler) => {
+                        handler.0.incoming_payload(contact, payload);
+                    }
+                }
+                Ok(())
+            }
+        }?;
 
         Ok(())
+    }
+
+    pub async fn register_handler(&self, payload_identifier: &str, handler: PayloadHandler) {
+        let mut guard = self.handlers.write().await;
+        guard.insert(payload_identifier.to_string(), handler);
     }
 
     pub async fn outgoing_message(

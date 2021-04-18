@@ -12,15 +12,14 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use hive_commons::model;
+use hive_commons::model::messages::Payload;
 use hive_commons::model::{Decodable, Encodable};
 
-use crate::ctrl::{
-    Contact, ContactManager, ControllerError, IdentityController, MessagingController,
-    StorageController,
-};
+use crate::ctrl::{Contact, ContactManager, ControllerError, IdentityController, MessagingController, StorageController, PayloadHandlerTrait, PayloadHandler};
 use crate::transport::ConnectionManager;
 use crate::views::contacts;
 
+const MSG_PAYLOAD_IDENTIFIER: &'static str = "hive::core::messages";
 const MSG_KEY_PREFIX: &'static str = "hive.core.messages.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,7 +53,7 @@ impl Eq for MessageModel {}
 pub enum MessagingViewMessage {
     UpdateInput(String),
     Send,
-    ReceiveMessage((Arc<Contact>, model::messages::Payload)),
+    ReceiveMessage((Arc<Contact>, Payload)),
     SelectContact(Arc<Contact>),
     Nope,
 }
@@ -63,9 +62,18 @@ pub enum MessagingViewMessage {
 pub struct MessagingProperties {
     pub on_error: Callback<String>,
     pub storage: StorageController,
-    pub identity: IdentityController,
     pub contacts: ContactManager,
-    pub connections: ConnectionManager,
+    pub messaging: MessagingController,
+}
+
+struct IncomingMessageHandler {
+    callback: Callback<(Arc<Contact>, Payload)>,
+}
+
+impl PayloadHandlerTrait for IncomingMessageHandler {
+    fn incoming_payload(&self, origin: Arc<Contact>, payload: Payload) {
+        self.callback.emit((origin, payload))
+    }
 }
 
 pub struct MessagingView {
@@ -84,20 +92,24 @@ impl Component for MessagingView {
     type Properties = MessagingProperties;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let messaging = MessagingController::new(
-            props.on_error.clone(),
-            props.identity.clone(),
-            props.contacts.clone(),
-            props.connections.clone(),
-            link.callback(MessagingViewMessage::ReceiveMessage),
-        );
+        let callback: Callback<(Arc<Contact>, Payload)> =
+            link.callback(|(contact, payload)| MessagingViewMessage::ReceiveMessage((contact, payload)));
+
+        let handler = PayloadHandler::new(Arc::new(IncomingMessageHandler {
+            callback
+        }));
+        let messaging = props.messaging.clone();
+
+        spawn_local(async move {
+            messaging.register_handler(MSG_PAYLOAD_IDENTIFIER, handler).await;
+        });
 
         MessagingView {
             link,
             on_error: props.on_error,
             storage: props.storage,
             contacts: props.contacts,
-            messaging,
+            messaging: props.messaging,
             selected_contact: None,
             current_messages: vec![],
             composed_message: "".to_string(),
@@ -229,8 +241,12 @@ impl MessagingView {
 
         let messages = self.append_message(&contact, MessageOrigin::Me, message.to_string());
 
+        let header = model::messages::PayloadHeader {
+            identifier: MSG_PAYLOAD_IDENTIFIER.to_string(),
+        };
+
         let payload = model::messages::Payload {
-            header: None,
+            header: Some(header),
             payload: msg_payload,
         };
 
@@ -254,7 +270,7 @@ impl MessagingView {
     fn receive_message(
         &self,
         contact: &Arc<Contact>,
-        payload: model::messages::Payload,
+        payload: Payload,
     ) -> Vec<MessageModel> {
         // TODO handle errors
         let msg_payload = model::messages::MessagePayload::decode(payload.payload).unwrap();

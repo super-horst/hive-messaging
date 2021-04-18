@@ -16,13 +16,15 @@ use serde::{Deserialize, Serialize};
 use hive_commons::crypto::{encryption, PublicKey, SendStep};
 use hive_commons::model;
 use hive_commons::model::{Decodable, Encodable};
+use hive_commons::model::messages::Payload;
 
 use hive_commons::protocol::{KeyAccess, ProtocolError, SendingStatus, Session, SessionManager};
 
 use crate::bindings::*;
-use crate::ctrl::{prompt, ControllerError, IdentityController, StorageController};
+use crate::ctrl::{prompt, ControllerError, IdentityController, StorageController, PayloadHandlerTrait};
 use crate::transport::ConnectionManager;
 
+pub const CONTACT_PAYLOAD_IDENTIFIER: &'static str = "hive::core::contacts";
 const KNOWN_CONTACTS_KEY: &'static str = "hive.core.contacts";
 const CONTACT_KEY_PREFIX: &'static str = "hive.core.contact.";
 
@@ -67,6 +69,12 @@ pub struct ContactManager {
     identity: Arc<dyn KeyAccess>,
     known_contacts: Arc<RwLock<HashMap<String, ContactProfileModel>>>,
     cached_contacts: Arc<RwLock<HashMap<PublicKey, Arc<Contact>>>>,
+}
+
+impl PayloadHandlerTrait for ContactManager {
+    fn incoming_payload(&self, origin: Arc<Contact>, payload: Payload) {
+        todo!()
+    }
 }
 
 impl ContactManager {
