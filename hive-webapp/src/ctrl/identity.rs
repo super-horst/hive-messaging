@@ -113,12 +113,12 @@ impl IdentityController {
                         if let Err(error) = cloned.create_account().await {
                             on_error.emit(format!("Failed to create account {:?}", error));
                             error!("Failed to create account {:?}", error);
-                            panic!(error)
+                            panic!("{:?}", error)
                         }
                         if let Err(error) = cloned.publish_pre_key_bundle().await {
                             on_error.emit(format!("Failed to publish pre keys {:?}", error));
                             error!("Failed to publish pre keys {:?}", error);
-                            panic!(error)
+                            panic!("{:?}", error)
                         }
                     });
                 }
@@ -128,7 +128,7 @@ impl IdentityController {
                         if let Err(error) = cloned.publish_pre_key_bundle().await {
                             on_error.emit(format!("Failed to publish pre keys {:?}", error));
                             error!("Failed to publish pre keys {:?}", error);
-                            panic!(error)
+                            panic!("{:?}", error)
                         }
                     });
                 }

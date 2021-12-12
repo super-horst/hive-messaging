@@ -226,7 +226,7 @@ impl MessagingView {
             Err(ControllerError::NoDataFound { .. }) => vec![],
             Err(error) => {
                 error!("Failed to access messages {:?}", error);
-                panic!(error)
+                panic!("{:?}", error)
             }
         }
     }
@@ -260,7 +260,7 @@ impl MessagingView {
             {
                 local_on_error.emit(format!("Failed to access messages {:?}", error));
                 error!("Failed to access messages {:?}", error);
-                panic!(error)
+                panic!("{:?}", error)
             }
         });
 

@@ -42,8 +42,8 @@ impl Message {
     }
 }
 
-#[has_many(model = "Message", field = "peer_id")]
 #[derive(Entity, PartialEq, Debug)]
+#[has_many(model = "Message", field = "peer_id")]
 pub struct Peer {
     #[primary_key]
     pub id: i32,

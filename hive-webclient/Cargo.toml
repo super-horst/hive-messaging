@@ -1,8 +1,8 @@
 [package]
 name = "hive-webclient"
 version = "0.1.0"
-authors = ["horst <horst>"]
-edition = "2018"
+authors = ["super-horst <super-horst@posteo.net>"]
+edition = "2021"
 
 [dependencies]
 web-view = "0.5.3"

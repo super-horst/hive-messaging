@@ -84,7 +84,7 @@ impl Component for ContactListView {
                         Err(error) => {
                             on_error.emit(format!("{:?}", error));
                             error!("{:?}", error);
-                            panic!(error)
+                            panic!("{:?}", error)
                         }
                     }
                 });
@@ -111,7 +111,7 @@ impl Component for ContactListView {
                         Err(error) => {
                             on_error.emit(format!("{:?}", error));
                             error!("{:?}", error);
-                            panic!(error)
+                            panic!("{:?}", error)
                         }
                     }
                 });

@@ -47,7 +47,7 @@ impl Component for AppContainer {
                 Ok(identity) => identity,
                 Err(error) => {
                     error!("{:?}", error);
-                    panic!(format!("{:?}", error))
+                    panic!("{:?}", error)
                 }
             };
 
@@ -56,7 +56,7 @@ impl Component for AppContainer {
                 Ok(contacts) => contacts,
                 Err(error) => {
                     error!("{:?}", error);
-                    panic!(format!("{:?}", error))
+                    panic!("{:?}", error)
                 }
             };
 
