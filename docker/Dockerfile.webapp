@@ -1,19 +1,16 @@
-FROM ubuntu:20.04 as builder
+FROM node:16.13 as builder
 EXPOSE 8080
 
-ENV RUST_BACKTRACE=full
-
-# compiler & npm
+# compiler
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl clang build-essential npm nodejs pkg-config && \
-    npm install npm@latest -g
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl clang build-essential
 
-# rust init
+USER 1000
+# rust tooling
+ENV RUST_BACKTRACE=full
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/root/.cargo/bin:$PATH"
+ENV PATH="/home/node/.cargo/bin:$PATH"
 RUN cargo install wasm-bindgen-cli wasm-pack && \
     rustup component add rustfmt && \
     rustup target add wasm32-unknown-unknown
 
-WORKDIR /app
-CMD [ "npm", "run", "serve" ]

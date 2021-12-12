@@ -1,12 +1,10 @@
 {
   "scripts": {
-    "prebuild": "./scripts/generate_js_protos.sh",
     "build": "webpack",
     "release": "webpack --mode production",
     "serve": "webpack-dev-server"
   },
   "dependencies": {
-    "html5-qrcode": "1.2.3",
     "google-protobuf": "3.13.0",
     "grpc-web": "1.2.1"
   },

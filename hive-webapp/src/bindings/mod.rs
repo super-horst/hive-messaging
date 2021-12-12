@@ -11,11 +11,3 @@ pub struct GrpcStatus {
     pub code: i32,
     pub message: String,
 }
-
-#[wasm_bindgen(module = "/js/qr_scanner.js")]
-extern "C" {
-
-    #[wasm_bindgen]
-    pub fn scan_qr();
-
-}
